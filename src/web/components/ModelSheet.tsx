@@ -1,6 +1,7 @@
 import type { CatalogEntry, SessionConfigOption } from '@shared/protocol';
 import { Check, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { type FlatOption, selectOptions } from '@/components/StatusStrip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -95,15 +96,18 @@ export function ModelSheet({
   const toggleFast = () => {
     if (!currentRow) return;
     const wantFast = !isFast(currentRow);
-    const sibling = flat.find(
+    const candidates = flat.filter(
       (o) =>
         o.value !== currentRow.value &&
         isFast(o) === wantFast &&
         ((o.entry?.family && o.entry.family === currentRow.entry?.family) ||
           baseName(o.name) === baseName(currentRow.name)),
     );
+    // keep the same reasoning level when the family has several
+    const sibling =
+      candidates.find((o) => o.entry?.level === currentRow.entry?.level) ?? candidates[0];
     if (!sibling) {
-      void import('sonner').then(({ toast }) => toast.warning(t('model.noFastVariant')));
+      toast.warning(t('model.noFastVariant'));
       return;
     }
     setComparing(sibling);
