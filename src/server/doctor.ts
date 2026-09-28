@@ -196,6 +196,7 @@ export async function doctorReport(opts: {
   }
 
   try {
+    fs.mkdirSync(stateDir(), { recursive: true });
     const st = fs.statfsSync(stateDir());
     const freeMb = Math.floor((st.bavail * st.bsize) / 1e6);
     checks.push({
