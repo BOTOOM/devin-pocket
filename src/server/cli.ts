@@ -231,12 +231,11 @@ switch (args.cmd) {
           isTermux() ? 'Termux detectado — wake lock on' : '',
         ].filter(Boolean),
       );
-      if (args.open) openBrowser(url);
-      if (!process.env.DEVIN_POCKET_DAEMON) wakeLock();
+      const supervised = process.env.DEVIN_POCKET_DAEMON === '1';
+      if (args.open && !supervised) openBrowser(url);
+      if (!supervised) wakeLock();
       await runServer(args);
-      if (process.env.DEVIN_POCKET_SUPERVISOR !== '1') {
-        fs.writeFileSync(pidFile(), String(process.pid));
-      }
+      if (!supervised) fs.writeFileSync(pidFile(), String(process.pid));
     } else {
       const pid = readPid();
       if (pid) {
