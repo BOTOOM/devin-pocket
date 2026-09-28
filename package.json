@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Mobile-first web client for Devin CLI over ACP. One command, runs on your phone (Termux), open it in the browser.",
   "license": "Apache-2.0",
+  "packageManager": "pnpm@12.6.0",
   "type": "module",
   "bin": {
     "devin-pocket": "bin/devin-pocket.mjs"
@@ -16,14 +17,15 @@
     "NOTICE"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22",
+    "pnpm": ">=10"
   },
   "scripts": {
-    "dev": "concurrently -k -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev": "concurrently -k -n server,web -c blue,magenta \"pnpm:dev:server\" \"pnpm:dev:web\"",
     "dev:server": "tsx watch src/server/cli.ts start --no-open --dev",
     "dev:web": "vite --config vite.config.ts",
-    "dev:fake": "DEVIN_POCKET_AGENT=\"npx tsx test/fake-agent.ts\" npm run dev",
-    "build": "npm run build:web && npm run build:server",
+    "dev:fake": "DEVIN_POCKET_AGENT=\"pnpm exec tsx test/fake-agent.ts\" pnpm run dev",
+    "build": "pnpm run build:web && pnpm run build:server",
     "build:web": "vite build --config vite.config.ts",
     "build:server": "tsdown",
     "check": "biome check .",
@@ -31,7 +33,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/web/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "prepack": "npm run build",
+    "prepack": "pnpm run build",
     "start": "node bin/devin-pocket.mjs start"
   },
   "dependencies": {

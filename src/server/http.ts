@@ -398,7 +398,7 @@ export class PocketServer {
       file = path.join(root, 'index.html');
     }
     if (!fs.existsSync(file)) {
-      res.writeHead(404).end('devin-pocket: web build not found (run npm run build:web)');
+      res.writeHead(404).end('devin-pocket: web build not found (run pnpm run build:web)');
       return;
     }
     const ext = path.extname(file);

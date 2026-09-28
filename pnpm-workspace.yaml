@@ -1,0 +1,21 @@
+minimumReleaseAge: 10080 # 7 days, supply-chain guard
+onlyBuiltDependencies:
+  - esbuild
+  - '@biomejs/biome'
+  - '@tailwindcss/oxide'
+# pinned versions newer than the 7-day cutoff — reviewed, kept pinned
+minimumReleaseAgeExclude:
+  - '@agentclientprotocol/sdk'
+  - '@types/node'
+  - '@vitest/mocker'
+  - '@vitest/spy'
+  - dompurify
+  - lucide-react
+  - marked
+  - vite
+  - vitest
+  - ws
+allowBuilds:
+  esbuild: true
+  '@biomejs/biome': true
+  '@tailwindcss/oxide': true

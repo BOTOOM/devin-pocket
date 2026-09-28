@@ -13,10 +13,10 @@ Devin Pocket es un cliente web móvil para Devin CLI sobre Agent Client Protocol
 
 ## Instalación
 
-Con npm:
+Con pnpm o npm:
 
 ```sh
-npm install -g devin-pocket
+pnpm add -g devin-pocket   # o: npm install -g devin-pocket
 ```
 
 Instalador (Linux, macOS, Termux o proot):
@@ -74,14 +74,24 @@ El estado y los registros viven en `$XDG_STATE_HOME/devin-pocket` (por defecto `
 ## Desarrollo
 
 ```sh
-npm install
-npm run dev
-npm run dev:fake
-npm test
-npm run build
+pnpm install
+pnpm run dev
+pnpm run dev:fake
+pnpm test
+pnpm run build
 ```
 
 El fake agent permite trabajar sin iniciar sesión: `DEVIN_POCKET_AGENT="npx tsx test/fake-agent.ts" FAKE_AGENT_AUTHED=1`.
+
+### Instalar desde el código fuente
+
+```sh
+git clone https://github.com/BOTOOM/devin-pocket.git && cd devin-pocket
+corepack enable && corepack prepare --activate   # o: npm i -g pnpm
+pnpm install && pnpm run build
+pnpm pack && pnpm add -g ./devin-pocket-*.tgz
+devin-pocket doctor && devin-pocket start
+```
 
 ## Arquitectura
 
@@ -104,8 +114,8 @@ Devin Pocket se distribuye bajo **Apache License 2.0**. Consulta `LICENSE` y `NO
 
 Devin Pocket is a mobile web client for Devin CLI over ACP. One local Node.js process serves the PWA and drives a `devin acp` child, so daily use happens in the browser instead of a terminal. It supports Android/Termux, Linux, and macOS.
 
-Requirements are Node.js 22+, Devin CLI, and authentication. On Android, use Termux and proot Ubuntu/Debian when the CLI needs glibc. Install with npm or the install script above. Run `start`, `stop`, `restart`, `status`, `logs`, `doctor`, and `open` as shown in the Spanish section.
+Requirements are Node.js 22+, Devin CLI, and authentication. On Android, use Termux and proot Ubuntu/Debian when the CLI needs glibc. Install with pnpm or npm (`pnpm add -g devin-pocket` / `npm install -g devin-pocket`) or the install script above. Run `start`, `stop`, `restart`, `status`, `logs`, `doctor`, and `open` as shown in the Spanish section.
 
-The config file is `~/.config/devin-pocket/config.json`; state and logs use `$XDG_STATE_HOME/devin-pocket`. Development uses `npm run dev`, `npm run dev:fake`, `npm test`, and `npm run build`. The architecture is one HTTP+WS server process with an ACP child, shared protocol/reducer code, and a React PWA.
+The config file is `~/.config/devin-pocket/config.json`; state and logs use `$XDG_STATE_HOME/devin-pocket`. Development uses `pnpm run dev`, `pnpm run dev:fake`, `pnpm test`, and `pnpm run build` (enable pnpm with `corepack enable` or `npm i -g pnpm`). From-source global install: `pnpm pack && pnpm add -g ./devin-pocket-*.tgz` — see the Spanish "Instalar desde el código fuente" block. The architecture is one HTTP+WS server process with an ACP child, shared protocol/reducer code, and a React PWA.
 
 Known limitations: model prices require an authenticated `devin models list`; edited permission commands are currently read-only because the wire protocol does not forward edits; real ACP compatibility was checked without logging in. Devin Pocket is Apache-2.0; see `LICENSE` and `NOTICE`, including the MIT attribution for portions ported from devin-tui by Mark Fenner.

@@ -45,11 +45,18 @@ NPM_G=(npm install -g)
 # Global npm dir usually needs root outside Termux; fall back to sudo only if not writable.
 if [[ -n "$SUDO" && ! -w "$(npm prefix -g)/lib" ]]; then NPM_G=("$SUDO" npm install -g); fi
 
+install_global() {
+  # Prefer pnpm global when present; fall back to npm on any failure
+  # (e.g. pnpm setup never run → PNPM_HOME/bin missing).
+  if has pnpm && pnpm add -g "$1"; then return 0; fi
+  "${NPM_G[@]}" "$1"
+}
+
 if [[ "$LOCAL" == 1 ]]; then
   ROOT=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-  "${NPM_G[@]}" "$ROOT"
+  install_global "$ROOT"
 else
-  "${NPM_G[@]}" "$APP@latest"
+  install_global "$APP@latest"
 fi
 
 if ! has devin; then
