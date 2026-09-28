@@ -121,12 +121,15 @@ export function ModelSheet({
             <SheetTitle>{t('model.title')}</SheetTitle>
             <div className="flex items-center gap-3">
               {hasFast && (
-                <label className="flex items-center gap-1.5 text-xs font-medium">
+                <label
+                  htmlFor="model-fast"
+                  className="flex items-center gap-1.5 text-xs font-medium"
+                >
                   Fast
                   <Switch
+                    id="model-fast"
                     checked={currentRow ? isFast(currentRow) : false}
                     onCheckedChange={toggleFast}
-                    aria-label="Fast"
                   />
                 </label>
               )}
