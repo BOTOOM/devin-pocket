@@ -18,10 +18,11 @@ export function Transcript({ state }: { state: SessionState }) {
   const working = state.turn === 'working' || state.turn === 'awaitingPermission';
 
   // Auto-scroll tail-follow; pause when the user scrolls up.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on every new/updated item
   useEffect(() => {
     const el = ref.current?.parentElement;
     if (follow && el) el.scrollTop = el.scrollHeight;
-  }, [follow]);
+  }, [follow, items]);
 
   useEffect(() => {
     const el = ref.current?.parentElement;

@@ -186,9 +186,18 @@ export class AgentProcess {
     }));
   }
 
+  private statusSubs = new Set<(s: AgentStatus) => void>();
+
+  /** Extra status subscribers (SessionManager listens without owning onStatus). */
+  onStatus(fn: (s: AgentStatus) => void): () => void {
+    this.statusSubs.add(fn);
+    return () => this.statusSubs.delete(fn);
+  }
+
   private setStatus(s: AgentStatus): void {
     this.status = s;
     this.ev.onStatus(s);
+    for (const fn of this.statusSubs) fn(s);
   }
 
   /** Track sessions to re-open after a restart. */

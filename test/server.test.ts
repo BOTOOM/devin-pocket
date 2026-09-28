@@ -108,6 +108,14 @@ function wsClient(port: number): {
   };
 }
 
+async function poll(pred: () => boolean, ms = 10_000): Promise<void> {
+  const t0 = Date.now();
+  while (!pred()) {
+    if (Date.now() - t0 > ms) throw new Error('poll timeout');
+    await new Promise((r) => setTimeout(r, 100));
+  }
+}
+
 describe('devin-pocket server', () => {
   let h: Harness;
   beforeAll(async () => {
@@ -185,6 +193,44 @@ describe('devin-pocket server', () => {
     const locked = list.find((s) => s.sessionId === 'fake-session-newest');
     expect(locked?.locked).toBe(true);
     expect(locked?.lockHolderPid).toBe(4242);
+  });
+
+  it('syncs the session list on ready and after create/delete', async () => {
+    // auto-list ran when the agent became ready during boot()
+    await poll(() => h.sessions.summaries().some((s) => s.sessionId === 'fake-session-newest'));
+    const c = wsClient(h.port);
+    const hello = await c.waitFor((m) => m.type === 'hello');
+    if (hello.type !== 'hello') throw new Error('bad');
+    expect(hello.sessions.some((s) => s.sessionId === 'fake-session-newest')).toBe(true);
+
+    c.send({ type: 'session.new', cwd: process.cwd() }, 'nl-1');
+    const ack = await c.waitFor((m) => m.type === 'ack' && m.id === 'nl-1');
+    if (ack.type !== 'ack' || !ack.ok) throw new Error('bad');
+    const sid = (ack.result as { sessionId: string }).sessionId;
+    await c.waitFor(
+      (m) => m.type === 'sessions.list' && m.sessions.some((s) => s.sessionId === sid),
+    );
+    c.send({ type: 'session.delete', sessionId: sid, cwd: process.cwd() }, 'nl-2');
+    await c.waitFor(
+      (m) => m.type === 'sessions.list' && !m.sessions.some((s) => s.sessionId === sid),
+    );
+    c.ws.close();
+  });
+
+  it('closing a session resolves its pending permission', async () => {
+    const c = wsClient(h.port);
+    await c.waitFor((m) => m.type === 'hello');
+    c.send({ type: 'session.new', cwd: process.cwd() }, 'pc-1');
+    const snap = await c.waitFor((m) => m.type === 'session.snapshot');
+    if (snap.type !== 'session.snapshot') throw new Error('bad');
+    const sid = snap.state.sessionId;
+    c.send({ type: 'prompt', sessionId: sid, blocks: [{ type: 'text', text: 'hi' }] }, 'pc-2');
+    await c.waitFor((m) => m.type === 'session.event' && m.event.type === 'permissionRequested');
+    c.send({ type: 'session.close', sessionId: sid }, 'pc-3');
+    // prompt RPC resolves (cancelled) instead of hanging forever
+    const ack = await c.waitFor((m) => m.type === 'ack' && m.id === 'pc-2', 20_000);
+    expect(ack.type === 'ack' && ack.ok).toBe(true);
+    c.ws.close();
   });
 
   it('/api/health + /api/doctor + /api/fs', async () => {

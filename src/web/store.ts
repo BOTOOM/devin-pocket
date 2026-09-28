@@ -96,6 +96,20 @@ export function setPrefs(p: Partial<UiPrefs>) {
   set({ prefs });
 }
 
+// Debounce sessions.refresh for events of unknown sessions (≥1s between sends).
+let refreshPending = false;
+let lastRefresh = 0;
+function requestSessionRefresh() {
+  if (refreshPending) return;
+  refreshPending = true;
+  const wait = Math.max(0, 1000 - (Date.now() - lastRefresh));
+  setTimeout(() => {
+    refreshPending = false;
+    lastRefresh = Date.now();
+    send({ type: 'sessions.refresh' }).catch(() => {});
+  }, wait);
+}
+
 function handle(msg: ServerMessage) {
   switch (msg.type) {
     case 'hello': {
@@ -137,7 +151,7 @@ function handle(msg: ServerMessage) {
       const s = state.open.get(msg.sessionId);
       if (!s) {
         // Event for a session we don't have (created on another client?) — ask for refresh.
-        send({ type: 'sessions.refresh' }).catch(() => {});
+        requestSessionRefresh();
         return;
       }
       const known = state.knownSeq.get(msg.sessionId) ?? s.seq;

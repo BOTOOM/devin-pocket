@@ -71,3 +71,17 @@ export function parseArgs(argv: string[]): Args {
   }
   return a;
 }
+
+/**
+ * Re-serialize an Args as a `start` command argv. Used to build supervisor and
+ * supervised-child command lines so `restart` (or any cmd) always yields `start`.
+ */
+export function serializeArgs(a: Args): string[] {
+  const out = ['start'];
+  if (a.port !== undefined) out.push('--port', String(a.port));
+  if (a.host !== undefined) out.push('--host', a.host);
+  if (a.cwd !== undefined) out.push('--cwd', a.cwd);
+  if (a.agent !== undefined) out.push('--agent', a.agent);
+  if (!a.open) out.push('--no-open');
+  return out;
+}

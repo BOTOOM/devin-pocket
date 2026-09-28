@@ -3,6 +3,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type WebSocket, WebSocketServer } from 'ws';
+import { z } from 'zod';
 import { estimateCost } from '../shared/cost.js';
 import type {
   ClientEnvelope,
@@ -20,6 +21,12 @@ import { type Logger, logFiles, readLogs, redact } from './log.js';
 import { agentStderrFile, type Config, platformInfo, stateDir, VERSION } from './paths.js';
 import { listPorts } from './ports.js';
 import type { SessionManager } from './sessions.js';
+
+/** Envelope shape gate before dispatch — unknown cmd.type falls to default ack. */
+const Envelope = z.object({
+  id: z.string(),
+  cmd: z.object({ type: z.string() }).passthrough(),
+});
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -97,7 +104,14 @@ export class PocketServer {
     const root = webRoot();
 
     this.http = http.createServer((req, res) => void this.handleHttp(req, res, root));
-    this.wss = new WebSocketServer({ server: this.http, path: '/ws' });
+    this.wss = new WebSocketServer({
+      server: this.http,
+      path: '/ws',
+      // prompts can carry base64 images (composer caps ~1.5 MB per file)
+      maxPayload: 2 * 1024 * 1024,
+      verifyClient: (info: { req: http.IncomingMessage }) =>
+        this.originAllowed(info.req.headers.origin, info.req.headers.host),
+    });
     this.wss.on('connection', (ws) => this.onConnect(ws));
 
     await new Promise<void>((resolve, reject) => {
@@ -108,6 +122,21 @@ export class PocketServer {
 
     sessions.onEvent((msg) => this.broadcast(msg));
     this.startPortsPolling();
+  }
+
+  /**
+   * CSRF/WS-hijack guard: Origin must be absent (same-origin fetch, curl) or
+   * match the Host header; dev mode also allows the Vite dev server.
+   */
+  private originAllowed(origin: string | undefined, host: string | undefined): boolean {
+    if (!origin) return true;
+    try {
+      const o = new URL(origin);
+      if (o.host === host) return true;
+      return this.deps.dev && o.host === 'localhost:5173';
+    } catch {
+      return false;
+    }
   }
 
   private onConnect(ws: WebSocket): void {
@@ -141,7 +170,9 @@ export class PocketServer {
   private async onMessage(ws: WebSocket, data: unknown): Promise<void> {
     let env: ClientEnvelope;
     try {
-      env = JSON.parse(String(data)) as ClientEnvelope;
+      const parsed = Envelope.safeParse(JSON.parse(String(data)));
+      if (!parsed.success) return;
+      env = parsed.data as ClientEnvelope;
     } catch {
       return;
     }
@@ -257,6 +288,12 @@ export class PocketServer {
     root: string,
   ): Promise<void> {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+    if (
+      url.pathname.startsWith('/api/') &&
+      !this.originAllowed(req.headers.origin, req.headers.host)
+    ) {
+      return this.json(res, { error: 'forbidden origin' }, 403);
+    }
     if (this.deps.dev && req.headers.origin?.includes('localhost:5173')) {
       res.setHeader('Access-Control-Allow-Origin', req.headers.origin);
       res.setHeader('Access-Control-Allow-Headers', 'content-type');
@@ -355,7 +392,8 @@ export class PocketServer {
     let p = path.normalize(decodeURIComponent(pathname)).replace(/^(\.\.[/\\])+/, '');
     if (p === '/' || p === '') p = '/index.html';
     let file = path.join(root, p);
-    if (!file.startsWith(root)) file = path.join(root, 'index.html');
+    const rel = path.relative(root, file);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) file = path.join(root, 'index.html');
     if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
       file = path.join(root, 'index.html');
     }

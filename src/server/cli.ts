@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AgentStatus } from '../shared/protocol.js';
 import { AgentProcess } from './acp/agent.js';
-import { type Args, parseArgs } from './args.js';
+import { type Args, parseArgs, serializeArgs } from './args.js';
 import { loadCatalog } from './catalog.js';
 import { doctorReport } from './doctor.js';
 import { PocketServer } from './http.js';
@@ -47,10 +47,16 @@ function openBrowser(url: string): void {
 function wakeLock(): void {
   if (!isTermux()) return;
   try {
-    spawn('termux-wake-lock', [], { stdio: 'ignore', detached: true }).unref();
+    spawn('termux-wake-lock', [], { stdio: 'ignore', detached: true })
+      .on('error', () => {})
+      .unref();
   } catch {
     // termux-api missing — fine
   }
+}
+
+function isLoopback(host: string): boolean {
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
 }
 
 function readPid(): number | null {
@@ -64,13 +70,14 @@ function readPid(): number | null {
 }
 
 /** Spawn the detached supervisor (this process exits; supervisor owns the pidfile). */
-function daemonize(_args: Args): number {
+function daemonize(args: Args): number {
   ensureDirs();
   const logFile = path.join(stateDir(), 'daemon.out.log');
   const out = fs.openSync(logFile, 'a');
   const env: NodeJS.ProcessEnv = { ...process.env, DEVIN_POCKET_SUPERVISOR: '1' };
   delete env.DEVIN_POCKET_DAEMON;
-  const argv = process.argv.slice(1).filter((x) => x !== '--foreground');
+  // re-serialize as `start ...` so `restart` doesn't daemonize itself forever
+  const argv = [process.argv[1] ?? '', ...serializeArgs(args)];
   const child = spawn(process.execPath, argv, {
     detached: true,
     stdio: ['ignore', out, out],
@@ -90,8 +97,8 @@ async function supervise(): Promise<void> {
   ensureDirs();
   const logFile = path.join(stateDir(), 'daemon.out.log');
   const out = fs.openSync(logFile, 'a');
-  const argv = process.argv.slice(1).filter((x) => x !== '--foreground');
-  argv.push('--foreground');
+  const supArgs = parseArgs(process.argv.slice(2));
+  const argv = [process.argv[1] ?? '', ...serializeArgs(supArgs), '--foreground'];
   const env: NodeJS.ProcessEnv = { ...process.env, DEVIN_POCKET_DAEMON: '1' };
   delete env.DEVIN_POCKET_SUPERVISOR;
 
@@ -197,7 +204,18 @@ async function runServer(args: Args): Promise<ServerHandle> {
     }
     throw e;
   }
-  void loadCatalog();
+  void loadCatalog().then((c) => server.broadcast({ type: 'catalog', catalog: c }));
+  // re-fetch pricing once login completes (models list needs auth)
+  let prevPhase: AgentStatus['phase'] = 'starting';
+  statusListeners.add((s) => {
+    if (s.phase === 'ready' && prevPhase === 'needsAuth') {
+      void loadCatalog(true).then((c) => server.broadcast({ type: 'catalog', catalog: c }));
+    }
+    prevPhase = s.phase;
+  });
+  if (!isLoopback(merged.host)) {
+    log.warn(`listening on ${merged.host} — exposed on the network without authentication`);
+  }
   agent.spawn();
 
   const shutdown = (): void => {
@@ -229,6 +247,9 @@ switch (args.cmd) {
           `Abre en el navegador / Open in browser:`,
           url,
           isTermux() ? 'Termux detectado — wake lock on' : '',
+          isLoopback(host)
+            ? ''
+            : 'Expuesta en la red sin autenticación / Exposed on the network without authentication — usa solo en redes de confianza / trusted networks only',
         ].filter(Boolean),
       );
       const supervised = process.env.DEVIN_POCKET_DAEMON === '1';
@@ -243,11 +264,16 @@ switch (args.cmd) {
         process.exit(0);
       }
       const pid2 = daemonize(args);
-      box([
-        `devin-pocket v${VERSION}`,
-        `Iniciado / Started (pid ${pid2})`,
-        `http://${host}:${port}`,
-      ]);
+      box(
+        [
+          `devin-pocket v${VERSION}`,
+          `Iniciado / Started (pid ${pid2})`,
+          `http://${host}:${port}`,
+          isLoopback(host)
+            ? ''
+            : 'Expuesta en la red sin autenticación / Exposed on the network without authentication — trusted networks only',
+        ].filter(Boolean),
+      );
       if (args.open) openBrowser(`http://${host}:${port}`);
     }
     break;

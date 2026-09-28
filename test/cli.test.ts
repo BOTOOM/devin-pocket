@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseArgs } from '../src/server/args.js';
+import { parseArgs, serializeArgs } from '../src/server/args.js';
 
 describe('parseArgs', () => {
   it('defaults to start with browser opening', () => {
@@ -44,5 +44,39 @@ describe('parseArgs', () => {
     expect(parseArgs(['doctor']).cmd).toBe('doctor');
     expect(parseArgs(['--version']).cmd).toBe('version');
     expect(parseArgs(['--help']).cmd).toBe('help');
+  });
+});
+
+describe('serializeArgs', () => {
+  it('roundtrips parse → serialize → parse', () => {
+    const a = parseArgs([
+      'start',
+      '--port',
+      '7799',
+      '--host',
+      '0.0.0.0',
+      '--cwd',
+      '/tmp',
+      '--agent',
+      'devin acp',
+      '--no-open',
+    ]);
+    expect(parseArgs(serializeArgs(a))).toMatchObject({
+      cmd: 'start',
+      port: 7799,
+      host: '0.0.0.0',
+      cwd: '/tmp',
+      agent: 'devin acp',
+      open: false,
+    });
+  });
+  it('restart (and any command) serializes to start', () => {
+    const argv = serializeArgs(parseArgs(['restart', '--port', '7780']));
+    expect(argv[0]).toBe('start');
+    expect(argv).toContain('--port');
+    expect(argv).not.toContain('restart');
+  });
+  it('omits defaults', () => {
+    expect(serializeArgs(parseArgs(['start']))).toEqual(['start']);
   });
 });

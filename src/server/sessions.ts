@@ -64,7 +64,25 @@ export class SessionManager {
     private agent: AgentProcess,
     private workspaces: Workspace[],
     private log: Logger,
-  ) {}
+  ) {
+    agent.onStatus((s) => {
+      if (s.phase === 'ready') {
+        // populate the session list at startup and after (re)authentication
+        void this.list().catch((e) => this.log.warn(`session/list: ${(e as Error).message}`));
+      } else if (s.phase === 'restarting' || s.phase === 'error' || s.phase === 'starting') {
+        // the ACP connection is gone — pending permission RPCs would hang forever
+        this.cancelAllPermissions();
+      }
+    });
+  }
+
+  private cancelAllPermissions(): void {
+    for (const [id, p] of this.permissions) {
+      this.permissions.delete(id);
+      p.resolve({ outcome: { outcome: 'cancelled' } });
+      this.emitEvent(p.sessionId, { type: 'permissionResolved', requestId: id });
+    }
+  }
 
   onEvent(fn: Send): () => void {
     this.listeners.add(fn);
@@ -165,6 +183,19 @@ export class SessionManager {
         }
       }
     }
+    // sessions we just created may not be in the agent's list yet — merge them in
+    for (const s of this.sessions.values()) {
+      if (!out.some((x) => x.sessionId === s.sessionId)) {
+        out.push({
+          sessionId: s.sessionId,
+          cwd: s.cwd,
+          title: s.title,
+          locked: false,
+          lockHolderPid: null,
+          open: true,
+        });
+      }
+    }
     // newest first
     out.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
     this.lastList = out;
@@ -191,6 +222,7 @@ export class SessionManager {
       this.emitEvent(res.sessionId, { type: 'configOptions', options: res.configOptions });
     }
     this.emit({ type: 'session.snapshot', state: this.sessions.get(res.sessionId)! });
+    void this.list(cwd).catch((e) => this.log.warn(`session/list: ${(e as Error).message}`));
     return this.sessions.get(res.sessionId)!;
   }
 
@@ -222,6 +254,13 @@ export class SessionManager {
   }
 
   close(sessionId: string): void {
+    // resolve pending permission requests so the agent's turn can unwind
+    for (const [id, p] of this.permissions) {
+      if (p.sessionId !== sessionId) continue;
+      this.permissions.delete(id);
+      p.resolve({ outcome: { outcome: 'cancelled' } });
+      this.emitEvent(sessionId, { type: 'permissionResolved', requestId: id });
+    }
     this.sessions.delete(sessionId);
     this.agent.untrack(sessionId);
     this.emit({ type: 'session.closed', sessionId });
@@ -230,6 +269,7 @@ export class SessionManager {
   async delete(sessionId: string): Promise<void> {
     await this.agent.deleteSession(sessionId);
     this.close(sessionId);
+    void this.list().catch((e) => this.log.warn(`session/list: ${(e as Error).message}`));
   }
 
   /** Prefer the agent's own `/rename` slash command; fall back to a local

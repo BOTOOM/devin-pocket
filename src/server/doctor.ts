@@ -165,9 +165,13 @@ export async function doctorReport(opts: {
   checks.push({
     id: 'port',
     label: `Port ${opts.port} on ${opts.host}`,
-    status: free && !ownPid ? 'warn' : 'ok',
-    detail: free && !ownPid ? 'free' : `devin-pocket listening on ${opts.host}:${opts.port}`,
-    fix: free && !ownPid ? `Use another port: --port ${opts.port + 1}` : undefined,
+    status: ownPid ? 'ok' : free ? 'ok' : 'warn',
+    detail: ownPid
+      ? `devin-pocket listening on ${opts.host}:${opts.port}`
+      : free
+        ? 'free'
+        : 'in use by another process',
+    fix: ownPid || free ? undefined : `Use another port: --port ${opts.port + 1}`,
   });
 
   if (isTermux()) {

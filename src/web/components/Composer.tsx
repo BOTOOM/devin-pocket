@@ -13,6 +13,7 @@ interface Mention {
 }
 
 const MENTION_MAX = 30;
+const IMAGE_MAX_BYTES = 1.5 * 1024 * 1024;
 
 export function Composer({
   sessionId,
@@ -81,6 +82,7 @@ export function Composer({
   };
 
   const submit = useCallback(async () => {
+    if (working) return;
     const blocks: ContentBlock[] = [];
     const trimmed = text.trim();
     if (trimmed) blocks.push({ type: 'text', text: trimmed });
@@ -92,12 +94,18 @@ export function Composer({
     setImages([]);
     setMentions([]);
     await send({ type: 'prompt', sessionId, blocks }).catch(() => {});
-  }, [text, mentions, images, sessionId]);
+  }, [text, mentions, images, sessionId, working]);
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return;
     const out: typeof images = [];
     for (const f of Array.from(files).slice(0, 8)) {
+      if (f.size > IMAGE_MAX_BYTES) {
+        void import('sonner').then(({ toast }) =>
+          toast.warning(t('composer.imageTooLarge', { name: f.name })),
+        );
+        continue;
+      }
       const data = await new Promise<string>((res) => {
         const r = new FileReader();
         r.onload = () => res(String(r.result).split(',')[1] ?? '');
@@ -225,7 +233,7 @@ export function Composer({
           value={text}
           onChange={(e) => onTextChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !mentionOpen) {
+            if (e.key === 'Enter' && !e.shiftKey && !mentionOpen && !working) {
               e.preventDefault();
               submit();
             }
