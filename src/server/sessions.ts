@@ -279,10 +279,12 @@ export class SessionManager {
     const hasRenameCmd = s?.commands.some((c) => c.name === 'rename');
     if (hasRenameCmd && s) {
       await this.prompt(sessionId, [{ type: 'text', text: `/rename ${title}` }]);
-      return;
+    } else {
+      saveTitle(sessionId, title);
     }
-    saveTitle(sessionId, title);
+    // update session state + the cached list so clients see the title at once
     this.emitEvent(sessionId, { type: 'info', title });
+    this.lastList = this.lastList.map((x) => (x.sessionId === sessionId ? { ...x, title } : x));
     this.emit({ type: 'sessions.list', sessions: this.summaries() });
   }
 

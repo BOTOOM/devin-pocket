@@ -266,6 +266,8 @@ export interface CatalogEntry {
   maxContext?: number;
   /** normalized reasoning level (None|Low|Medium|High|XHigh|Max) */
   level?: string;
+  /** label modifiers, e.g. 'Fast', '1M' (context window variant) */
+  mods?: string[];
 }
 
 export type CatalogState =

@@ -88,7 +88,7 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
                     {m.name}
                     {state.currentMode === m.id && <Check className="size-4" />}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="w-full min-w-0 whitespace-normal break-words text-left text-xs text-muted-foreground">
                     {m.description ?? MODE_DESC[m.id.toLowerCase()] ?? ''}
                   </span>
                 </ToggleGroupItem>
@@ -119,7 +119,7 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
                 <button
                   key={o.value}
                   type="button"
-                  className="flex min-h-11 w-full items-center justify-between rounded-lg border px-3 text-left hover:bg-accent"
+                  className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border px-3 text-left hover:bg-accent"
                   onClick={async () => {
                     await send({
                       type: 'config.set',
@@ -130,8 +130,8 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
                     setSheet(null);
                   }}
                 >
-                  <span>{o.name}</span>
-                  {o.value === reasonValue && <Check className="size-4" />}
+                  <span className="min-w-0 flex-1 whitespace-normal break-words">{o.name}</span>
+                  {o.value === reasonValue && <Check className="size-4 shrink-0" />}
                 </button>
               ))}
             </div>

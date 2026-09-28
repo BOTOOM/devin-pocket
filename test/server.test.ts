@@ -217,6 +217,23 @@ describe('devin-pocket server', () => {
     c.ws.close();
   });
 
+  it('rename broadcasts the new title in sessions.list', async () => {
+    const c = wsClient(h.port);
+    await c.waitFor((m) => m.type === 'hello');
+    c.send(
+      { type: 'session.rename', sessionId: 'fake-session-newest', title: 'Renamed test' },
+      'rn-1',
+    );
+    await c.waitFor((m) => m.type === 'ack' && m.id === 'rn-1');
+    const list = await c.waitFor(
+      (m) =>
+        m.type === 'sessions.list' &&
+        m.sessions.some((s) => s.sessionId === 'fake-session-newest' && s.title === 'Renamed test'),
+    );
+    expect(list.type).toBe('sessions.list');
+    c.ws.close();
+  });
+
   it('closing a session resolves its pending permission', async () => {
     const c = wsClient(h.port);
     await c.waitFor((m) => m.type === 'hello');

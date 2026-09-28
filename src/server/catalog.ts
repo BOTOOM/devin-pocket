@@ -44,10 +44,27 @@ function parsePrices(
     : undefined;
 }
 
+/** Label tokens that are modifiers, not reasoning levels (e.g. 'SWE-1.6 Fast', 'Opus 1M'). */
+const MOD_TOKENS = new Map([
+  ['fast', 'Fast'],
+  ['1m', '1M'],
+]);
+
+/** Extract modifier tokens from the label suffix (before level parsing). */
+function parseMods(suffix: string): string[] | undefined {
+  const mods = suffix
+    .split(/\s+/)
+    .map((w) => MOD_TOKENS.get(w.toLowerCase()))
+    .filter((m): m is string => m !== undefined);
+  return mods.length ? mods : undefined;
+}
+
 /** `label` minus the family prefix → normalized `level`. Suffix like
- *  'Medium Thinking' → Medium; 'No Thinking' → None. */
+ *  'Medium Thinking' → Medium; 'No Thinking' → None; 'Fast'/'1M' are mods. */
 function parseLevel(suffix: string): string | undefined {
-  const words = suffix.split(/\s+/).filter((w) => w.toLowerCase() !== 'thinking');
+  const words = suffix
+    .split(/\s+/)
+    .filter((w) => w.toLowerCase() !== 'thinking' && !MOD_TOKENS.has(w.toLowerCase()));
   const name = words.join(' ');
   if (name === 'No') return 'None';
   if (!name) return undefined;
@@ -92,6 +109,7 @@ export function parseCatalog(text: string): CatalogEntry[] {
         isBeta: v.is_beta === true,
         maxContext: v.max_context_tokens,
         level: parseLevel(suffix),
+        mods: parseMods(suffix),
       });
     }
   }

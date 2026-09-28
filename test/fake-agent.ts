@@ -235,6 +235,8 @@ function buildConfig(): SessionConfigOption[] {
           options: [
             { value: 'gpt-6-sol', name: 'GPT-6 Sol' },
             { value: 'swe-2', name: 'SWE-2' },
+            { value: 'swe-1-6', name: 'SWE-1.6' },
+            { value: 'swe-1-6-fast', name: 'SWE-1.6 Fast' },
           ],
         },
         {

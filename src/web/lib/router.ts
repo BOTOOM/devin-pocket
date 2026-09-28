@@ -23,7 +23,11 @@ addEventListener('hashchange', () => {
 export function navigate(r: Route | string) {
   const path =
     typeof r === 'string'
-      ? r
+      ? r === 'home' || r === '/'
+        ? '/'
+        : r.startsWith('/')
+          ? r
+          : `/${r}`
       : r.name === 'chat'
         ? `/s/${encodeURIComponent(r.sessionId)}`
         : r.name === 'home'
