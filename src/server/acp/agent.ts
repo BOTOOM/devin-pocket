@@ -28,6 +28,7 @@ import {
 } from '@agentclientprotocol/sdk';
 import type { AgentInfo, AgentStatus, TurnStat } from '../../shared/protocol.js';
 import type { Logger, StderrSink } from '../log.js';
+import { VERSION } from '../paths.js';
 
 export { resolveBin, splitCommand };
 
@@ -279,7 +280,7 @@ export class AgentProcess {
           fs: { readTextFile: false, writeTextFile: false },
           terminal: false,
         },
-        clientInfo: { name: 'devin-pocket', title: 'Devin Pocket', version: '0.1.0' },
+        clientInfo: { name: 'devin-pocket', title: 'Devin Pocket', version: VERSION },
       });
       this.restartAttempt = 0;
       const methods = this.authMethods;
