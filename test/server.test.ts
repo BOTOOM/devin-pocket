@@ -197,6 +197,121 @@ describe('devin-pocket server', () => {
     c.ws.close();
   });
 
+  it('sends queued messages in order after the active turn finishes', async () => {
+    const c = wsClient(h.port);
+    await c.waitFor((m) => m.type === 'hello');
+    c.send({ type: 'session.new', cwd: process.cwd() }, 'serial-new');
+    const snap = await c.waitFor((m) => m.type === 'session.snapshot');
+    if (snap.type !== 'session.snapshot') throw new Error('missing snapshot');
+    const sid = snap.state.sessionId;
+    c.send(
+      { type: 'prompt.enqueue', sessionId: sid, blocks: [{ type: 'text', text: 'QUEUE_SHORT' }] },
+      'serial-1',
+    );
+    await c.waitFor(
+      (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnStarted',
+    );
+    c.send(
+      {
+        type: 'prompt.enqueue',
+        sessionId: sid,
+        blocks: [{ type: 'text', text: 'QUEUE_RESULT_auto' }],
+      },
+      'serial-2',
+    );
+    await c.waitFor((m) => m.type === 'ack' && m.id === 'serial-2');
+    expect(h.sessions.openStates().find((s) => s.sessionId === sid)?.queue).toHaveLength(1);
+    await c.waitFor(
+      (m) =>
+        m.type === 'session.event' &&
+        m.sessionId === sid &&
+        m.event.type === 'agentChunk' &&
+        m.event.text.includes('QUEUE_RESULT_auto'),
+    );
+    const events = c.msgs.filter((m) => m.type === 'session.event' && m.sessionId === sid);
+    const firstEnd = events.findIndex(
+      (m) => m.type === 'session.event' && m.event.type === 'turnEnded',
+    );
+    const secondStart = events.findIndex(
+      (m, i) => i > firstEnd && m.type === 'session.event' && m.event.type === 'turnStarted',
+    );
+    expect(firstEnd).toBeGreaterThan(0);
+    expect(secondStart).toBeGreaterThan(firstEnd);
+    c.ws.close();
+  });
+
+  it('queues across reconnects, supports editing/removal, and interrupts to send now', async () => {
+    const c = wsClient(h.port);
+    await c.waitFor((m) => m.type === 'hello');
+    c.send({ type: 'session.new', cwd: process.cwd() }, 'queue-new');
+    const snap = await c.waitFor((m) => m.type === 'session.snapshot');
+    if (snap.type !== 'session.snapshot') throw new Error('missing snapshot');
+    const sid = snap.state.sessionId;
+    c.send(
+      { type: 'prompt.enqueue', sessionId: sid, blocks: [{ type: 'text', text: 'QUEUE_HOLD' }] },
+      'queue-hold',
+    );
+    await c.waitFor(
+      (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnStarted',
+    );
+    c.send(
+      {
+        type: 'prompt.enqueue',
+        sessionId: sid,
+        blocks: [{ type: 'text', text: 'QUEUE_RESULT_first' }],
+      },
+      'queue-first',
+    );
+    c.send(
+      {
+        type: 'prompt.enqueue',
+        sessionId: sid,
+        blocks: [{ type: 'text', text: 'QUEUE_RESULT_second' }],
+      },
+      'queue-second',
+    );
+    const second = await c.waitFor((m) => m.type === 'ack' && m.id === 'queue-second');
+    if (second.type !== 'ack' || !second.ok) throw new Error('queue failed');
+    const secondId = (second.result as { id: string }).id;
+    const other = wsClient(h.port);
+    const hello = await other.waitFor((m) => m.type === 'hello');
+    if (hello.type !== 'hello') throw new Error('missing hello');
+    expect(hello.open.find((s) => s.sessionId === sid)?.queue).toHaveLength(2);
+    other.send({ type: 'prompt.remove', sessionId: sid, id: secondId }, 'queue-remove');
+    const removed = await other.waitFor((m) => m.type === 'ack' && m.id === 'queue-remove');
+    expect(removed.type === 'ack' && removed.ok).toBe(true);
+    const first = await c.waitFor((m) => m.type === 'ack' && m.id === 'queue-first');
+    if (first.type !== 'ack' || !first.ok) throw new Error('queue failed');
+    const firstId = (first.result as { id: string }).id;
+    c.send({ type: 'prompt.sendNow', sessionId: sid, id: firstId }, 'queue-now');
+    await c.waitFor((m) => m.type === 'ack' && m.id === 'queue-now');
+    await poll(
+      () =>
+        h.sessions
+          .openStates()
+          .find((s) => s.sessionId === sid)
+          ?.items.some(
+            (i) => i.kind === 'agent' && i.text.includes('Completed QUEUE_RESULT_first'),
+          ) ?? false,
+    );
+    const state = h.sessions.openStates().find((s) => s.sessionId === sid);
+    expect(state?.queue).toHaveLength(0);
+    expect(
+      state?.items.some(
+        (i) =>
+          i.kind === 'user' &&
+          i.blocks.some((b) => b.type === 'text' && b.text === 'QUEUE_RESULT_second'),
+      ),
+    ).toBe(false);
+    expect(
+      c.msgs.filter(
+        (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
+      ),
+    ).toHaveLength(2);
+    c.ws.close();
+    other.ws.close();
+  });
+
   it('config.set thought_level', async () => {
     const c = wsClient(h.port);
     await c.waitFor((m) => m.type === 'hello');

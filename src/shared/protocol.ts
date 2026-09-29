@@ -170,8 +170,14 @@ export interface UsageInfo {
   cost?: { amount: number; currency: string };
 }
 
+export interface QueuedPrompt {
+  id: string;
+  blocks: ContentBlock[];
+}
+
 export interface SessionState {
   sessionId: string;
+  queue: QueuedPrompt[];
   cwd: string;
   title?: string;
   turn: TurnPhase;
@@ -236,6 +242,7 @@ export type SessionEvent =
   | { type: 'turnStats'; stat: TurnStat }
   | { type: 'info'; title?: string }
   | { type: 'turnStarted' }
+  | { type: 'queueChanged'; queue: QueuedPrompt[] }
   | { type: 'turnEnded'; stopReason: string }
   | { type: 'permissionRequested'; request: PermissionRequest }
   | { type: 'permissionResolved'; requestId: string }
@@ -363,6 +370,9 @@ export type ClientCommand =
   | { type: 'session.delete'; sessionId: string; cwd: string }
   | { type: 'session.rename'; sessionId: string; title: string }
   | { type: 'prompt'; sessionId: string; blocks: ContentBlock[] }
+  | { type: 'prompt.enqueue'; sessionId: string; blocks: ContentBlock[] }
+  | { type: 'prompt.remove'; sessionId: string; id: string }
+  | { type: 'prompt.sendNow'; sessionId: string; id: string }
   | { type: 'cancel'; sessionId: string }
   | { type: 'mode.set'; sessionId: string; modeId: string }
   | { type: 'config.set'; sessionId: string; configId: string; value: string }

@@ -54,3 +54,21 @@ test('ACP Markdown renders on mobile without losing file references or code', as
   const overflows = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
   expect(overflows).toBe(false);
 });
+
+test('queue can interrupt an active turn on mobile', async ({ page }) => {
+  await page.goto('/#/');
+  await page
+    .getByRole('button', { name: /Nueva sesión|New session/i })
+    .first()
+    .click();
+  await page.locator('textarea').fill('QUEUE_HOLD');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: /Añadir a la cola|Add to queue/i })).toBeVisible();
+  await page.locator('textarea').fill('QUEUE_RESULT_mobile');
+  await page.keyboard.press('Enter');
+  const queue = page.getByRole('region', { name: /En cola|Queued/i });
+  await expect(queue.getByText('QUEUE_RESULT_mobile')).toBeVisible();
+  await queue.getByRole('button', { name: /Enviar ahora|Send now/i }).click();
+  await expect(page.getByText('Completed QUEUE_RESULT_mobile')).toBeVisible({ timeout: 15_000 });
+  await expect(queue).toHaveCount(0);
+});

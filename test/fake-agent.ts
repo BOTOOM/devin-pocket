@@ -718,6 +718,22 @@ const agent: Agent = {
     process.stderr.write(`fake-agent: prompt #${promptCount}: ${ptext.slice(0, 80)}\n`);
     void update({ sessionUpdate: 'user_message_chunk', content: { type: 'text', text: ptext } });
     cancelled = false;
+    if (ptext === 'QUEUE_SHORT') {
+      await sleep(FAST ? 400 : 1500);
+      return { stopReason: 'end_turn' };
+    }
+    if (ptext === 'QUEUE_HOLD') {
+      await update({
+        sessionUpdate: 'agent_message_chunk',
+        content: text('Working on queued task'),
+      });
+      for (let i = 0; i < 100 && !cancelled; i++) await sleep(FAST ? 40 : 100);
+      return { stopReason: cancelled ? 'cancelled' : 'end_turn' };
+    }
+    if (ptext.startsWith('QUEUE_RESULT_')) {
+      await update({ sessionUpdate: 'agent_message_chunk', content: text(`Completed ${ptext}`) });
+      return { stopReason: 'end_turn' };
+    }
     if (ptext === 'MARKDOWN_FIXTURE') {
       await update({
         sessionUpdate: 'agent_message_chunk',

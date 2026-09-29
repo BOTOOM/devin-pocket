@@ -1,5 +1,14 @@
 import type { ContentBlock, FsEntry, SessionState } from '@shared/protocol';
-import { AtSign, File as FileIcon, Folder, Image as ImageIcon, Send, Square } from 'lucide-react';
+import {
+  AtSign,
+  File as FileIcon,
+  Folder,
+  Image as ImageIcon,
+  Pencil,
+  Send,
+  Square,
+  Trash2,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CommandPalette } from '@/components/CommandPalette';
 import { Button } from '@/components/ui/button';
@@ -35,6 +44,7 @@ export function Composer({
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const submitting = useRef(false);
 
   const working =
     state?.turn === 'working' ||
@@ -82,7 +92,7 @@ export function Composer({
   };
 
   const submit = useCallback(async () => {
-    if (working) return;
+    if (submitting.current) return;
     const blocks: ContentBlock[] = [];
     const trimmed = text.trim();
     if (trimmed) blocks.push({ type: 'text', text: trimmed });
@@ -90,11 +100,18 @@ export function Composer({
     for (const img of images)
       blocks.push({ type: 'image', data: img.data, mimeType: img.mimeType });
     if (blocks.length === 0) return;
-    setText('');
-    setImages([]);
-    setMentions([]);
-    await send({ type: 'prompt', sessionId, blocks }).catch(() => {});
-  }, [text, mentions, images, sessionId, working]);
+    submitting.current = true;
+    try {
+      await send({ type: 'prompt.enqueue', sessionId, blocks });
+      setText('');
+      setImages([]);
+      setMentions([]);
+    } catch (e) {
+      void import('sonner').then(({ toast }) => toast.error((e as Error).message));
+    } finally {
+      submitting.current = false;
+    }
+  }, [text, mentions, images, sessionId]);
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -129,6 +146,98 @@ export function Composer({
 
   return (
     <div className="safe-x safe-bottom relative border-t bg-background px-4 pb-2 pt-2">
+      {(state?.queue.length ?? 0) > 0 && (
+        <section
+          className="mb-2 max-h-[28dvh] space-y-1 overflow-y-auto"
+          aria-label={t('composer.queue', { count: state?.queue.length ?? 0 })}
+        >
+          <p className="text-xs font-medium text-muted-foreground">
+            {t('composer.queue', { count: state?.queue.length ?? 0 })}
+          </p>
+          {state?.queue.map((item) => {
+            const queuedText = item.blocks
+              .filter((b) => b.type === 'text')
+              .map((b) => b.text)
+              .join(' ');
+            const attachments = item.blocks.filter((b) => b.type !== 'text').length;
+            return (
+              <div
+                key={item.id}
+                className="flex min-w-0 items-center gap-1 rounded-lg border bg-muted/40 px-2 py-1"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm" title={queuedText}>
+                  {queuedText || t('composer.attachments', { count: attachments })}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={!agentReady}
+                  onClick={() =>
+                    send({ type: 'prompt.sendNow', sessionId, id: item.id }).catch(
+                      (e) =>
+                        void import('sonner').then(({ toast }) =>
+                          toast.error((e as Error).message),
+                        ),
+                    )
+                  }
+                >
+                  {t('composer.sendNow')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-10 shrink-0"
+                  aria-label={t('composer.editQueued')}
+                  disabled={!!text.trim() || images.length > 0 || mentions.length > 0}
+                  onClick={async () => {
+                    try {
+                      await send({ type: 'prompt.remove', sessionId, id: item.id });
+                      setText(
+                        item.blocks
+                          .filter((b) => b.type === 'text')
+                          .map((b) => b.text)
+                          .join('\n'),
+                      );
+                      setImages(
+                        item.blocks
+                          .filter((b) => b.type === 'image')
+                          .map((b) => ({ data: b.data, mimeType: b.mimeType, name: 'image' })),
+                      );
+                      setMentions(
+                        item.blocks
+                          .filter((b) => b.type === 'resource_link')
+                          .map((b) => ({ name: b.name ?? b.uri, uri: b.uri })),
+                      );
+                      taRef.current?.focus();
+                    } catch (e) {
+                      void import('sonner').then(({ toast }) => toast.error((e as Error).message));
+                    }
+                  }}
+                >
+                  <Pencil className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-10 shrink-0"
+                  aria-label={t('composer.removeQueued')}
+                  onClick={() =>
+                    send({ type: 'prompt.remove', sessionId, id: item.id }).catch(
+                      (e) =>
+                        void import('sonner').then(({ toast }) =>
+                          toast.error((e as Error).message),
+                        ),
+                    )
+                  }
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            );
+          })}
+        </section>
+      )}
       {mentionOpen && (
         <div className="absolute inset-x-4 bottom-full mb-1 max-h-[40dvh] overflow-y-auto rounded-xl border bg-popover shadow-lg">
           {fsResults.length === 0 ? (
@@ -233,7 +342,7 @@ export function Composer({
           value={text}
           onChange={(e) => onTextChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !mentionOpen && !working) {
+            if (e.key === 'Enter' && !e.shiftKey && !mentionOpen) {
               e.preventDefault();
               submit();
             }
@@ -246,7 +355,7 @@ export function Composer({
           }`}
         />
 
-        {working ? (
+        {working && (
           <Button
             variant="destructive"
             size="icon"
@@ -256,17 +365,16 @@ export function Composer({
           >
             <Square className="size-4 fill-current" />
           </Button>
-        ) : (
-          <Button
-            size="icon"
-            className="h-11 w-11 shrink-0 rounded-full"
-            aria-label={t('composer.send')}
-            disabled={!agentReady || (!text.trim() && images.length === 0 && mentions.length === 0)}
-            onClick={submit}
-          >
-            <Send className="size-5" />
-          </Button>
         )}
+        <Button
+          size="icon"
+          className="h-11 w-11 shrink-0 rounded-full"
+          aria-label={working ? t('composer.queued') : t('composer.send')}
+          disabled={!agentReady || (!text.trim() && images.length === 0 && mentions.length === 0)}
+          onClick={submit}
+        >
+          <Send className="size-5" />
+        </Button>
       </div>
 
       <CommandPalette

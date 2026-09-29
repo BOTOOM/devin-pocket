@@ -230,6 +230,21 @@ export class PocketServer {
           this.ack(ws, env.id, true, r);
           break;
         }
+        case 'prompt.enqueue': {
+          const id = sessions.enqueue(cmd.sessionId, cmd.blocks);
+          this.ack(ws, env.id, true, { id });
+          break;
+        }
+        case 'prompt.remove': {
+          const ok = sessions.removeQueued(cmd.sessionId, cmd.id);
+          this.ack(ws, env.id, ok, ok ? undefined : 'queued message not found');
+          break;
+        }
+        case 'prompt.sendNow': {
+          await sessions.sendNow(cmd.sessionId, cmd.id);
+          this.ack(ws, env.id, true);
+          break;
+        }
         case 'cancel': {
           await sessions.cancel(cmd.sessionId);
           this.ack(ws, env.id, true);

@@ -8,6 +8,7 @@ export function initialSessionState(sessionId: string, cwd: string): SessionStat
     sessionId,
     cwd,
     turn: 'idle',
+    queue: [],
     items: [],
     plan: [],
     commands: [],
@@ -122,6 +123,9 @@ export function applyEvent(state: SessionState, ev: SessionEvent, now = Date.now
       return s;
     case 'info':
       if (ev.title !== undefined) s.title = ev.title;
+      return s;
+    case 'queueChanged':
+      s.queue = ev.queue;
       return s;
     case 'turnStarted':
       s.turn = 'working';

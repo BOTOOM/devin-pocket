@@ -9,6 +9,7 @@ import type {
 import type {
   ContentBlock as CB,
   PermissionRequest,
+  QueuedPrompt,
   ServerMessage,
   SessionEvent,
   SessionState,
@@ -62,6 +63,8 @@ export class SessionManager {
   /** sessionId → prompt text whose user_message_chunk echo should be swallowed */
   private echoExpect = new Map<string, { text: string; buf: string }>();
   private lastList: SessionSummary[] = [];
+  private active = new Set<string>();
+  private interrupting = new Set<string>();
 
   constructor(
     private agent: AgentProcess,
@@ -277,6 +280,7 @@ export class SessionManager {
       this.emitEvent(sessionId, { type: 'permissionResolved', requestId: id });
     }
     this.sessions.delete(sessionId);
+    this.echoExpect.delete(sessionId);
     this.agent.untrack(sessionId);
     this.emit({ type: 'session.closed', sessionId });
   }
@@ -303,14 +307,75 @@ export class SessionManager {
     this.emit({ type: 'sessions.list', sessions: this.summaries() });
   }
 
+  enqueue(sessionId: string, blocks: CB[]): string {
+    const s = this.sessions.get(sessionId);
+    if (!s || s.loading) throw new Error('session is not open');
+    if (blocks.length === 0) throw new Error('empty prompt');
+    if (s.queue.length >= 10) throw new Error('queue is full');
+    const item: QueuedPrompt = { id: crypto.randomUUID(), blocks };
+    this.emitEvent(sessionId, { type: 'queueChanged', queue: [...s.queue, item] });
+    this.startNext(sessionId);
+    return item.id;
+  }
+
+  removeQueued(sessionId: string, id: string): boolean {
+    const s = this.sessions.get(sessionId);
+    if (!s?.queue.some((p) => p.id === id)) return false;
+    this.emitEvent(sessionId, { type: 'queueChanged', queue: s.queue.filter((p) => p.id !== id) });
+    return true;
+  }
+
+  async sendNow(sessionId: string, id: string): Promise<void> {
+    const s = this.sessions.get(sessionId);
+    const item = s?.queue.find((p) => p.id === id);
+    if (!s || !item) throw new Error('queued message not found');
+    this.emitEvent(sessionId, {
+      type: 'queueChanged',
+      queue: [item, ...s.queue.filter((p) => p.id !== id)],
+    });
+    if (this.active.has(sessionId)) {
+      if (this.interrupting.has(sessionId)) return;
+      this.interrupting.add(sessionId);
+      try {
+        await this.cancel(sessionId);
+      } finally {
+        this.interrupting.delete(sessionId);
+        this.startNext(sessionId);
+      }
+    } else this.startNext(sessionId);
+  }
+
+  private startNext(sessionId: string): void {
+    const s = this.sessions.get(sessionId);
+    if (
+      !s ||
+      s.loading ||
+      this.active.has(sessionId) ||
+      this.interrupting.has(sessionId) ||
+      this.agent.status.phase !== 'ready'
+    )
+      return;
+    const [next, ...rest] = s.queue;
+    if (!next) return;
+    this.emitEvent(sessionId, { type: 'queueChanged', queue: rest });
+    void this.prompt(sessionId, next.blocks).catch((e) => {
+      this.log.warn(`queued prompt: ${(e as Error).message}`);
+    });
+  }
+
   async prompt(sessionId: string, blocks: CB[]): Promise<{ stopReason: string }> {
+    if (!this.sessions.has(sessionId) || this.active.has(sessionId))
+      throw new Error('session is not open or already working');
+    this.active.add(sessionId);
     this.emitEvent(sessionId, { type: 'turnStarted' });
     // local echo; agent's user_message_chunk echo is suppressed in handleNotification
     const text = blocks.map((b) => (b.type === 'text' ? b.text : '')).join('');
     if (text) this.echoExpect.set(sessionId, { text, buf: '' });
     for (const b of blocks) this.emitEvent(sessionId, { type: 'userChunk', block: b });
+    let success = false;
     try {
       const res = await this.agent.prompt(sessionId, blocks as ContentBlock[]);
+      success = true;
       this.emitEvent(sessionId, { type: 'turnEnded', stopReason: res.stopReason });
       return { stopReason: res.stopReason };
     } catch (e) {
@@ -321,11 +386,21 @@ export class SessionManager {
       this.emitEvent(sessionId, { type: 'error', message: msg });
       this.emitEvent(sessionId, { type: 'turnEnded', stopReason: 'error' });
       throw e;
+    } finally {
+      this.echoExpect.delete(sessionId);
+      this.active.delete(sessionId);
+      if (success) this.startNext(sessionId);
     }
   }
 
   async cancel(sessionId: string): Promise<void> {
     await this.agent.cancel(sessionId);
+    for (const [id, p] of this.permissions) {
+      if (p.sessionId !== sessionId) continue;
+      this.permissions.delete(id);
+      p.resolve({ outcome: { outcome: 'cancelled' } });
+      this.emitEvent(sessionId, { type: 'permissionResolved', requestId: id });
+    }
   }
 
   async setMode(sessionId: string, modeId: string): Promise<void> {
