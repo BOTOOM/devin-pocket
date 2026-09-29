@@ -270,10 +270,31 @@ export interface CatalogEntry {
   mods?: string[];
 }
 
+export interface CatalogDebug {
+  command: string; // e.g. "/path/devin models list --format json"
+  exitCode: number | null;
+  signal?: string;
+  durationMs: number;
+  stdoutHead: string; // first 4000 chars
+  stderrHead: string; // first 2000 chars
+  parseError?: string;
+  entryCount: number;
+  source: 'cli' | 'cache' | 'fixture' | 'none';
+  cacheFile: string;
+  cacheAgeMs?: number;
+  fetchedAt?: number;
+}
+
 export type CatalogState =
   | { status: 'loading' }
-  | { status: 'ready'; entries: CatalogEntry[]; fetchedAt: number; fromCache: boolean }
-  | { status: 'unavailable'; reason: string };
+  | {
+      status: 'ready';
+      entries: CatalogEntry[];
+      fetchedAt: number;
+      fromCache: boolean;
+      debug?: CatalogDebug;
+    }
+  | { status: 'unavailable'; reason: string; debug?: CatalogDebug };
 
 // ---------------------------------------------------------------------------
 // Misc server-side facts

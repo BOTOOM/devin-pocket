@@ -204,12 +204,18 @@ async function runServer(args: Args): Promise<ServerHandle> {
     }
     throw e;
   }
-  void loadCatalog().then((c) => server.broadcast({ type: 'catalog', catalog: c }));
+  void loadCatalog(false, log).then((c) => server.broadcast({ type: 'catalog', catalog: c }));
+  // refresh pricing once a day
+  setInterval(
+    () =>
+      void loadCatalog(true, log).then((c) => server.broadcast({ type: 'catalog', catalog: c })),
+    24 * 3600 * 1000,
+  ).unref();
   // re-fetch pricing once login completes (models list needs auth)
   let prevPhase: AgentStatus['phase'] = 'starting';
   statusListeners.add((s) => {
     if (s.phase === 'ready' && prevPhase === 'needsAuth') {
-      void loadCatalog(true).then((c) => server.broadcast({ type: 'catalog', catalog: c }));
+      void loadCatalog(true, log).then((c) => server.broadcast({ type: 'catalog', catalog: c }));
     }
     prevPhase = s.phase;
   });
@@ -303,6 +309,37 @@ switch (args.cmd) {
     process.stdout.write(`Reiniciado / Restarted (pid ${pid2})\n`);
     break;
   }
+  case 'models': {
+    const c = await loadCatalog(true);
+    const d = c.status === 'loading' ? undefined : c.debug;
+    if (d) {
+      process.stdout.write(
+        `source: ${d.source} · entries: ${d.entryCount} · ${d.durationMs}ms · exit ${d.exitCode ?? '—'}\n` +
+          `command: ${d.command}\n` +
+          (d.parseError ? `parseError: ${d.parseError}\n` : '') +
+          (d.stderrHead
+            ? `stderr: ${d.stderrHead.split('\n').slice(0, 5).join('\n        ')}\n`
+            : ''),
+      );
+    }
+    if (c.status === 'ready') {
+      const pad = (s: unknown, n: number) =>
+        String(s ?? '')
+          .slice(0, n)
+          .padEnd(n);
+      process.stdout.write(
+        `${pad('uid', 34)}${pad('label', 32)}${pad('tier', 10)}${pad('in', 7)}${pad('out', 7)}mods\n`,
+      );
+      for (const e of c.entries) {
+        process.stdout.write(
+          `${pad(e.modelUid, 34)}${pad(e.label, 32)}${pad(e.costTier, 10)}${pad(e.prices?.input, 7)}${pad(e.prices?.output, 7)}${(e.mods ?? []).join(',')}\n`,
+        );
+      }
+    } else if (c.status === 'unavailable') {
+      process.stdout.write(`unavailable: ${c.reason}\n`);
+    }
+    break;
+  }
   case 'status': {
     const pid = readPid();
     process.stdout.write(pid ? `Corriendo / Running (pid ${pid})\n` : 'Detenido / Stopped\n');
@@ -360,7 +397,7 @@ switch (args.cmd) {
 
 Uso / Usage:
   devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD] [--no-open] [--dev] [--foreground]
-  devin-pocket stop | restart | status | logs [-f] [-n N] | doctor | open | version | help
+  devin-pocket stop | restart | status | logs [-f] [-n N] | doctor | models | open | version | help
 
 Sin comando = start · No command = start
 `,

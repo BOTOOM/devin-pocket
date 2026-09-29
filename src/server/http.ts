@@ -251,7 +251,7 @@ export class PocketServer {
           break;
         }
         case 'catalog.refresh': {
-          const cat = await loadCatalog(true);
+          const cat = await loadCatalog(true, this.deps.log);
           this.broadcast({ type: 'catalog', catalog: cat });
           this.ack(ws, env.id, true, cat);
           break;

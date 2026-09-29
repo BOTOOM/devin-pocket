@@ -1,3 +1,4 @@
+import { matchEntry } from '@shared/catalog-match';
 import type { CatalogEntry, SessionConfigOption } from '@shared/protocol';
 import { Check, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -54,15 +55,9 @@ export function ModelSheet({
   const [comparing, setComparing] = useState<Row | null>(null);
 
   const entries = catalog.status === 'ready' ? catalog.entries : [];
-  const byLabel = useMemo(() => {
-    const m = new Map<string, CatalogEntry>();
-    for (const e of entries) m.set(e.label.toLowerCase(), e);
-    return m;
-  }, [entries]);
-
   const flat: Row[] = selectOptions(option).map((o) => ({
     ...o,
-    entry: byLabel.get(o.name.toLowerCase()),
+    entry: matchEntry(o, entries),
   }));
   const filtered = q ? flat.filter((o) => o.name.toLowerCase().includes(q.toLowerCase())) : flat;
 

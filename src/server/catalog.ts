@@ -11,11 +11,13 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { CatalogEntry, CatalogState } from '../shared/protocol.js';
+import type { CatalogDebug, CatalogEntry, CatalogState } from '../shared/protocol.js';
 import { resolveBin } from './acp/agent.js';
+import type { Logger } from './log.js';
 import { modelsCacheFile } from './paths.js';
 
 const TIMEOUT_MS = 20_000;
+const CACHE_MAX_AGE_MS = 24 * 3600 * 1000;
 const LEVEL_NAMES = ['None', 'Low', 'Medium', 'High', 'XHigh', 'Max'];
 const LEVEL_RANK = new Map(LEVEL_NAMES.map((n, i) => [n.toLowerCase(), i]));
 
@@ -71,68 +73,164 @@ function parseLevel(suffix: string): string | undefined {
   return LEVEL_NAMES.find((l) => l.toLowerCase() === name.toLowerCase());
 }
 
-/** Parse `devin models list --format json` output → entry array. */
-export function parseCatalog(text: string): CatalogEntry[] {
-  const data = JSON.parse(text) as {
-    families?: {
-      family_label?: string;
-      family_uid?: string;
-      variants?: {
-        model_uid?: string;
-        label?: string;
-        cost_tier?: string;
-        cost_summary?: string;
-        is_new?: boolean;
-        is_beta?: boolean;
-        max_context_tokens?: number;
-      }[];
-    }[];
-  };
+type VariantIn = {
+  model_uid?: string;
+  modelUid?: string;
+  uid?: string;
+  id?: string;
+  label?: string;
+  name?: string;
+  cost_tier?: string;
+  costTier?: string;
+  cost_summary?: string;
+  costSummary?: string;
+  is_new?: boolean;
+  isNew?: boolean;
+  is_beta?: boolean;
+  isBeta?: boolean;
+  max_context_tokens?: number;
+  maxContextTokens?: number;
+  family_label?: string;
+  familyLabel?: string;
+  family_uid?: string;
+  familyUid?: string;
+  family?: string;
+};
+
+/**
+ * Parse `devin models list --format json` output → entries + optional parseError.
+ * Tolerates {families:[]}, {models:[]}, {variants:[]}, or a top-level array.
+ */
+export function parseCatalogDetailed(text: string): {
+  entries: CatalogEntry[];
+  parseError?: string;
+} {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    return { entries: [], parseError: (e as Error).message };
+  }
+  const families: { label: string; uid?: string; variants: VariantIn[] }[] = [];
+  if (Array.isArray(data)) {
+    families.push({ label: '', variants: data as VariantIn[] });
+  } else if (typeof data === 'object' && data !== null) {
+    const d = data as Record<string, unknown>;
+    if (Array.isArray(d.families)) {
+      for (const f of d.families as Record<string, unknown>[]) {
+        families.push({
+          label:
+            (f.family_label as string) ??
+            (f.familyLabel as string) ??
+            (f.label as string) ??
+            (f.name as string) ??
+            '',
+          uid:
+            (f.family_uid as string) ?? (f.familyUid as string) ?? (f.uid as string) ?? undefined,
+          variants: (f.variants as VariantIn[]) ?? (f.models as VariantIn[]) ?? [],
+        });
+      }
+    } else if (Array.isArray(d.models) || Array.isArray(d.variants)) {
+      families.push({
+        label: (d.family_label as string) ?? '',
+        variants: (d.models as VariantIn[]) ?? (d.variants as VariantIn[]),
+      });
+    } else {
+      return {
+        entries: [],
+        parseError: `unexpected JSON shape: top-level keys [${Object.keys(d).join(', ')}]`,
+      };
+    }
+  } else {
+    return { entries: [], parseError: `unexpected JSON shape: ${typeof data}` };
+  }
   const out: CatalogEntry[] = [];
-  for (const f of data.families ?? []) {
-    const famLabel = f.family_label ?? '';
-    for (const v of f.variants ?? []) {
-      if (!v.model_uid) continue;
-      const label = v.label ?? v.model_uid;
+  for (const f of families) {
+    for (const v of f.variants) {
+      const uid = v.model_uid ?? v.modelUid ?? v.uid ?? v.id;
+      if (!uid) continue;
+      const label = v.label ?? v.name ?? uid;
+      const famLabel = v.family_label ?? v.familyLabel ?? f.label;
+      const famUid = v.family_uid ?? v.familyUid ?? v.family ?? f.uid;
       const suffix = label.startsWith(famLabel)
         ? label.slice(famLabel.length).trim()
         : label.trim();
       out.push({
-        modelUid: v.model_uid,
+        modelUid: uid,
         label,
-        family: f.family_uid,
+        family: famUid,
         familyLabel: famLabel || undefined,
-        costTier: v.cost_tier,
-        prices: parsePrices(v.cost_summary),
-        costSummary: v.cost_summary,
-        isNew: v.is_new === true,
-        isBeta: v.is_beta === true,
-        maxContext: v.max_context_tokens,
+        costTier: v.cost_tier ?? v.costTier,
+        prices: parsePrices(v.cost_summary ?? v.costSummary),
+        costSummary: v.cost_summary ?? v.costSummary,
+        isNew: (v.is_new ?? v.isNew) === true,
+        isBeta: (v.is_beta ?? v.isBeta) === true,
+        maxContext: v.max_context_tokens ?? v.maxContextTokens,
         level: parseLevel(suffix),
         mods: parseMods(suffix),
       });
     }
   }
-  return out;
+  return { entries: out };
 }
 
-function runModelsList(): Promise<string | null> {
+/** Parse `devin models list --format json` output → entry array. */
+export function parseCatalog(text: string): CatalogEntry[] {
+  return parseCatalogDetailed(text).entries;
+}
+
+interface CliResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+  signal?: string;
+  durationMs: number;
+}
+
+function runModelsList(): Promise<CliResult> {
+  const started = Date.now();
   return new Promise((resolve) => {
     const child = execFile(
       resolveBin('devin'),
       ['models', 'list', '--format', 'json'],
       { timeout: TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 },
-      (err, stdout) => resolve(err || !stdout.trim() ? null : stdout),
+      (err, stdout, stderr) =>
+        resolve({
+          stdout: String(stdout),
+          stderr: String(stderr),
+          exitCode: err
+            ? typeof (err as { code?: unknown }).code === 'number'
+              ? (err as { code: number }).code
+              : null
+            : 0,
+          signal: (err as { signal?: string } | null)?.signal ?? undefined,
+          durationMs: Date.now() - started,
+        }),
     );
-    child.on('error', () => resolve(null));
+    child.on('error', (e) =>
+      resolve({
+        stdout: '',
+        stderr: e.message,
+        exitCode: null,
+        durationMs: Date.now() - started,
+      }),
+    );
   });
 }
 
-function readFileCatalog(file: string): CatalogEntry[] | null {
+function readText(file: string): string | null {
   try {
-    return parseCatalog(fs.readFileSync(file, 'utf8'));
+    return fs.readFileSync(file, 'utf8');
   } catch {
     return null;
+  }
+}
+
+function cacheAgeMs(cacheFile: string): number | undefined {
+  try {
+    return Date.now() - fs.statSync(cacheFile).mtimeMs;
+  } catch {
+    return undefined;
   }
 }
 
@@ -143,34 +241,114 @@ export function getCatalog(): CatalogState {
   return state;
 }
 
-/** Load once; `refresh` re-runs the CLI (e.g. after auth). */
-export function loadCatalog(refresh = false): Promise<CatalogState> {
+/**
+ * Load the catalog once. Order: fixture env → fresh (<24h) cache → CLI (written
+ * to cache) → stale cache → unavailable. `refresh` always runs the CLI.
+ * Every path is recorded in `state.debug` for the diagnostics view.
+ */
+export function loadCatalog(refresh = false, log?: Logger): Promise<CatalogState> {
   if (!refresh && pending) return pending;
   pending = (async (): Promise<CatalogState> => {
+    const cacheFile = modelsCacheFile();
+    const age = cacheAgeMs(cacheFile);
     const fixture = process.env.DEVIN_POCKET_MODELS_FILE;
+    const debug: CatalogDebug = {
+      command: fixture ? `read ${fixture}` : `${resolveBin('devin')} models list --format json`,
+      exitCode: null,
+      durationMs: 0,
+      stdoutHead: '',
+      stderrHead: '',
+      entryCount: 0,
+      source: 'none',
+      cacheFile,
+      cacheAgeMs: age,
+    };
+
+    const fromCache = (): CatalogState | null => {
+      const text = readText(cacheFile);
+      if (text === null) return null;
+      const { entries } = parseCatalogDetailed(text);
+      if (!entries.length) return null;
+      debug.source = 'cache';
+      debug.entryCount = entries.length;
+      debug.fetchedAt = Date.now();
+      return { status: 'ready', entries, fetchedAt: Date.now(), fromCache: true, debug };
+    };
+
     if (fixture) {
-      const entries = readFileCatalog(fixture);
-      state = entries
-        ? { status: 'ready', entries, fetchedAt: Date.now(), fromCache: false }
-        : { status: 'unavailable', reason: `cannot parse ${fixture}` };
+      const text = readText(fixture);
+      if (text !== null) {
+        const { entries, parseError } = parseCatalogDetailed(text);
+        debug.exitCode = 0;
+        debug.stdoutHead = text.slice(0, 4000);
+        debug.entryCount = entries.length;
+        debug.parseError = parseError;
+        if (!parseError && entries.length) {
+          debug.source = 'fixture';
+          debug.fetchedAt = Date.now();
+          state = { status: 'ready', entries, fetchedAt: Date.now(), fromCache: false, debug };
+          return state;
+        }
+        log?.warn(`catalog fixture parse failed: ${parseError ?? 'no entries'}`);
+      } else {
+        debug.stderrHead = `cannot read ${fixture}`;
+      }
+      debug.source = 'fixture';
+      state = { status: 'unavailable', reason: `cannot parse ${fixture}`, debug };
       return state;
     }
-    const text = await runModelsList();
-    if (text !== null) {
-      try {
-        const entries = parseCatalog(text);
-        fs.mkdirSync(path.dirname(modelsCacheFile()), { recursive: true });
-        fs.writeFileSync(modelsCacheFile(), text);
-        state = { status: 'ready', entries, fetchedAt: Date.now(), fromCache: false };
+
+    if (!refresh && age !== undefined && age < CACHE_MAX_AGE_MS) {
+      const cached = fromCache();
+      if (cached) {
+        state = cached;
         return state;
-      } catch {
-        // unparsable — fall through to cache
       }
     }
-    const cached = readFileCatalog(modelsCacheFile());
-    state = cached
-      ? { status: 'ready', entries: cached, fetchedAt: Date.now(), fromCache: true }
-      : { status: 'unavailable', reason: 'devin models list failed and no cache' };
+
+    const r = await runModelsList();
+    debug.exitCode = r.exitCode;
+    debug.signal = r.signal;
+    debug.durationMs = r.durationMs;
+    debug.stdoutHead = r.stdout.slice(0, 4000);
+    debug.stderrHead = r.stderr.slice(0, 2000);
+
+    if (r.exitCode === 0 && r.stdout.trim()) {
+      const { entries, parseError } = parseCatalogDetailed(r.stdout);
+      debug.parseError = parseError;
+      if (!parseError && entries.length) {
+        try {
+          fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
+          fs.writeFileSync(cacheFile, r.stdout);
+        } catch {
+          // cache write best-effort
+        }
+        debug.source = 'cli';
+        debug.entryCount = entries.length;
+        debug.fetchedAt = Date.now();
+        state = { status: 'ready', entries, fetchedAt: Date.now(), fromCache: false, debug };
+        return state;
+      }
+      log?.warn(`catalog parse failed: ${parseError ?? 'no entries'}`);
+    } else {
+      log?.warn(
+        `devin models list failed (exit ${r.exitCode ?? 'spawn'}${r.signal ? ` ${r.signal}` : ''}): ${r.stderr.split('\n')[0]?.slice(0, 300) ?? ''}`,
+      );
+    }
+
+    const stale = fromCache();
+    if (stale) {
+      state = stale;
+      return state;
+    }
+    state = {
+      status: 'unavailable',
+      reason:
+        r.exitCode === 0
+          ? (debug.parseError ?? 'no catalog data')
+          : r.stderr.split('\n')[0] || 'devin models list failed',
+      debug,
+    };
     return state;
   })();
   return pending;

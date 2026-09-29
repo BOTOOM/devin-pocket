@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { SessionUpdate } from '@agentclientprotocol/sdk';
@@ -19,8 +19,30 @@ process.env.XDG_CONFIG_HOME = tmp;
 process.env.XDG_CACHE_HOME = tmp;
 process.env.FAKE_AGENT_AUTHED = '1';
 process.env.FAKE_AGENT_FAST = '1';
+process.env.DEVIN_POCKET_MODELS_FILE = path.join(tmp, 'models.json');
 
 const AGENT_CMD = `npx tsx ${path.join(import.meta.dirname, 'fake-agent.ts')}`;
+
+writeFileSync(
+  process.env.DEVIN_POCKET_MODELS_FILE as string,
+  JSON.stringify({
+    families: [
+      {
+        family_label: 'SWE-1.6',
+        family_uid: 'swe-1-6',
+        variants: [
+          {
+            model_uid: 'swe-1-6',
+            label: 'SWE-1.6',
+            cost_tier: 'medium',
+            cost_summary: '$1 / 1M input $4 / 1M output',
+          },
+          { model_uid: 'swe-1-6-fast', label: 'SWE-1.6 Fast', cost_tier: 'high' },
+        ],
+      },
+    ],
+  }),
+);
 
 interface Harness {
   server: PocketServer;
@@ -247,6 +269,21 @@ describe('devin-pocket server', () => {
     // prompt RPC resolves (cancelled) instead of hanging forever
     const ack = await c.waitFor((m) => m.type === 'ack' && m.id === 'pc-2', 20_000);
     expect(ack.type === 'ack' && ack.ok).toBe(true);
+    c.ws.close();
+  });
+
+  it('catalog.refresh returns debug info (fixture source)', async () => {
+    const c = wsClient(h.port);
+    await c.waitFor((m) => m.type === 'hello');
+    c.send({ type: 'catalog.refresh' }, 'cat-1');
+    const ack = await c.waitFor((m) => m.type === 'ack' && m.id === 'cat-1');
+    if (ack.type !== 'ack' || !ack.ok) throw new Error('bad');
+    const cat = ack.result as {
+      status: string;
+      debug?: { source: string; entryCount: number };
+    };
+    expect(cat.debug?.source).toBe('fixture');
+    expect(cat.debug?.entryCount).toBe(2);
     c.ws.close();
   });
 

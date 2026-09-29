@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCatalog } from '../src/server/catalog.js';
+import { parseCatalog, parseCatalogDetailed } from '../src/server/catalog.js';
 
 function fixture(variants: { model_uid: string; label: string }[]): string {
   // real labels share the family prefix; the suffix holds level + mods
@@ -26,5 +26,37 @@ describe('parseCatalog mods/level', () => {
     )[0]!;
     expect(e.mods).toEqual(['1M', 'Fast']);
     expect(e.level).toBe('High');
+  });
+});
+
+describe('parseCatalogDetailed shapes', () => {
+  it('accepts a top-level array of variants', () => {
+    const { entries, parseError } = parseCatalogDetailed(
+      JSON.stringify([
+        {
+          model_uid: 'swe-1-6',
+          label: 'SWE-1.6',
+          cost_summary: '$1 / 1M input $4 / 1M output',
+        },
+      ]),
+    );
+    expect(parseError).toBeUndefined();
+    expect(entries[0]?.prices).toEqual({ input: 1, output: 4, cached: undefined });
+  });
+  it('accepts { models: [...] }', () => {
+    const { entries, parseError } = parseCatalogDetailed(
+      JSON.stringify({ models: [{ uid: 'x1', name: 'Model X' }] }),
+    );
+    expect(parseError).toBeUndefined();
+    expect(entries[0]).toMatchObject({ modelUid: 'x1', label: 'Model X' });
+  });
+  it('reports a parseError with top-level keys on unknown shape', () => {
+    const { entries, parseError } = parseCatalogDetailed(JSON.stringify({ data: {}, meta: 1 }));
+    expect(entries).toEqual([]);
+    expect(parseError).toContain('data');
+    expect(parseError).toContain('meta');
+  });
+  it('reports invalid JSON', () => {
+    expect(parseCatalogDetailed('not json').parseError).toBeTruthy();
   });
 });

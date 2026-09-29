@@ -36,6 +36,7 @@ devin-pocket restart
 devin-pocket status
 devin-pocket logs
 devin-pocket doctor
+devin-pocket models   # diagnóstico del catálogo de modelos y precios
 devin-pocket open
 ```
 
@@ -114,7 +115,7 @@ Devin Pocket se distribuye bajo **Apache License 2.0**. Consulta `LICENSE` y `NO
 
 Devin Pocket is a mobile web client for Devin CLI over ACP. One local Node.js process serves the PWA and drives a `devin acp` child, so daily use happens in the browser instead of a terminal. It supports Android/Termux, Linux, and macOS.
 
-Requirements are Node.js 22+, Devin CLI, and authentication. On Android, use Termux and proot Ubuntu/Debian when the CLI needs glibc. Install with pnpm or npm (`pnpm add -g devin-pocket` / `npm install -g devin-pocket`) or the install script above. Run `start`, `stop`, `restart`, `status`, `logs`, `doctor`, and `open` as shown in the Spanish section.
+Requirements are Node.js 22+, Devin CLI, and authentication. On Android, use Termux and proot Ubuntu/Debian when the CLI needs glibc. Install with pnpm or npm (`pnpm add -g devin-pocket` / `npm install -g devin-pocket`) or the install script above. Run `start`, `stop`, `restart`, `status`, `logs`, `doctor`, `models` (catalog/pricing diagnostics), and `open` as shown in the Spanish section.
 
 The config file is `~/.config/devin-pocket/config.json`; state and logs use `$XDG_STATE_HOME/devin-pocket`. Development uses `pnpm run dev`, `pnpm run dev:fake`, `pnpm test`, and `pnpm run build` (enable pnpm with `corepack enable` or `npm i -g pnpm`). From-source global install: `pnpm pack && pnpm add -g ./devin-pocket-*.tgz` — see the Spanish "Instalar desde el código fuente" block. The architecture is one HTTP+WS server process with an ACP child, shared protocol/reducer code, and a React PWA.
 
