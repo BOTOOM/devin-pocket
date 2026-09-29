@@ -22,3 +22,35 @@ test('fake agent home → session → prompt → permission → tool and usage',
     timeout: 20_000,
   });
 });
+
+test('ACP Markdown renders on mobile without losing file references or code', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/#/');
+  await page
+    .getByRole('button', { name: /Nueva sesión|New session/i })
+    .first()
+    .click();
+  await page.locator('textarea').fill('MARKDOWN_FIXTURE');
+  await page.keyboard.press('Enter');
+  const response = page
+    .locator('.prose')
+    .filter({ has: page.getByRole('heading', { name: 'Título' }) });
+  await expect(response.getByRole('listitem')).toHaveCount(2);
+  await expect(response.locator('table td').last()).toHaveText('$1');
+  await expect(response.locator('.file-reference')).toHaveText([
+    '/tmp/proyecto/src/index.ts:10-12',
+    '/tmp/proyecto/README.md',
+  ]);
+  await expect(response.locator('script')).toHaveCount(0);
+  await expect(response.locator('pre code')).toHaveText('const test = "<script>";');
+  await response.locator('[data-copy-code]').click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe('const test = "<script>";');
+  await expect(response.locator('a')).toHaveAttribute('href', 'https://example.com');
+  const overflows = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  expect(overflows).toBe(false);
+});

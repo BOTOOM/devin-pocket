@@ -151,6 +151,28 @@ notifications `_cognition.ai/turn_stats` and `_cognition.ai/output`.
 
 ## Known gaps / TODO
 
+- **Planned: queued messages + "send now"**. While a turn is running, let users
+  enqueue messages (including attachments) per session and show/edit/remove them
+  above the mobile composer. Keep the queue in server memory, not browser local
+  storage or the session list; broadcast queue state on reconnect. Serialize ACP
+  `prompt` calls per session: dispatch queued messages after `turnEnded`; "send now"
+  first calls ACP `cancel`, waits for the active prompt to settle, then sends the
+  selected message. Keep the Stop action separate from "send now"; account for
+  pending permissions, reconnects, errors, agent restarts and duplicate sends.
+  Test normal queueing, ordering, interruption and cancellation with the fake
+  agent and mobile e2e. Do not restart/install while a user is actively chatting
+  through this app without arranging a safe moment.
+- **Investigate `/btw` side questions before implementation**: Devin CLI docs
+  describe `/btw` as an ACP agent-side slash command advertised via
+  `available_commands_update`; the sidechain uses conversation context
+  without adding the question to the main thread, and its progress streams as
+  ACP session updates. Pocket's command palette already inserts advertised
+  slash commands, but Composer blocks `prompt` while working and SessionManager
+  treats every prompt as a main turn (echo + turnStarted/turnEnded). Test the
+  actual event shapes and whether concurrent `session/prompt` works on an
+  isolated session before choosing a separate side-question command, mobile
+  panel, and output routing; never use a second agent process or send tests to
+  an active user's session.
 - Real-account catalog/pricing JSON shape is **unverified** — inspect via the
   Diagnostics "Modelos y precios" card or `devin-pocket models`. The parser is
   tolerant (families / array / `{models}`) and reports `parseError` on unknown shapes.

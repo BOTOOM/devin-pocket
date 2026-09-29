@@ -718,6 +718,15 @@ const agent: Agent = {
     process.stderr.write(`fake-agent: prompt #${promptCount}: ${ptext.slice(0, 80)}\n`);
     void update({ sessionUpdate: 'user_message_chunk', content: { type: 'text', text: ptext } });
     cancelled = false;
+    if (ptext === 'MARKDOWN_FIXTURE') {
+      await update({
+        sessionUpdate: 'agent_message_chunk',
+        content: text(
+          '# Título\n\n- primer elemento\n- segundo elemento\n\n| Modelo | Precio |\n|---|---|\n| Rápido | $1 |\n\n```ts\nconst test = "<script>";\n```\n\nArchivo <ref_snippet file="/tmp/proyecto/src/index.ts" lines="10-12" /> y <ref_file file="/tmp/proyecto/README.md" />.\n\n[Web](https://example.com) <script>alert(1)</script>',
+        ),
+      });
+      return { stopReason: 'end_turn' };
+    }
     await sleep(FAST ? 100 : 1500);
     const stopReason = promptCount === 1 ? await runMainTurn() : await runSlowTurn();
     await emitTurnStats(promptCount - 1);
