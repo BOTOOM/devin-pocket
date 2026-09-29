@@ -80,6 +80,9 @@ export class Logger {
     }
   }
 
+  debug(msg: string, extra?: unknown): void {
+    this.write('DEBUG', msg, extra);
+  }
   info(msg: string, extra?: unknown): void {
     this.write('INFO', msg, extra);
   }

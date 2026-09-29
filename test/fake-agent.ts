@@ -519,7 +519,11 @@ async function runSlowTurn(): Promise<'end_turn' | 'cancelled'> {
   return 'end_turn';
 }
 
+// sessions created via session/new are remembered so listSessions can return them
+const created: { sessionId: string; cwd: string; title: string | null; updatedAt: string }[] = [];
+
 const FAKE_SESSIONS = () => [
+  ...created,
   {
     sessionId: 'fake-session-newest',
     cwd: AGENT_CWD,
@@ -572,9 +576,15 @@ const agent: Agent = {
       agentInfo: { name: 'fake-devin', title: 'Devin Agent', version: '0.0.1' },
     };
   },
-  async newSession() {
+  async newSession(params) {
     if (!authenticated) throw NOT_AUTHENTICATED();
     sessionId = `fake-${Math.random().toString(36).slice(2, 10)}`;
+    created.push({
+      sessionId,
+      cwd: params?.cwd ?? AGENT_CWD,
+      title: null,
+      updatedAt: new Date().toISOString(),
+    });
     promptCount = 0;
     setTimeout(() => void extLog('mcp servers changed: 1 connected'), 50);
     setTimeout(
@@ -598,8 +608,13 @@ const agent: Agent = {
   },
   async listSessions(params) {
     if (!authenticated) throw NOT_AUTHENTICATED();
-    process.stderr.write(`fake-agent: list_sessions cwd=${params?.cwd ?? ''} → 3 sessions\n`);
-    return { sessions: FAKE_SESSIONS() };
+    const all = FAKE_SESSIONS();
+    // no cwd → global list; with cwd → only sessions in that directory
+    const sessions = params?.cwd ? all.filter((s) => s.cwd === params.cwd) : all;
+    process.stderr.write(
+      `fake-agent: list_sessions cwd=${params?.cwd ?? '(all)'} → ${sessions.length} sessions\n`,
+    );
+    return { sessions };
   },
   async loadSession(params) {
     if (!authenticated) throw NOT_AUTHENTICATED();
@@ -668,6 +683,8 @@ const agent: Agent = {
   },
   async deleteSession(params) {
     process.stderr.write(`fake-agent: delete_session ${params.sessionId}\n`);
+    const i = created.findIndex((s) => s.sessionId === params.sessionId);
+    if (i >= 0) created.splice(i, 1);
     return {};
   },
   async setSessionMode(params) {

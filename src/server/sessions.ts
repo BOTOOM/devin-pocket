@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import type {
   ContentBlock,
   PermissionOption,
@@ -45,7 +46,9 @@ function saveTitle(sessionId: string, title: string): void {
   try {
     const t = loadTitles();
     t[sessionId] = title;
-    fs.writeFileSync(titlesFile(), JSON.stringify(t));
+    const f = titlesFile();
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, JSON.stringify(t));
   } catch {
     // best-effort
   }
@@ -149,7 +152,7 @@ export class SessionManager {
     return this.lastList.map((s) => ({ ...s, open: this.sessions.has(s.sessionId) }));
   }
 
-  /** session/list across configured workspaces (+ cwd when different). */
+  /** session/list globally, then per configured workspace (+ cwd when different). */
   async list(cwd?: string): Promise<SessionSummary[]> {
     const cwds = new Set<string>();
     for (const w of this.workspaces) cwds.add(w.path);
@@ -157,24 +160,35 @@ export class SessionManager {
     if (cwds.size === 0) cwds.add(process.cwd());
     const titles = loadTitles();
     const out: SessionSummary[] = [];
+    const seen = new Set<string>();
+    const pushInfos = (infos: Awaited<ReturnType<AgentProcess['listSessions']>>, c?: string) => {
+      for (const si of infos) {
+        if (seen.has(si.sessionId)) continue;
+        seen.add(si.sessionId);
+        const meta = si._meta ?? {};
+        const locked =
+          meta['cognition.ai/isLocked'] === true || meta['cognition.ai/isLocked'] === 'true';
+        const pid = meta['cognition.ai/lockHolderPid'];
+        out.push({
+          sessionId: si.sessionId,
+          cwd: si.cwd ?? c ?? process.cwd(),
+          title: titles[si.sessionId] ?? si.title ?? undefined,
+          updatedAt: si.updatedAt ?? undefined,
+          locked,
+          lockHolderPid: typeof pid === 'number' ? pid : null,
+          open: this.sessions.has(si.sessionId),
+        });
+      }
+    };
+    // ACP allows omitting cwd — one global query first, then per-cwd merge
+    try {
+      pushInfos(await this.agent.listSessions());
+    } catch (e) {
+      this.log.debug(`session/list (no cwd): ${(e as Error).message}`);
+    }
     for (const c of cwds) {
       try {
-        const infos = await this.agent.listSessions(c);
-        for (const si of infos) {
-          const meta = si._meta ?? {};
-          const locked =
-            meta['cognition.ai/isLocked'] === true || meta['cognition.ai/isLocked'] === 'true';
-          const pid = meta['cognition.ai/lockHolderPid'];
-          out.push({
-            sessionId: si.sessionId,
-            cwd: si.cwd ?? c,
-            title: titles[si.sessionId] ?? si.title ?? undefined,
-            updatedAt: si.updatedAt ?? undefined,
-            locked,
-            lockHolderPid: typeof pid === 'number' ? pid : null,
-            open: this.sessions.has(si.sessionId),
-          });
-        }
+        pushInfos(await this.agent.listSessions(c), c);
       } catch (e) {
         this.log.warn(`session/list ${c}: ${(e as Error).message}`);
         if (/not logged in|not authenticated|auth/i.test((e as Error).message)) {
@@ -185,7 +199,8 @@ export class SessionManager {
     }
     // sessions we just created may not be in the agent's list yet — merge them in
     for (const s of this.sessions.values()) {
-      if (!out.some((x) => x.sessionId === s.sessionId)) {
+      if (!seen.has(s.sessionId)) {
+        seen.add(s.sessionId);
         out.push({
           sessionId: s.sessionId,
           cwd: s.cwd,

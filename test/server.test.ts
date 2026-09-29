@@ -272,6 +272,21 @@ describe('devin-pocket server', () => {
     c.ws.close();
   });
 
+  it('app-created sessions survive restart via the global session/list', async () => {
+    const otherCwd = mkdtempSync(path.join(os.tmpdir(), 'devin-pocket-cwd-'));
+    const s = await h.sessions.create(otherCwd);
+    await h.sessions.rename(s.sessionId, 'Persisted session');
+    // simulated restart: a fresh manager with no workspaces — only the
+    // cwd-less session/list can return a session created under otherCwd
+    const log2 = new Logger(path.join(tmp, `test2-${Date.now()}.log`));
+    const m2 = new SessionManager(h.agent, [], log2);
+    const list = await m2.list();
+    const found = list.find((x) => x.sessionId === s.sessionId);
+    expect(found).toBeTruthy();
+    expect(found?.title).toBe('Persisted session');
+    expect(found?.cwd).toBe(otherCwd);
+  });
+
   it('catalog.refresh returns debug info (fixture source)', async () => {
     const c = wsClient(h.port);
     await c.waitFor((m) => m.type === 'hello');
