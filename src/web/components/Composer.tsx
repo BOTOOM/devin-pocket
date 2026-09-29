@@ -95,6 +95,23 @@ export function Composer({
     if (submitting.current) return;
     const blocks: ContentBlock[] = [];
     const trimmed = text.trim();
+    if (
+      trimmed.startsWith('/btw ') &&
+      state?.commands.some((c) => c.name === 'btw') &&
+      !images.length &&
+      !mentions.length
+    ) {
+      submitting.current = true;
+      try {
+        await send({ type: 'aside.ask', sessionId, question: trimmed.slice(5) });
+        setText('');
+      } catch (e) {
+        void import('sonner').then(({ toast }) => toast.error((e as Error).message));
+      } finally {
+        submitting.current = false;
+      }
+      return;
+    }
     if (trimmed) blocks.push({ type: 'text', text: trimmed });
     for (const m of mentions) blocks.push({ type: 'resource_link', uri: m.uri, name: m.name });
     for (const img of images)
@@ -111,7 +128,7 @@ export function Composer({
     } finally {
       submitting.current = false;
     }
-  }, [text, mentions, images, sessionId]);
+  }, [text, mentions, images, sessionId, state?.commands]);
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -369,7 +386,13 @@ export function Composer({
         <Button
           size="icon"
           className="h-11 w-11 shrink-0 rounded-full"
-          aria-label={working ? t('composer.queued') : t('composer.send')}
+          aria-label={
+            text.trim().startsWith('/btw ') && state?.commands.some((c) => c.name === 'btw')
+              ? t('aside.ask')
+              : working
+                ? t('composer.queued')
+                : t('composer.send')
+          }
           disabled={!agentReady || (!text.trim() && images.length === 0 && mentions.length === 0)}
           onClick={submit}
         >

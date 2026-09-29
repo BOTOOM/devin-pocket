@@ -65,6 +65,7 @@ export class SessionManager {
   private lastList: SessionSummary[] = [];
   private active = new Set<string>();
   private interrupting = new Set<string>();
+  private sideActive = new Set<string>();
 
   constructor(
     private agent: AgentProcess,
@@ -119,6 +120,20 @@ export class SessionManager {
   /** Feed an ACP notification into the matching session state. */
   handleNotification(n: SessionNotification): void {
     const sid = n.sessionId;
+    const channel = n.update._meta?.['cognition.ai/channel'] ?? n._meta?.['cognition.ai/channel'];
+    const isAside = this.sideActive.has(sid) && (channel === 'btw' || !this.active.has(sid));
+    if (
+      isAside &&
+      n.update.sessionUpdate === 'agent_message_chunk' &&
+      n.update.content.type === 'text'
+    ) {
+      this.emitEvent(sid, { type: 'asideChunk', text: n.update.content.text });
+      return;
+    }
+    if (n.update.sessionUpdate === 'user_message_chunk' && this.sideActive.has(sid)) {
+      const block = n.update.content;
+      if (channel === 'btw' || (block.type === 'text' && block.text.startsWith('/btw '))) return;
+    }
     if (n.update.sessionUpdate === 'user_message_chunk') {
       // swallow the live echo of a prompt we already rendered locally
       const block = n.update.content;
@@ -281,6 +296,7 @@ export class SessionManager {
     }
     this.sessions.delete(sessionId);
     this.echoExpect.delete(sessionId);
+    this.sideActive.delete(sessionId);
     this.agent.untrack(sessionId);
     this.emit({ type: 'session.closed', sessionId });
   }
@@ -305,6 +321,28 @@ export class SessionManager {
     this.emitEvent(sessionId, { type: 'info', title });
     this.lastList = this.lastList.map((x) => (x.sessionId === sessionId ? { ...x, title } : x));
     this.emit({ type: 'sessions.list', sessions: this.summaries() });
+  }
+
+  askAside(sessionId: string, question: string): void {
+    const s = this.sessions.get(sessionId);
+    const q = question.trim();
+    if (!s || s.loading) throw new Error('session is not open');
+    if (!s.commands.some((c) => c.name === 'btw')) throw new Error('/btw is not available');
+    if (!q || q.length > 4000) throw new Error('invalid question');
+    if (this.sideActive.has(sessionId)) throw new Error('side question already running');
+    if (this.agent.status.phase !== 'ready') throw new Error('agent is not ready');
+    this.sideActive.add(sessionId);
+    this.emitEvent(sessionId, { type: 'asideStarted', question: q });
+    void this.agent
+      .prompt(sessionId, [{ type: 'text', text: `/btw ${q}` }])
+      .then(() => {
+        this.sideActive.delete(sessionId);
+        this.emitEvent(sessionId, { type: 'asideEnded' });
+      })
+      .catch((e) => {
+        this.sideActive.delete(sessionId);
+        this.emitEvent(sessionId, { type: 'asideEnded', error: (e as Error).message });
+      });
   }
 
   enqueue(sessionId: string, blocks: CB[]): string {

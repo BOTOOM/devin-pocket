@@ -72,3 +72,24 @@ test('queue can interrupt an active turn on mobile', async ({ page }) => {
   await expect(page.getByText('Completed QUEUE_RESULT_mobile')).toBeVisible({ timeout: 15_000 });
   await expect(queue).toHaveCount(0);
 });
+
+test('side question works alongside an active turn', async ({ page }) => {
+  await page.goto('/#/');
+  await page
+    .getByRole('button', { name: /Nueva sesión|New session/i })
+    .first()
+    .click();
+  await expect(page.getByRole('button', { name: /Pregunta aparte|Side question/i })).toBeVisible();
+  await page.locator('textarea').first().fill('QUEUE_HOLD');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Working on queued task')).toBeVisible();
+  await page.getByRole('button', { name: /Pregunta aparte|Side question/i }).click();
+  const panel = page.getByRole('region', { name: /Pregunta aparte|Side question/i });
+  await panel.getByRole('textbox').fill('¿Cómo va?');
+  await panel
+    .getByRole('button', { name: /Preguntar sin interrumpir|Ask without interrupting/i })
+    .click();
+  await expect(panel.getByText('Side answer: ¿Cómo va?')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Añadir a la cola|Add to queue/i })).toBeVisible();
+  await expect(page.locator('.prose').filter({ hasText: 'Side answer:' })).toHaveCount(1);
+});

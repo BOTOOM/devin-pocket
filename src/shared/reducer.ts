@@ -127,6 +127,15 @@ export function applyEvent(state: SessionState, ev: SessionEvent, now = Date.now
     case 'queueChanged':
       s.queue = ev.queue;
       return s;
+    case 'asideStarted':
+      s.aside = { question: ev.question, answer: '', status: 'working' };
+      return s;
+    case 'asideChunk':
+      if (s.aside) s.aside = { ...s.aside, answer: s.aside.answer + ev.text };
+      return s;
+    case 'asideEnded':
+      if (s.aside) s.aside = { ...s.aside, status: ev.error ? 'error' : 'done', error: ev.error };
+      return s;
     case 'turnStarted':
       s.turn = 'working';
       s.error = undefined;

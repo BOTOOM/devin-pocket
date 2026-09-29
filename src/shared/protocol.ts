@@ -175,9 +175,17 @@ export interface QueuedPrompt {
   blocks: ContentBlock[];
 }
 
+export interface AsideState {
+  question: string;
+  answer: string;
+  status: 'working' | 'done' | 'error';
+  error?: string;
+}
+
 export interface SessionState {
   sessionId: string;
   queue: QueuedPrompt[];
+  aside?: AsideState;
   cwd: string;
   title?: string;
   turn: TurnPhase;
@@ -243,6 +251,9 @@ export type SessionEvent =
   | { type: 'info'; title?: string }
   | { type: 'turnStarted' }
   | { type: 'queueChanged'; queue: QueuedPrompt[] }
+  | { type: 'asideStarted'; question: string }
+  | { type: 'asideChunk'; text: string }
+  | { type: 'asideEnded'; error?: string }
   | { type: 'turnEnded'; stopReason: string }
   | { type: 'permissionRequested'; request: PermissionRequest }
   | { type: 'permissionResolved'; requestId: string }
@@ -373,6 +384,7 @@ export type ClientCommand =
   | { type: 'prompt.enqueue'; sessionId: string; blocks: ContentBlock[] }
   | { type: 'prompt.remove'; sessionId: string; id: string }
   | { type: 'prompt.sendNow'; sessionId: string; id: string }
+  | { type: 'aside.ask'; sessionId: string; question: string }
   | { type: 'cancel'; sessionId: string }
   | { type: 'mode.set'; sessionId: string; modeId: string }
   | { type: 'config.set'; sessionId: string; configId: string; value: string }

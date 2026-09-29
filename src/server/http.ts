@@ -245,6 +245,11 @@ export class PocketServer {
           this.ack(ws, env.id, true);
           break;
         }
+        case 'aside.ask': {
+          sessions.askAside(cmd.sessionId, cmd.question);
+          this.ack(ws, env.id, true);
+          break;
+        }
         case 'cancel': {
           await sessions.cancel(cmd.sessionId);
           this.ack(ws, env.id, true);

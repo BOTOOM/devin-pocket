@@ -312,6 +312,60 @@ describe('devin-pocket server', () => {
     other.ws.close();
   });
 
+  it('answers a side question without cancelling or mixing the active turn', async () => {
+    const c = wsClient(h.port);
+    await c.waitFor((m) => m.type === 'hello');
+    c.send({ type: 'session.new', cwd: process.cwd() }, 'aside-new');
+    const snap = await c.waitFor((m) => m.type === 'session.snapshot');
+    if (snap.type !== 'session.snapshot') throw new Error('missing snapshot');
+    const sid = snap.state.sessionId;
+    await c.waitFor(
+      (m) =>
+        m.type === 'session.event' &&
+        m.sessionId === sid &&
+        m.event.type === 'commands' &&
+        m.event.commands.some((command) => command.name === 'btw'),
+    );
+    c.send(
+      { type: 'prompt.enqueue', sessionId: sid, blocks: [{ type: 'text', text: 'QUEUE_HOLD' }] },
+      'aside-hold',
+    );
+    await c.waitFor(
+      (m) =>
+        m.type === 'session.event' &&
+        m.sessionId === sid &&
+        m.event.type === 'agentChunk' &&
+        m.event.text.includes('Working on queued task'),
+    );
+    c.send({ type: 'aside.ask', sessionId: sid, question: '¿Cómo va?' }, 'aside-ask');
+    const ack = await c.waitFor((m) => m.type === 'ack' && m.id === 'aside-ask');
+    expect(ack.type === 'ack' && ack.ok).toBe(true);
+    await c.waitFor(
+      (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'asideEnded',
+    );
+    const state = h.sessions.openStates().find((s) => s.sessionId === sid);
+    expect(state?.aside).toMatchObject({
+      question: '¿Cómo va?',
+      answer: 'Side answer: ¿Cómo va?',
+      status: 'done',
+    });
+    expect(state?.turn).toBe('working');
+    expect(state?.items.some((i) => i.kind === 'agent' && i.text.includes('Side answer'))).toBe(
+      false,
+    );
+    expect(
+      state?.items.some(
+        (i) =>
+          i.kind === 'user' && i.blocks.some((b) => b.type === 'text' && b.text.startsWith('/btw')),
+      ),
+    ).toBe(false);
+    c.send({ type: 'cancel', sessionId: sid }, 'aside-stop');
+    await c.waitFor(
+      (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
+    );
+    c.ws.close();
+  });
+
   it('config.set thought_level', async () => {
     const c = wsClient(h.port);
     await c.waitFor((m) => m.type === 'hello');

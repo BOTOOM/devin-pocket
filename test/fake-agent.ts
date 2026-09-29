@@ -55,6 +55,12 @@ const MODES = [
 
 const AVAILABLE_COMMANDS = [
   {
+    name: 'btw',
+    description: 'ask a side question',
+    input: { hint: '[question]' },
+    _meta: { 'cognition.ai/category': 'Session' },
+  },
+  {
     name: 'plan',
     description: 'create an execution plan',
     input: { hint: '[prompt]' },
@@ -713,8 +719,18 @@ const agent: Agent = {
   },
   async prompt(params) {
     if (!authenticated) throw NOT_AUTHENTICATED();
-    promptCount++;
     const ptext = params.prompt.map((b) => (b.type === 'text' ? b.text : '')).join('');
+    if (ptext.startsWith('/btw ')) {
+      const sideMeta = { 'cognition.ai/channel': 'btw' };
+      await update({ sessionUpdate: 'user_message_chunk', content: text(ptext), _meta: sideMeta });
+      await update({
+        sessionUpdate: 'agent_message_chunk',
+        content: text(`Side answer: ${ptext.slice(5)}`),
+        _meta: sideMeta,
+      });
+      return { stopReason: 'end_turn' };
+    }
+    promptCount++;
     process.stderr.write(`fake-agent: prompt #${promptCount}: ${ptext.slice(0, 80)}\n`);
     void update({ sessionUpdate: 'user_message_chunk', content: { type: 'text', text: ptext } });
     cancelled = false;
