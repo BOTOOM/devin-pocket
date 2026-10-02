@@ -120,8 +120,9 @@ test('queued message edits in place keeping its position', async ({ page }) => {
   await row.getByRole('button', { name: /Editar mensaje|Edit message/i }).click();
   await expect(page.getByText(/Editando mensaje en cola|Editing queued message/i)).toBeVisible();
   await expect(input).toHaveValue('SECOND_QUEUED');
-  // the item stays queued while being edited
+  // the item stays queued while being edited, and its send-now can't fire the old content
   await expect(queue.getByText('SECOND_QUEUED')).toBeVisible();
+  await expect(row.getByRole('button', { name: /Enviar ahora|Send now/i })).toBeDisabled();
   await input.fill('SECOND_EDITED');
   await page.getByRole('button', { name: /Guardar cambios|Save changes/i }).click();
   await expect(page.getByText(/Editando mensaje en cola|Editing queued message/i)).toHaveCount(0);

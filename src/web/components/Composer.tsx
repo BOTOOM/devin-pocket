@@ -1,6 +1,7 @@
 import type { ContentBlock, FsEntry, SessionState } from '@shared/protocol';
 import {
   AtSign,
+  Check,
   ChevronDown,
   File as FileIcon,
   Folder,
@@ -54,6 +55,8 @@ export function Composer({
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fsSeq = useRef(0);
   const submitting = useRef(false);
+  // Bumped when the draft clears — stale FileReader results are dropped.
+  const draftEpoch = useRef(0);
 
   const working =
     state?.turn === 'working' ||
@@ -156,20 +159,25 @@ export function Composer({
           ? { type: 'prompt.update', sessionId, id: editingId, blocks }
           : { type: 'prompt.enqueue', sessionId, blocks },
       );
+      draftEpoch.current++;
       setText('');
       setImages([]);
       setMentions([]);
       setEditingId(null);
     } catch (e) {
-      void import('sonner').then(({ toast }) => toast.error((e as Error).message));
+      const msg = (e as Error).message;
+      void import('sonner').then(({ toast }) =>
+        toast.error(editingId && /not found/i.test(msg) ? t('composer.editGone') : msg),
+      );
       // The queued item may already have been sent; drop edit mode so a retry enqueues fresh.
       setEditingId(null);
     } finally {
       submitting.current = false;
     }
-  }, [text, mentions, images, sessionId, state?.commands, editingId]);
+  }, [text, mentions, images, sessionId, state?.commands, editingId, t]);
 
   const cancelEdit = () => {
+    draftEpoch.current++;
     setEditingId(null);
     setText('');
     setImages([]);
@@ -178,6 +186,7 @@ export function Composer({
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return;
+    const epoch = draftEpoch.current;
     const out: typeof images = [];
     for (const f of Array.from(files).slice(0, 8)) {
       if (f.size > IMAGE_MAX_BYTES) {
@@ -193,7 +202,7 @@ export function Composer({
       });
       out.push({ data, mimeType: f.type || 'image/png', name: f.name });
     }
-    setImages((prev) => [...prev, ...out]);
+    if (draftEpoch.current === epoch) setImages((prev) => [...prev, ...out]);
   };
 
   // Auto-grow up to ~6 lines; scrollbar only once overflowing.
@@ -237,6 +246,9 @@ export function Composer({
                   >
                     <span className="min-w-0 flex-1 truncate text-sm" title={queuedText}>
                       {queuedText || t('composer.attachments', { count: attachments })}
+                      {attachments > 0 && !!queuedText && (
+                        <span className="text-muted-foreground"> · 📎{attachments}</span>
+                      )}
                     </span>
                     <Button
                       variant="ghost"
@@ -244,7 +256,7 @@ export function Composer({
                       className="size-10 shrink-0"
                       aria-label={t('composer.sendNow')}
                       title={t('composer.sendNow')}
-                      disabled={!agentReady}
+                      disabled={!agentReady || item.id === editingId}
                       onClick={() =>
                         send({ type: 'prompt.sendNow', sessionId, id: item.id }).catch(
                           (e) =>
@@ -296,14 +308,15 @@ export function Composer({
                       size="icon"
                       className="size-10 shrink-0"
                       aria-label={t('composer.removeQueued')}
-                      onClick={() =>
+                      onClick={() => {
+                        if (item.id === editingId) cancelEdit();
                         send({ type: 'prompt.remove', sessionId, id: item.id }).catch(
                           (e) =>
                             void import('sonner').then(({ toast }) =>
                               toast.error((e as Error).message),
                             ),
-                        )
-                      }
+                        );
+                      }}
                     >
                       <Trash2 className="size-4" />
                     </Button>
@@ -492,7 +505,7 @@ export function Composer({
           disabled={!agentReady || (!text.trim() && images.length === 0 && mentions.length === 0)}
           onClick={submit}
         >
-          <Send className="size-5" />
+          {editingId ? <Check className="size-5" /> : <Send className="size-5" />}
         </Button>
       </div>
 
