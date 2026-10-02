@@ -236,7 +236,11 @@ export function Composer({
                   .filter((b) => b.type === 'text')
                   .map((b) => b.text)
                   .join(' ');
-                const attachments = item.blocks.filter((b) => b.type !== 'text').length;
+                const imgCount = item.blocks.filter((b) => b.type === 'image').length;
+                const fileCount = item.blocks.filter(
+                  (b) => b.type !== 'text' && b.type !== 'image',
+                ).length;
+                const attachments = imgCount + fileCount;
                 return (
                   <div
                     key={item.id}
@@ -246,10 +250,19 @@ export function Composer({
                   >
                     <span className="min-w-0 flex-1 truncate text-sm" title={queuedText}>
                       {queuedText || t('composer.attachments', { count: attachments })}
-                      {attachments > 0 && !!queuedText && (
-                        <span className="text-muted-foreground"> · 📎{attachments}</span>
-                      )}
                     </span>
+                    {imgCount > 0 && (
+                      <span className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">
+                        <ImageIcon className="size-3.5" />
+                        {imgCount}
+                      </span>
+                    )}
+                    {fileCount > 0 && (
+                      <span className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground">
+                        <FileIcon className="size-3.5" />
+                        {fileCount}
+                      </span>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
