@@ -66,6 +66,8 @@ export class SessionManager {
   private active = new Set<string>();
   private interrupting = new Set<string>();
   private sideActive = new Set<string>();
+  /** sessionId → counters while a session/load replay is in flight */
+  private loadStats = new Map<string, { updates: number; events: number; pipelineMs: number }>();
 
   constructor(
     private agent: AgentProcess,
@@ -120,6 +122,8 @@ export class SessionManager {
   /** Feed an ACP notification into the matching session state. */
   handleNotification(n: SessionNotification): void {
     const sid = n.sessionId;
+    const stat = this.loadStats.get(sid);
+    if (stat) stat.updates++;
     const channel = n.update._meta?.['cognition.ai/channel'] ?? n._meta?.['cognition.ai/channel'];
     const isAside = this.sideActive.has(sid) && (channel === 'btw' || !this.active.has(sid));
     if (
@@ -154,7 +158,14 @@ export class SessionManager {
     }
     const events = normalizeUpdate(n.update);
     this.ensure(sid);
-    for (const ev of events) this.emitEvent(sid, ev);
+    if (stat) {
+      stat.events += events.length;
+      const t0 = performance.now();
+      for (const ev of events) this.emitEvent(sid, ev);
+      stat.pipelineMs += performance.now() - t0;
+    } else {
+      for (const ev of events) this.emitEvent(sid, ev);
+    }
   }
 
   handleTurnStats(sessionId: string, stat: TurnStat): void {
@@ -262,6 +273,9 @@ export class SessionManager {
   async open(sessionId: string, cwd: string): Promise<SessionState> {
     this.ensure(sessionId, cwd);
     this.emitEvent(sessionId, { type: 'loading', loading: true });
+    const stat = { updates: 0, events: 0, pipelineMs: 0 };
+    this.loadStats.set(sessionId, stat);
+    const t0 = performance.now();
     try {
       const res = await this.agent.loadSession(sessionId, cwd);
       this.agent.trackOpen(sessionId, cwd);
@@ -281,6 +295,11 @@ export class SessionManager {
       }
       return this.sessions.get(sessionId)!;
     } finally {
+      this.loadStats.delete(sessionId);
+      this.log.info(
+        `session/load ${sessionId}: ${stat.updates} updates, ${stat.events} events, ` +
+          `pipeline ${Math.round(stat.pipelineMs)}ms, total ${Math.round(performance.now() - t0)}ms`,
+      );
       this.emitEvent(sessionId, { type: 'loading', loading: false });
       this.emit({ type: 'session.snapshot', state: this.sessions.get(sessionId)! });
     }
