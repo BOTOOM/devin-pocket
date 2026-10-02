@@ -232,8 +232,10 @@ export function Composer({
                 </span>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="shrink-0"
+                  size="icon"
+                  className="size-10 shrink-0"
+                  aria-label={t('composer.sendNow')}
+                  title={t('composer.sendNow')}
                   disabled={!agentReady}
                   onClick={() =>
                     send({ type: 'prompt.sendNow', sessionId, id: item.id }).catch(
@@ -244,7 +246,7 @@ export function Composer({
                     )
                   }
                 >
-                  {t('composer.sendNow')}
+                  <Send className="size-4" />
                 </Button>
                 <Button
                   variant="ghost"
