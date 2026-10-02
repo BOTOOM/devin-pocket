@@ -1,6 +1,7 @@
 import type { ContentBlock, FsEntry, SessionState } from '@shared/protocol';
 import {
   AtSign,
+  ChevronDown,
   File as FileIcon,
   Folder,
   Image as ImageIcon,
@@ -12,6 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CommandPalette } from '@/components/CommandPalette';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
 import { useT } from '@/i18n';
 import { send } from '@/lib/ws';
@@ -45,6 +47,7 @@ export function Composer({
   const [fsResults, setFsResults] = useState<FsEntry[]>([]);
   const [fsLoading, setFsLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [queueOpen, setQueueOpen] = useState(true);
   const [overflow, setOverflow] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -207,99 +210,109 @@ export function Composer({
   return (
     <div className="safe-x safe-bottom relative border-t bg-background px-3 pb-2 pt-2">
       {(state?.queue.length ?? 0) > 0 && (
-        <section
-          className="mb-2 max-h-[28dvh] space-y-1 overflow-y-auto"
-          aria-label={t('composer.queue', { count: state?.queue.length ?? 0 })}
-        >
-          <p className="text-xs font-medium text-muted-foreground">
+        <Collapsible open={queueOpen} onOpenChange={setQueueOpen} className="mb-2">
+          <CollapsibleTrigger className="flex min-h-8 w-full items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-accent/60">
             {t('composer.queue', { count: state?.queue.length ?? 0 })}
-          </p>
-          {state?.queue.map((item) => {
-            const queuedText = item.blocks
-              .filter((b) => b.type === 'text')
-              .map((b) => b.text)
-              .join(' ');
-            const attachments = item.blocks.filter((b) => b.type !== 'text').length;
-            return (
-              <div
-                key={item.id}
-                className={`flex min-w-0 items-center gap-1 rounded-lg border px-2 py-1 ${
-                  item.id === editingId ? 'border-primary bg-primary/5' : 'bg-muted/40'
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate text-sm" title={queuedText}>
-                  {queuedText || t('composer.attachments', { count: attachments })}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-10 shrink-0"
-                  aria-label={t('composer.sendNow')}
-                  title={t('composer.sendNow')}
-                  disabled={!agentReady}
-                  onClick={() =>
-                    send({ type: 'prompt.sendNow', sessionId, id: item.id }).catch(
-                      (e) =>
-                        void import('sonner').then(({ toast }) =>
-                          toast.error((e as Error).message),
-                        ),
-                    )
-                  }
-                >
-                  <Send className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-10 shrink-0"
-                  aria-label={t('composer.editQueued')}
-                  disabled={
-                    editingId != null || !!text.trim() || images.length > 0 || mentions.length > 0
-                  }
-                  onClick={() => {
-                    // Edit in place: keep the item queued; prompt.update preserves its position.
-                    setEditingId(item.id);
-                    setText(
-                      item.blocks
-                        .filter((b) => b.type === 'text')
-                        .map((b) => b.text)
-                        .join('\n'),
-                    );
-                    setImages(
-                      item.blocks
-                        .filter((b) => b.type === 'image')
-                        .map((b) => ({ data: b.data, mimeType: b.mimeType, name: 'image' })),
-                    );
-                    setMentions(
-                      item.blocks
-                        .filter((b) => b.type === 'resource_link')
-                        .map((b) => ({ name: b.name ?? b.uri, uri: b.uri })),
-                    );
-                    taRef.current?.focus();
-                  }}
-                >
-                  <Pencil className="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-10 shrink-0"
-                  aria-label={t('composer.removeQueued')}
-                  onClick={() =>
-                    send({ type: 'prompt.remove', sessionId, id: item.id }).catch(
-                      (e) =>
-                        void import('sonner').then(({ toast }) =>
-                          toast.error((e as Error).message),
-                        ),
-                    )
-                  }
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-            );
-          })}
-        </section>
+            <ChevronDown
+              className={`size-4 transition-transform ${queueOpen ? 'rotate-180' : ''}`}
+            />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-1">
+            <section
+              className="max-h-[28dvh] space-y-1 overflow-y-auto"
+              aria-label={t('composer.queue', { count: state?.queue.length ?? 0 })}
+            >
+              {state?.queue.map((item) => {
+                const queuedText = item.blocks
+                  .filter((b) => b.type === 'text')
+                  .map((b) => b.text)
+                  .join(' ');
+                const attachments = item.blocks.filter((b) => b.type !== 'text').length;
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex min-w-0 items-center gap-1 rounded-lg border px-2 py-1 ${
+                      item.id === editingId ? 'border-primary bg-primary/5' : 'bg-muted/40'
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate text-sm" title={queuedText}>
+                      {queuedText || t('composer.attachments', { count: attachments })}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-10 shrink-0"
+                      aria-label={t('composer.sendNow')}
+                      title={t('composer.sendNow')}
+                      disabled={!agentReady}
+                      onClick={() =>
+                        send({ type: 'prompt.sendNow', sessionId, id: item.id }).catch(
+                          (e) =>
+                            void import('sonner').then(({ toast }) =>
+                              toast.error((e as Error).message),
+                            ),
+                        )
+                      }
+                    >
+                      <Send className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-10 shrink-0"
+                      aria-label={t('composer.editQueued')}
+                      disabled={
+                        editingId != null ||
+                        !!text.trim() ||
+                        images.length > 0 ||
+                        mentions.length > 0
+                      }
+                      onClick={() => {
+                        // Edit in place: keep the item queued; prompt.update preserves its position.
+                        setEditingId(item.id);
+                        setText(
+                          item.blocks
+                            .filter((b) => b.type === 'text')
+                            .map((b) => b.text)
+                            .join('\n'),
+                        );
+                        setImages(
+                          item.blocks
+                            .filter((b) => b.type === 'image')
+                            .map((b) => ({ data: b.data, mimeType: b.mimeType, name: 'image' })),
+                        );
+                        setMentions(
+                          item.blocks
+                            .filter((b) => b.type === 'resource_link')
+                            .map((b) => ({ name: b.name ?? b.uri, uri: b.uri })),
+                        );
+                        taRef.current?.focus();
+                      }}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-10 shrink-0"
+                      aria-label={t('composer.removeQueued')}
+                      onClick={() =>
+                        send({ type: 'prompt.remove', sessionId, id: item.id }).catch(
+                          (e) =>
+                            void import('sonner').then(({ toast }) =>
+                              toast.error((e as Error).message),
+                            ),
+                        )
+                      }
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </section>
+          </CollapsibleContent>
+        </Collapsible>
       )}
       {mentionOpen && (
         <div className="absolute inset-x-3 bottom-full mb-1 max-h-[40dvh] overflow-y-auto rounded-xl border bg-popover shadow-lg">
