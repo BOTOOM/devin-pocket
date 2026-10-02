@@ -322,6 +322,20 @@ export function Composer({
         </div>
       )}
 
+      <Button
+        variant="ghost"
+        size="sm"
+        className="mb-1 min-h-11 gap-2 px-2 text-muted-foreground"
+        onClick={() => setCmdOpen(true)}
+      >
+        <span
+          aria-hidden="true"
+          className="flex size-6 items-center justify-center rounded-md border text-sm font-semibold"
+        >
+          /
+        </span>
+        {t('cmd.title')}
+      </Button>
       <div className="flex items-end gap-1.5">
         <input
           ref={fileRef}

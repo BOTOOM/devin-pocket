@@ -49,6 +49,21 @@ test('compact controls stay on one row with long settings on a narrow phone', as
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
+test('visible commands button opens palette without changing the draft', async ({ page }) => {
+  await page.goto('/#/');
+  await page
+    .getByRole('button', { name: /Nueva sesión|New session/i })
+    .first()
+    .click();
+  const input = page.locator('textarea').first();
+  await input.fill('Borrador');
+  await page.getByRole('button', { name: /Comandos|Commands/i }).click();
+  await expect(page.getByRole('dialog').getByText('/plan', { exact: true })).toBeVisible();
+  await expect(input).toHaveValue('Borrador');
+  await page.getByRole('dialog').getByText('/plan', { exact: true }).click();
+  await expect(input).toHaveValue('/plan ');
+});
+
 test('ACP Markdown renders on mobile without losing file references or code', async ({
   page,
   context,
