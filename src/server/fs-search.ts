@@ -1,10 +1,15 @@
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { FsEntry, Workspace } from '../shared/protocol.js';
 
 const SKIP = new Set(['node_modules', '.git', 'dist', 'target', '.venv', '__pycache__']);
 const MAX_DEPTH = 6;
+const WALK_BUDGET = 20_000;
+/** Mention queries re-scan per keystroke otherwise; the tree rarely changes. */
+const WALK_TTL_MS = 15_000;
+const WALK_CACHE_MAX = 32;
 
 /** cwd must be inside home or a configured workspace. */
 export function cwdAllowed(cwd: string, workspaces: Workspace[]): boolean {
@@ -34,39 +39,49 @@ function gitignoreMatchers(root: string): RegExp[] {
   }
 }
 
-function walk(root: string, ignores: RegExp[], out: FsEntry[], budget: { n: number }): void {
+/** Async BFS so a big tree doesn't stall the event loop; no per-file stat (unused). */
+async function walk(root: string, ignores: RegExp[], out: FsEntry[]): Promise<void> {
   const queue: { dir: string; depth: number }[] = [{ dir: root, depth: 0 }];
-  while (queue.length && budget.n > 0) {
+  let budget = WALK_BUDGET;
+  while (queue.length && budget > 0) {
     const { dir, depth } = queue.shift()!;
     if (depth > MAX_DEPTH) continue;
     let ents: fs.Dirent[];
     try {
-      ents = fs.readdirSync(dir, { withFileTypes: true });
+      ents = await fsp.readdir(dir, { withFileTypes: true });
     } catch {
       continue;
     }
     for (const e of ents) {
-      if (budget.n <= 0) return;
+      if (budget <= 0) return;
       if (e.name.startsWith('.') && e.name !== '.github') continue;
-      const full = path.join(dir, e.name);
-      const rel = path.relative(root, full);
+      const rel = path.relative(root, path.join(dir, e.name));
       if (SKIP.has(e.name) || ignores.some((r) => r.test(rel))) continue;
       if (e.isDirectory()) {
         out.push({ name: e.name, path: rel, kind: 'dir' });
-        queue.push({ dir: full, depth: depth + 1 });
-        budget.n--;
+        queue.push({ dir: path.join(dir, e.name), depth: depth + 1 });
+        budget--;
       } else if (e.isFile()) {
-        let size: number | undefined;
-        try {
-          size = fs.statSync(full).size;
-        } catch {
-          size = undefined;
-        }
-        out.push({ name: e.name, path: rel, kind: 'file', size });
-        budget.n--;
+        out.push({ name: e.name, path: rel, kind: 'file' });
+        budget--;
       }
     }
   }
+}
+
+const walkCache = new Map<string, { at: number; entries: FsEntry[] }>();
+const walkInflight = new Map<string, Promise<FsEntry[]>>();
+
+function walkOnce(root: string, ignores: RegExp[]): Promise<FsEntry[]> {
+  const inflight = walkInflight.get(root);
+  if (inflight) return inflight;
+  const p = (async () => {
+    const out: FsEntry[] = [];
+    await walk(root, ignores, out);
+    return out;
+  })().finally(() => walkInflight.delete(root));
+  walkInflight.set(root, p);
+  return p;
 }
 
 /** Subsequence fuzzy match of q against s (case-insensitive). */
@@ -85,14 +100,22 @@ export function fuzzyMatch(q: string, s: string): number | null {
   return qi === ql.length ? score : null;
 }
 
-export function search(
+export async function search(
   cwd: string,
   q: string,
   limit: number,
-): { entries: FsEntry[]; truncated: boolean } {
-  const ignores = gitignoreMatchers(cwd);
-  const all: FsEntry[] = [];
-  walk(cwd, ignores, all, { n: 20_000 });
+): Promise<{ entries: FsEntry[]; truncated: boolean }> {
+  // '' resolves like cwdAllowed does — process cwd — so early queries still work.
+  const root = path.resolve(cwd);
+  const hit = walkCache.get(root);
+  let all: FsEntry[];
+  if (hit && Date.now() - hit.at < WALK_TTL_MS) {
+    all = hit.entries;
+  } else {
+    all = await walkOnce(root, gitignoreMatchers(root));
+    if (walkCache.size >= WALK_CACHE_MAX) walkCache.clear();
+    walkCache.set(root, { at: Date.now(), entries: all });
+  }
   const scored = all
     .map((e) => ({ e, s: fuzzyMatch(q, e.path) }))
     .filter((x): x is { e: FsEntry; s: number } => x.s !== null)

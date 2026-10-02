@@ -351,7 +351,7 @@ export class PocketServer {
         if (!cwdAllowed(cwd, this.deps.config.workspaces)) {
           return this.json(res, { error: 'cwd not allowed' }, 403);
         }
-        return this.json(res, search(cwd, q, limit));
+        return this.json(res, await search(cwd, q, limit));
       }
       if (url.pathname === '/api/workspaces/browse') {
         const p = url.searchParams.get('path') ?? '';
