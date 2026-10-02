@@ -57,11 +57,77 @@ test('visible commands button opens palette without changing the draft', async (
     .click();
   const input = page.locator('textarea').first();
   await input.fill('Borrador');
-  await page.getByRole('button', { name: /Comandos|Commands/i }).click();
+  const attach = page.getByRole('button', { name: /Adjuntar imagen|Attach image/i });
+  const cmdBtn = page.getByRole('button', { name: /Comandos|Commands/i });
+  // icon-only button on the same row as attach/mention
+  const [a, b] = await Promise.all([attach.boundingBox(), cmdBtn.boundingBox()]);
+  expect(Math.abs((a?.y ?? 0) - (b?.y ?? 0))).toBeLessThan(4);
+  await cmdBtn.click();
   await expect(page.getByRole('dialog').getByText('/plan', { exact: true })).toBeVisible();
   await expect(input).toHaveValue('Borrador');
   await page.getByRole('dialog').getByText('/plan', { exact: true }).click();
   await expect(input).toHaveValue('/plan ');
+});
+
+test('mention button loads files and picks one', async ({ page }) => {
+  await page.goto('/#/');
+  await page.getByText('Fix the flaky test').click();
+  const input = page.locator('textarea').first();
+  await expect(input).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: /Mencionar archivo|Mention file/i }).click();
+  const row = page.getByRole('button', { name: /package\.json/ }).first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await page.keyboard.type('pack');
+  await expect(row).toBeVisible();
+  await row.click();
+  await expect(page.getByRole('button', { name: /^@package\.json/ })).toBeVisible();
+  await expect(input).toHaveValue('');
+});
+
+test('enter inserts a newline when enter-to-send is off', async ({ page }) => {
+  await page.goto('/#/settings');
+  const toggle = page.getByRole('switch', { name: /Enter envía|Enter sends/i });
+  await expect(toggle).toBeChecked();
+  await toggle.click();
+  await page.goto('/#/');
+  await page.getByText('Fix the flaky test').click();
+  const input = page.locator('textarea').first();
+  await expect(input).toBeVisible({ timeout: 20_000 });
+  await input.fill('línea uno');
+  await page.keyboard.press('Enter');
+  await expect(input).toHaveValue('línea uno\n');
+  await page.goto('/#/settings');
+  await page.getByRole('switch', { name: /Enter envía|Enter sends/i }).click();
+});
+
+test('queued message edits in place keeping its position', async ({ page }) => {
+  await page.goto('/#/');
+  await page
+    .getByRole('button', { name: /Nueva sesión|New session/i })
+    .first()
+    .click();
+  const input = page.locator('textarea');
+  await input.fill('QUEUE_HOLD');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: /Añadir a la cola|Add to queue/i })).toBeVisible();
+  await input.fill('FIRST_QUEUED');
+  await page.keyboard.press('Enter');
+  await input.fill('SECOND_QUEUED');
+  await page.keyboard.press('Enter');
+  const queue = page.getByRole('region', { name: /En cola|Queued/i });
+  await expect(queue.getByText('SECOND_QUEUED')).toBeVisible();
+  const row = queue.locator('div', { hasText: 'SECOND_QUEUED' });
+  await row.getByRole('button', { name: /Editar mensaje|Edit message/i }).click();
+  await expect(page.getByText(/Editando mensaje en cola|Editing queued message/i)).toBeVisible();
+  await expect(input).toHaveValue('SECOND_QUEUED');
+  // the item stays queued while being edited
+  await expect(queue.getByText('SECOND_QUEUED')).toBeVisible();
+  await input.fill('SECOND_EDITED');
+  await page.getByRole('button', { name: /Guardar cambios|Save changes/i }).click();
+  await expect(page.getByText(/Editando mensaje en cola|Editing queued message/i)).toHaveCount(0);
+  const rows = queue.locator('> div');
+  await expect(rows.nth(0)).toContainText('FIRST_QUEUED');
+  await expect(rows.nth(1)).toContainText('SECOND_EDITED');
 });
 
 test('new session shows busy state, blocks double-clicks and reports errors', async ({ page }) => {

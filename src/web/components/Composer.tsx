@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useT } from '@/i18n';
 import { send } from '@/lib/ws';
+import { useStore } from '@/store';
 
 interface Mention {
   name: string;
@@ -34,16 +35,21 @@ export function Composer({
   agentReady: boolean;
 }) {
   const t = useT();
+  const enterToSend = useStore((s) => s.prefs.enterToSend);
   const [text, setText] = useState('');
   const [images, setImages] = useState<{ data: string; mimeType: string; name: string }[]>([]);
   const [mentions, setMentions] = useState<Mention[]>([]);
   const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQ, setMentionQ] = useState('');
   const [cmdOpen, setCmdOpen] = useState(false);
   const [fsResults, setFsResults] = useState<FsEntry[]>([]);
+  const [fsLoading, setFsLoading] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [overflow, setOverflow] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fsSeq = useRef(0);
   const submitting = useRef(false);
 
   const working =
@@ -52,25 +58,42 @@ export function Composer({
     state?.turn === 'cancelling';
   const cwd = state?.cwd ?? '';
 
+  // Debounced /api/fs lookup; fsSeq discards out-of-order responses.
+  const fetchMention = useCallback(
+    (q: string) => {
+      if (debounce.current) clearTimeout(debounce.current);
+      const seq = ++fsSeq.current;
+      setFsLoading(true);
+      debounce.current = setTimeout(() => {
+        fetch(
+          `/api/fs?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(q)}&limit=${MENTION_MAX}`,
+        )
+          .then((r) => (r.ok ? r.json() : Promise.reject()))
+          .then((d: { entries: FsEntry[] }) => {
+            if (fsSeq.current !== seq) return;
+            setFsResults(
+              [...d.entries].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'dir' ? -1 : 1)),
+            );
+            setFsLoading(false);
+          })
+          .catch(() => {
+            if (fsSeq.current !== seq) return;
+            setFsResults([]);
+            setFsLoading(false);
+          });
+      }, 200);
+    },
+    [cwd],
+  );
+
   const onTextChange = (v: string) => {
     setText(v);
     const caret = taRef.current?.selectionStart ?? v.length;
     const m = v.slice(0, caret).match(/@([\p{L}\p{N}_\-./]*)$/u);
     if (m) {
       setMentionOpen(true);
-      if (debounce.current) clearTimeout(debounce.current);
-      debounce.current = setTimeout(() => {
-        fetch(
-          `/api/fs?cwd=${encodeURIComponent(cwd)}&q=${encodeURIComponent(m[1] ?? '')}&limit=${MENTION_MAX}`,
-        )
-          .then((r) => (r.ok ? r.json() : Promise.reject()))
-          .then((d: { entries: FsEntry[] }) =>
-            setFsResults(
-              [...d.entries].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'dir' ? -1 : 1)),
-            ),
-          )
-          .catch(() => setFsResults([]));
-      }, 200);
+      setMentionQ(m[1] ?? '');
+      fetchMention(m[1] ?? '');
     } else if (v.trim() === '/') {
       setCmdOpen(true);
       setText('');
@@ -78,6 +101,12 @@ export function Composer({
       setMentionOpen(false);
     }
   };
+
+  // cwd arrives with the session snapshot — refresh an open mention list when it does.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refetch only when cwd changes
+  useEffect(() => {
+    if (mentionOpen) fetchMention(mentionQ);
+  }, [cwd]);
 
   const pickMention = (e: FsEntry) => {
     const caret = taRef.current?.selectionStart ?? text.length;
@@ -119,16 +148,30 @@ export function Composer({
     if (blocks.length === 0) return;
     submitting.current = true;
     try {
-      await send({ type: 'prompt.enqueue', sessionId, blocks });
+      await send(
+        editingId
+          ? { type: 'prompt.update', sessionId, id: editingId, blocks }
+          : { type: 'prompt.enqueue', sessionId, blocks },
+      );
       setText('');
       setImages([]);
       setMentions([]);
+      setEditingId(null);
     } catch (e) {
       void import('sonner').then(({ toast }) => toast.error((e as Error).message));
+      // The queued item may already have been sent; drop edit mode so a retry enqueues fresh.
+      setEditingId(null);
     } finally {
       submitting.current = false;
     }
-  }, [text, mentions, images, sessionId, state?.commands]);
+  }, [text, mentions, images, sessionId, state?.commands, editingId]);
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setText('');
+    setImages([]);
+    setMentions([]);
+  };
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -180,7 +223,9 @@ export function Composer({
             return (
               <div
                 key={item.id}
-                className="flex min-w-0 items-center gap-1 rounded-lg border bg-muted/40 px-2 py-1"
+                className={`flex min-w-0 items-center gap-1 rounded-lg border px-2 py-1 ${
+                  item.id === editingId ? 'border-primary bg-primary/5' : 'bg-muted/40'
+                }`}
               >
                 <span className="min-w-0 flex-1 truncate text-sm" title={queuedText}>
                   {queuedText || t('composer.attachments', { count: attachments })}
@@ -206,30 +251,29 @@ export function Composer({
                   size="icon"
                   className="size-10 shrink-0"
                   aria-label={t('composer.editQueued')}
-                  disabled={!!text.trim() || images.length > 0 || mentions.length > 0}
-                  onClick={async () => {
-                    try {
-                      await send({ type: 'prompt.remove', sessionId, id: item.id });
-                      setText(
-                        item.blocks
-                          .filter((b) => b.type === 'text')
-                          .map((b) => b.text)
-                          .join('\n'),
-                      );
-                      setImages(
-                        item.blocks
-                          .filter((b) => b.type === 'image')
-                          .map((b) => ({ data: b.data, mimeType: b.mimeType, name: 'image' })),
-                      );
-                      setMentions(
-                        item.blocks
-                          .filter((b) => b.type === 'resource_link')
-                          .map((b) => ({ name: b.name ?? b.uri, uri: b.uri })),
-                      );
-                      taRef.current?.focus();
-                    } catch (e) {
-                      void import('sonner').then(({ toast }) => toast.error((e as Error).message));
-                    }
+                  disabled={
+                    editingId != null || !!text.trim() || images.length > 0 || mentions.length > 0
+                  }
+                  onClick={() => {
+                    // Edit in place: keep the item queued; prompt.update preserves its position.
+                    setEditingId(item.id);
+                    setText(
+                      item.blocks
+                        .filter((b) => b.type === 'text')
+                        .map((b) => b.text)
+                        .join('\n'),
+                    );
+                    setImages(
+                      item.blocks
+                        .filter((b) => b.type === 'image')
+                        .map((b) => ({ data: b.data, mimeType: b.mimeType, name: 'image' })),
+                    );
+                    setMentions(
+                      item.blocks
+                        .filter((b) => b.type === 'resource_link')
+                        .map((b) => ({ name: b.name ?? b.uri, uri: b.uri })),
+                    );
+                    taRef.current?.focus();
                   }}
                 >
                   <Pencil className="size-4" />
@@ -259,7 +303,7 @@ export function Composer({
         <div className="absolute inset-x-4 bottom-full mb-1 max-h-[40dvh] overflow-y-auto rounded-xl border bg-popover shadow-lg">
           {fsResults.length === 0 ? (
             <p className="px-4 py-4 text-center text-sm text-muted-foreground">
-              {t('common.loading')}
+              {fsLoading ? t('common.loading') : t('composer.noMatches')}
             </p>
           ) : (
             fsResults.map((e) => (
@@ -322,20 +366,21 @@ export function Composer({
         </div>
       )}
 
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mb-1 min-h-11 gap-2 px-2 text-muted-foreground"
-        onClick={() => setCmdOpen(true)}
-      >
-        <span
-          aria-hidden="true"
-          className="flex size-6 items-center justify-center rounded-md border text-sm font-semibold"
-        >
-          /
-        </span>
-        {t('cmd.title')}
-      </Button>
+      {editingId && (
+        <div className="mb-1.5 flex items-center gap-2 rounded-lg border border-primary/50 bg-primary/5 px-3 py-1.5 text-xs">
+          <Pencil className="size-3.5 shrink-0 text-primary" />
+          <span className="min-w-0 flex-1 truncate">{t('composer.editing')}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7 shrink-0"
+            aria-label={t('common.cancel')}
+            onClick={cancelEdit}
+          >
+            ×
+          </Button>
+        </div>
+      )}
       <div className="flex items-end gap-1.5">
         <input
           ref={fileRef}
@@ -362,10 +407,26 @@ export function Composer({
           onClick={() => {
             setText((v) => `${v}@`);
             setMentionOpen(true);
+            setMentionQ('');
+            fetchMention('');
             taRef.current?.focus();
           }}
         >
           <AtSign className="size-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11 shrink-0"
+          aria-label={t('cmd.title')}
+          onClick={() => setCmdOpen(true)}
+        >
+          <span
+            aria-hidden="true"
+            className="flex size-6 items-center justify-center rounded-md border text-sm font-semibold"
+          >
+            /
+          </span>
         </Button>
 
         <Textarea
@@ -373,7 +434,7 @@ export function Composer({
           value={text}
           onChange={(e) => onTextChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !mentionOpen) {
+            if (e.key === 'Enter' && !e.shiftKey && !mentionOpen && enterToSend) {
               e.preventDefault();
               submit();
             }
@@ -401,11 +462,13 @@ export function Composer({
           size="icon"
           className="h-11 w-11 shrink-0 rounded-full"
           aria-label={
-            text.trim().startsWith('/btw ') && state?.commands.some((c) => c.name === 'btw')
-              ? t('aside.ask')
-              : working
-                ? t('composer.queued')
-                : t('composer.send')
+            editingId
+              ? t('composer.saveEdit')
+              : text.trim().startsWith('/btw ') && state?.commands.some((c) => c.name === 'btw')
+                ? t('aside.ask')
+                : working
+                  ? t('composer.queued')
+                  : t('composer.send')
           }
           disabled={!agentReady || (!text.trim() && images.length === 0 && mentions.length === 0)}
           onClick={submit}

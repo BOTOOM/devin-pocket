@@ -93,6 +93,18 @@ export function SettingsScreen() {
                 onCheckedChange={(v) => setPrefs({ showThoughts: v })}
               />
             </div>
+            <Separator />
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <Label htmlFor="enterSend">{t('settings.enterToSend')}</Label>
+                <p className="text-xs text-muted-foreground">{t('settings.enterToSend.hint')}</p>
+              </div>
+              <Switch
+                id="enterSend"
+                checked={prefs.enterToSend}
+                onCheckedChange={(v) => setPrefs({ enterToSend: v })}
+              />
+            </div>
           </CardContent>
         </Card>
 

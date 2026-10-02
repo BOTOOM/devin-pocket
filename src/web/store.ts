@@ -15,6 +15,7 @@ import { onConnection, onMessage, send, startSocket } from '@/lib/ws';
 
 export interface UiPrefs {
   showThoughts: boolean;
+  enterToSend: boolean;
   workspaces: Workspace[];
   workspace?: string;
 }
@@ -41,9 +42,9 @@ const ACTIVE_KEY = 'dp.activeSession';
 function loadPrefs(): UiPrefs {
   try {
     const p = JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}');
-    return { showThoughts: false, workspaces: [], ...p };
+    return { showThoughts: false, enterToSend: true, workspaces: [], ...p };
   } catch {
-    return { showThoughts: false, workspaces: [] };
+    return { showThoughts: false, enterToSend: true, workspaces: [] };
   }
 }
 

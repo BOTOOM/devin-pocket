@@ -56,7 +56,13 @@ export function CommandPalette({
           <SheetDescription>{t('cmd.title')}</SheetDescription>
         </SheetHeader>
         <Cmd className="bg-transparent">
-          <CommandInput placeholder={t('cmd.search')} />
+          <CommandInput
+            placeholder={t('cmd.search')}
+            // On touch devices autofocus summons the keyboard and covers the sheet.
+            autoFocus={
+              typeof matchMedia === 'function' ? !matchMedia('(pointer: coarse)').matches : true
+            }
+          />
           <CommandList className="max-h-[38dvh]">
             <CommandEmpty>—</CommandEmpty>
             {[...groups.entries()].map(([cat, list]) => (
