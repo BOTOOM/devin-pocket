@@ -23,6 +23,32 @@ test('fake agent home → session → prompt → permission → tool and usage',
   });
 });
 
+test('compact controls stay on one row with long settings on a narrow phone', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto('/#/');
+  await page
+    .getByRole('button', { name: /Nueva sesión|New session/i })
+    .first()
+    .click();
+  await page.locator('[data-chip="mode"]').click();
+  await page.getByText('Bypass Permissions', { exact: true }).last().click();
+  await expect(page.locator('[data-chip="mode"]')).toContainText('Bypass Permissions');
+  const positions = await page.locator('[data-chip]').evaluateAll((buttons) =>
+    buttons
+      .filter((b) => ['mode', 'model', 'reasoning'].includes(b.getAttribute('data-chip') ?? ''))
+      .map((b) => {
+        const rect = b.getBoundingClientRect();
+        return { top: rect.top, right: rect.right };
+      }),
+  );
+  expect(positions).toHaveLength(3);
+  expect(new Set(positions.map((p) => p.top)).size).toBe(1);
+  expect(positions.every((p) => p.right <= 320)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  await page.locator('[data-chip="model"]').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+});
+
 test('ACP Markdown renders on mobile without losing file references or code', async ({
   page,
   context,

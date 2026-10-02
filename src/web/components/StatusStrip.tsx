@@ -29,29 +29,42 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
   if (!state) return null;
   const { model, reasoning } = pickModelOptions(state);
   const modelValue = currentValue(model);
+  const modelName = model && selectOptions(model).find((o) => o.value === modelValue)?.name;
   const reasonValue = currentValue(reasoning);
   const modeName =
     state.modes.find((m) => m.id === state.currentMode)?.name ?? state.currentMode ?? '';
+  const controls = Number(state.modes.length > 0) + Number(!!model) + Number(!!reasonValue);
+  const columns =
+    controls === 3 ? 'grid-cols-[1fr_1.5fr_.8fr]' : controls === 2 ? 'grid-cols-2' : 'grid-cols-1';
 
   return (
     <div className="safe-x space-y-1.5 border-b px-4 py-2">
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className={`grid max-w-xl min-w-0 items-center gap-1.5 ${columns}`}>
         {state.modes.length > 0 && (
           <Chip
             chip="mode"
+            label={`${t('mode.title')}: ${modeName}`}
             onClick={() => setSheet('mode')}
             active={state.currentMode === 'bypass'}
           >
-            {modeName || 'mode'}
+            {modeName || t('mode.title')}
           </Chip>
         )}
         {model && (
-          <Chip chip="model" onClick={() => setSheet('model')}>
-            {modelValue ?? 'model'}
+          <Chip
+            chip="model"
+            label={`${t('model.title')}: ${modelName ?? modelValue ?? ''}`}
+            onClick={() => setSheet('model')}
+          >
+            {modelName ?? modelValue ?? t('model.title')}
           </Chip>
         )}
         {reasoning && reasonValue && (
-          <Chip chip="reasoning" onClick={() => setSheet('reason')}>
+          <Chip
+            chip="reasoning"
+            label={`${t('reasoning.title')}: ${reasonValue}`}
+            onClick={() => setSheet('reason')}
+          >
             {reasonValue}
           </Chip>
         )}
@@ -147,25 +160,29 @@ function Chip({
   onClick,
   active,
   chip,
+  label,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   active?: boolean;
   chip?: string;
+  label: string;
 }) {
   return (
     <button
       type="button"
       data-chip={chip}
+      aria-label={label}
+      title={label}
       onClick={onClick}
-      className={`flex h-8 items-center gap-1 rounded-full border px-3 text-xs font-medium ${
+      className={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-medium ${
         active
           ? 'border-warning/60 bg-warning/15 text-warning-foreground dark:text-warning'
           : 'bg-card'
       }`}
     >
-      {children}
-      <ChevronDown className="size-3 opacity-60" />
+      <span className="min-w-0 truncate">{children}</span>
+      <ChevronDown className="size-3 shrink-0 opacity-60" />
     </button>
   );
 }
