@@ -107,7 +107,11 @@ export class SessionManager {
     if (!s) return;
     const next = applyEvent(s, ev);
     this.sessions.set(sessionId, next);
-    this.emit({ type: 'session.event', sessionId, seq: next.seq, event: ev });
+    // During a session/load replay thousands of updates would each become a WS
+    // message; clients only need the `loading` flag and the final snapshot.
+    if (!s.loading || ev.type === 'loading') {
+      this.emit({ type: 'session.event', sessionId, seq: next.seq, event: ev });
+    }
   }
 
   private ensure(sessionId: string, cwd?: string): SessionState {

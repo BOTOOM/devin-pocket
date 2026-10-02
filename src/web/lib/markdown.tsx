@@ -1,7 +1,7 @@
 import DOMPurify from 'dompurify';
 import { Check, Copy } from 'lucide-react';
 import { marked } from 'marked';
-import { useRef, useState } from 'react';
+import { memo, useRef, useState } from 'react';
 import { t, useT } from '@/i18n';
 
 function escapeHtml(value: string): string {
@@ -46,7 +46,13 @@ marked.use({
   },
 });
 
-export function Markdown({ text, className }: { text: string; className?: string }) {
+export const Markdown = memo(function Markdown({
+  text,
+  className,
+}: {
+  text: string;
+  className?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const t = useT();
   const html = DOMPurify.sanitize(marked.parse(text, { async: false }));
@@ -84,7 +90,7 @@ export function Markdown({ text, className }: { text: string; className?: string
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
-}
+});
 
 export function CopyButton({ text, className }: { text: string; className?: string }) {
   useT();

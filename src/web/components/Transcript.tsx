@@ -1,6 +1,6 @@
 import type { ContentBlock, SessionState, TranscriptItem } from '@shared/protocol';
 import { ArrowDown, ChevronRight, Loader2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { ToolCard } from '@/components/ToolCard';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -64,7 +64,7 @@ export function Transcript({ state }: { state: SessionState }) {
   );
 }
 
-function Item({
+const Item = memo(function Item({
   item,
   showThoughts,
   cwd,
@@ -126,7 +126,7 @@ function Item({
         </div>
       );
   }
-}
+});
 
 function UserBlock({ block }: { block: ContentBlock }) {
   if (block.type === 'text') return <p className="whitespace-pre-wrap">{block.text}</p>;

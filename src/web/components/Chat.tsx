@@ -139,7 +139,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
               <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
-        ) : state.loading && state.items.length === 0 ? (
+        ) : state.loading ? (
           <div className="space-y-3 p-4">
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-16 w-full" />

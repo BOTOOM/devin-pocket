@@ -12,7 +12,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useT } from '@/i18n';
@@ -44,7 +44,7 @@ export function rel(cwd: string, p: string): string {
   return base && p.startsWith(`${base}/`) ? p.slice(base.length + 1) : p;
 }
 
-export function ToolCard({ item, cwd }: { item: ToolItem; cwd: string }) {
+export const ToolCard = memo(function ToolCard({ item, cwd }: { item: ToolItem; cwd: string }) {
   const t = useT();
   const Icon = ICONS[item.toolKind] ?? Wrench;
   const done = item.status === 'completed' || item.status === 'failed';
@@ -133,7 +133,7 @@ export function ToolCard({ item, cwd }: { item: ToolItem; cwd: string }) {
       </Collapsible>
     </div>
   );
-}
+});
 
 export function DiffView({
   path,

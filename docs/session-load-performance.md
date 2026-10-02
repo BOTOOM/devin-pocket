@@ -96,3 +96,7 @@ the `await loadSession` dominates (agent serialization), the real fix is upstrea
 
 - Phase 1 implemented: `session/load` stats logged from `SessionManager.open()`
   (`updates`, `events`, `pipelineMs`, `totalMs`).
+- Phase 2 implemented: `emitEvent` suppresses WS broadcasts while `state.loading`
+  (only `loading` events pass; the final `session.snapshot` carries the state);
+  `Chat.tsx` shows the skeleton for the whole load; `Item`, `Markdown` and
+  `ToolCard` are `React.memo`.
