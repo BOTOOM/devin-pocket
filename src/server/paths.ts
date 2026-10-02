@@ -4,7 +4,7 @@ import path from 'node:path';
 import { z } from 'zod';
 
 export const APP_NAME = 'devin-pocket';
-export const VERSION = '0.1.1';
+export const VERSION = '0.1.2';
 
 export const workspaceSchema = z.object({
   path: z.string(),
