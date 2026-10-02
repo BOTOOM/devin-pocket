@@ -235,6 +235,11 @@ export class PocketServer {
           this.ack(ws, env.id, true, { id });
           break;
         }
+        case 'prompt.update': {
+          const ok = sessions.updateQueued(cmd.sessionId, cmd.id, cmd.blocks);
+          this.ack(ws, env.id, ok, ok ? undefined : 'queued message not found');
+          break;
+        }
         case 'prompt.remove': {
           const ok = sessions.removeQueued(cmd.sessionId, cmd.id);
           this.ack(ws, env.id, ok, ok ? undefined : 'queued message not found');

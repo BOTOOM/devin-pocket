@@ -400,6 +400,17 @@ export class SessionManager {
     return true;
   }
 
+  /** Replace a queued prompt's blocks in place, keeping its position. */
+  updateQueued(sessionId: string, id: string, blocks: CB[]): boolean {
+    const s = this.sessions.get(sessionId);
+    const idx = s?.queue.findIndex((p) => p.id === id) ?? -1;
+    if (!s || idx < 0 || blocks.length === 0) return false;
+    const queue = [...s.queue];
+    queue[idx] = { id, blocks };
+    this.emitEvent(sessionId, { type: 'queueChanged', queue });
+    return true;
+  }
+
   async sendNow(sessionId: string, id: string): Promise<void> {
     const s = this.sessions.get(sessionId);
     const item = s?.queue.find((p) => p.id === id);

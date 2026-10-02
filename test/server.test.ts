@@ -312,6 +312,68 @@ describe('devin-pocket server', () => {
     other.ws.close();
   });
 
+  it('prompt.update edits a queued message keeping its position', async () => {
+    const c = wsClient(h.port);
+    await c.waitFor((m) => m.type === 'hello');
+    c.send({ type: 'session.new', cwd: process.cwd() }, 'upd-new');
+    const created = await c.waitFor((m) => m.type === 'ack' && m.id === 'upd-new');
+    if (created.type !== 'ack' || !created.ok) throw new Error('session.new failed');
+    const sid = (created.result as { sessionId: string }).sessionId;
+    c.send(
+      { type: 'prompt.enqueue', sessionId: sid, blocks: [{ type: 'text', text: 'QUEUE_HOLD' }] },
+      'upd-hold',
+    );
+    await c.waitFor(
+      (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnStarted',
+    );
+    c.send(
+      { type: 'prompt.enqueue', sessionId: sid, blocks: [{ type: 'text', text: 'ONE' }] },
+      'upd-1',
+    );
+    c.send(
+      { type: 'prompt.enqueue', sessionId: sid, blocks: [{ type: 'text', text: 'TWO' }] },
+      'upd-2',
+    );
+    const a1 = await c.waitFor((m) => m.type === 'ack' && m.id === 'upd-1');
+    const a2 = await c.waitFor((m) => m.type === 'ack' && m.id === 'upd-2');
+    if (a1.type !== 'ack' || a2.type !== 'ack' || !a1.ok || !a2.ok)
+      throw new Error('enqueue failed');
+    const id1 = (a1.result as { id: string }).id;
+    const id2 = (a2.result as { id: string }).id;
+
+    c.send(
+      {
+        type: 'prompt.update',
+        sessionId: sid,
+        id: id2,
+        blocks: [{ type: 'text', text: 'TWO_EDITED' }],
+      },
+      'upd-e',
+    );
+    const edited = await c.waitFor((m) => m.type === 'ack' && m.id === 'upd-e');
+    expect(edited.type === 'ack' && edited.ok).toBe(true);
+    const q = h.sessions.openStates().find((s) => s.sessionId === sid)?.queue ?? [];
+    expect(q.map((i) => i.id)).toEqual([id1, id2]);
+    expect(q[1]?.blocks[0]).toMatchObject({ type: 'text', text: 'TWO_EDITED' });
+
+    c.send(
+      {
+        type: 'prompt.update',
+        sessionId: sid,
+        id: 'missing',
+        blocks: [{ type: 'text', text: 'x' }],
+      },
+      'upd-404',
+    );
+    const missing = await c.waitFor((m) => m.type === 'ack' && m.id === 'upd-404');
+    expect(missing.type === 'ack' && !missing.ok).toBe(true);
+
+    c.send({ type: 'prompt.remove', sessionId: sid, id: id1 }, 'upd-r1');
+    c.send({ type: 'prompt.remove', sessionId: sid, id: id2 }, 'upd-r2');
+    await c.waitFor((m) => m.type === 'ack' && m.id === 'upd-r2');
+    c.ws.close();
+  });
+
   it('answers a side question without cancelling or mixing the active turn', async () => {
     const c = wsClient(h.port);
     await c.waitFor((m) => m.type === 'hello');

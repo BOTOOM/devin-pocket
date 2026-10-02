@@ -382,6 +382,7 @@ export type ClientCommand =
   | { type: 'session.rename'; sessionId: string; title: string }
   | { type: 'prompt'; sessionId: string; blocks: ContentBlock[] }
   | { type: 'prompt.enqueue'; sessionId: string; blocks: ContentBlock[] }
+  | { type: 'prompt.update'; sessionId: string; id: string; blocks: ContentBlock[] }
   | { type: 'prompt.remove'; sessionId: string; id: string }
   | { type: 'prompt.sendNow'; sessionId: string; id: string }
   | { type: 'aside.ask'; sessionId: string; question: string }
