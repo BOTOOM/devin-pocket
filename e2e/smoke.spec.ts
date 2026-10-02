@@ -64,6 +64,51 @@ test('visible commands button opens palette without changing the draft', async (
   await expect(input).toHaveValue('/plan ');
 });
 
+test('new session shows busy state, blocks double-clicks and reports errors', async ({ page }) => {
+  let newCount = 0;
+  let ackId: string | null = null;
+  let pendingAck: string | null = null;
+  let deliver: ((msg: string) => void) | null = null;
+  await page.routeWebSocket(/\/ws$/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((msg) => {
+      const data = JSON.parse(String(msg));
+      if (data?.cmd?.type === 'session.new') {
+        newCount++;
+        ackId = data.id;
+      }
+      server.send(msg);
+    });
+    server.onMessage((msg) => {
+      const data = JSON.parse(String(msg));
+      if (data?.type === 'ack' && data.id === ackId) {
+        pendingAck = String(msg);
+        deliver = (m) => ws.send(m);
+        return;
+      }
+      ws.send(msg);
+    });
+  });
+  await page.goto('/#/');
+  const newBtn = page.getByRole('button', { name: /Nueva sesión|New session/i }).first();
+  await newBtn.click();
+  const busy = page.getByRole('button', { name: /Creando|Creating/i });
+  await expect(busy).toBeVisible();
+  await expect(busy).toBeDisabled();
+  expect(newCount).toBe(1);
+  deliver?.(JSON.stringify({ type: 'ack', id: ackId, ok: false, error: 'boom' }));
+  await expect(
+    page.getByText(/No se pudo crear la sesión|Could not create the session/i),
+  ).toBeVisible();
+  await expect(newBtn).toBeEnabled();
+  pendingAck = null;
+  await newBtn.click();
+  await expect.poll(() => newCount).toBe(2);
+  await expect.poll(() => pendingAck).not.toBeNull();
+  deliver?.(pendingAck ?? '');
+  await expect(page.locator('textarea')).toBeVisible();
+});
+
 test('ACP Markdown renders on mobile without losing file references or code', async ({
   page,
   context,

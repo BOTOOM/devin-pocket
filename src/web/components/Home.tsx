@@ -1,6 +1,7 @@
 import type { SessionSummary } from '@shared/protocol';
 import {
   FolderOpen,
+  Loader2,
   Lock,
   MoreVertical,
   Plus,
@@ -47,6 +48,7 @@ export function HomeScreen() {
   const [rename, setRename] = useState<SessionSummary | null>(null);
   const [del, setDel] = useState<SessionSummary | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   // Workspace pick only affects "Nueva sesión" — the list itself is global.
   const cwd = prefs.workspace ?? workspaces[0]?.path ?? serverCwd ?? '';
@@ -62,8 +64,21 @@ export function HomeScreen() {
   };
 
   const newSession = async () => {
-    const res = (await send({ type: 'session.new', cwd })) as { sessionId?: string } | undefined;
-    if (res?.sessionId) navigate({ name: 'chat', sessionId: res.sessionId });
+    if (creating) return;
+    setCreating(true);
+    try {
+      const res = (await send({ type: 'session.new', cwd })) as { sessionId?: string } | undefined;
+      if (res?.sessionId) {
+        navigate({ name: 'chat', sessionId: res.sessionId });
+        return;
+      }
+      setCreating(false);
+    } catch (e) {
+      setCreating(false);
+      void import('sonner').then(({ toast }) =>
+        toast.error(t('home.newSession.error'), { description: (e as Error).message }),
+      );
+    }
   };
 
   const groups: Record<'today' | 'yesterday' | 'older', SessionSummary[]> = {
@@ -99,8 +114,14 @@ export function HomeScreen() {
           <span className="truncate">{cwd ? baseName(cwd) : t('home.chooseFolder')}</span>
         </Button>
         <div className="flex-1" />
-        <Button className="h-10 gap-2" disabled={!cwd} onClick={newSession}>
-          <Plus className="size-4" /> {t('home.newSession')}
+        <Button
+          className="h-10 gap-2"
+          disabled={!cwd || creating}
+          aria-busy={creating}
+          onClick={newSession}
+        >
+          {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          {creating ? t('home.newSession.creating') : t('home.newSession')}
         </Button>
       </div>
 
@@ -135,8 +156,14 @@ export function HomeScreen() {
             </div>
             <h3 className="text-lg font-semibold">{t('home.start.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('home.start.body')}</p>
-            <Button className="mt-1 gap-2" disabled={!cwd} onClick={newSession}>
-              <Plus className="size-4" /> {t('home.newSession')}
+            <Button
+              className="mt-1 gap-2"
+              disabled={!cwd || creating}
+              aria-busy={creating}
+              onClick={newSession}
+            >
+              {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              {creating ? t('home.newSession.creating') : t('home.newSession')}
             </Button>
           </div>
         ) : (
