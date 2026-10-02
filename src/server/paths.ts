@@ -1,10 +1,26 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 export const APP_NAME = 'devin-pocket';
-export const VERSION = '0.1.5';
+
+/** package.json is the single source of truth — resolves from src/ and from dist/. */
+function readVersion(): string {
+  try {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    for (const up of [path.join(here, '..'), path.join(here, '..', '..')]) {
+      const pkg = JSON.parse(fs.readFileSync(path.join(up, 'package.json'), 'utf8')) as {
+        name?: string;
+        version?: string;
+      };
+      if (pkg.name === APP_NAME && pkg.version) return pkg.version;
+    }
+  } catch {}
+  return '0.0.0-dev';
+}
+export const VERSION = readVersion();
 
 export const workspaceSchema = z.object({
   path: z.string(),
