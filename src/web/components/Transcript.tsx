@@ -1,6 +1,6 @@
 import type { ContentBlock, SessionState, TranscriptItem } from '@shared/protocol';
 import { ArrowDown, ChevronRight, Loader2 } from 'lucide-react';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ToolCard } from '@/components/ToolCard';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -8,14 +8,39 @@ import { useT } from '@/i18n';
 import { Markdown } from '@/lib/markdown';
 import { useStore } from '@/store';
 
+const PAGE = 60;
+
 export function Transcript({ state }: { state: SessionState }) {
   const t = useT();
   const showThoughts = useStore((s) => s.prefs.showThoughts);
   const ref = useRef<HTMLDivElement>(null);
   const [follow, setFollow] = useState(true);
+  const [limit, setLimit] = useState(PAGE);
+  const anchorRef = useRef<{ height: number; top: number } | null>(null);
+  const hiddenRef = useRef(0);
 
   const items = state.items;
+  const hidden = Math.max(0, items.length - limit);
+  hiddenRef.current = hidden;
+  const visible = hidden > 0 ? items.slice(-limit) : items;
   const working = state.turn === 'working' || state.turn === 'awaitingPermission';
+
+  const expand = () => {
+    const el = ref.current?.parentElement;
+    if (el) anchorRef.current = { height: el.scrollHeight, top: el.scrollTop };
+    setLimit((l) => Math.min(l + PAGE, items.length));
+  };
+
+  // Keep the viewport anchored when prepending older items.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when limit changes
+  useLayoutEffect(() => {
+    const el = ref.current?.parentElement;
+    const a = anchorRef.current;
+    if (el && a) {
+      anchorRef.current = null;
+      el.scrollTop = el.scrollHeight - a.height + a.top;
+    }
+  }, [limit]);
 
   // Auto-scroll tail-follow; pause when the user scrolls up.
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on every new/updated item
@@ -24,11 +49,13 @@ export function Transcript({ state }: { state: SessionState }) {
     if (follow && el) el.scrollTop = el.scrollHeight;
   }, [follow, items]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: expand reads refs only; mount once
   useEffect(() => {
     const el = ref.current?.parentElement;
     if (!el) return;
     const onScroll = () => {
       setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
+      if (el.scrollTop < 160 && hiddenRef.current > 0) expand();
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
@@ -37,7 +64,14 @@ export function Transcript({ state }: { state: SessionState }) {
   return (
     <div ref={ref} className="relative px-3 py-4">
       <div className="space-y-3">
-        {items.map((item) => (
+        {hidden > 0 && (
+          <div className="flex justify-center">
+            <Button variant="outline" size="sm" onClick={expand}>
+              {t('chat.loadEarlier', { n: Math.min(hidden, PAGE) })}
+            </Button>
+          </div>
+        )}
+        {visible.map((item) => (
           <Item key={item.id} item={item} showThoughts={showThoughts} cwd={state.cwd} />
         ))}
         {working && (

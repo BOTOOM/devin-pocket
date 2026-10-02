@@ -677,6 +677,20 @@ const agent: Agent = {
     });
     await emitTurnStats(1);
     await replay({ sessionUpdate: 'session_info_update', title: 'Workspace Overview' });
+    // FAKE_AGENT_REPLAY_ITEMS=N appends N extra tool calls to simulate a long history.
+    const extra = Number(process.env.FAKE_AGENT_REPLAY_ITEMS ?? '0');
+    for (let i = 1; i <= extra; i++) {
+      await replay(
+        {
+          sessionUpdate: 'tool_call',
+          toolCallId: `tc-fill#${i}`,
+          title: `Filler call ${i}`,
+          kind: 'read',
+          status: 'completed',
+        } as never,
+        2,
+      );
+    }
     await replay({
       sessionUpdate: 'available_commands_update',
       availableCommands: AVAILABLE_COMMANDS,

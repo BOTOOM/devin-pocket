@@ -100,3 +100,15 @@ the `await loadSession` dominates (agent serialization), the real fix is upstrea
   (only `loading` events pass; the final `session.snapshot` carries the state);
   `Chat.tsx` shows the skeleton for the whole load; `Item`, `Markdown` and
   `ToolCard` are `React.memo`.
+- Phase 3 implemented: `Transcript` renders the last 60 items only, expanding in
+  60-item pages on scroll-to-top or the "Load earlier" button with scroll
+  anchoring. Also fixed duplicate `session.open` replays: `SessionManager.open`
+  dedupes concurrent loads (`opening` map) and `Chat.tsx` sends `session.open`
+  at most once per sessionId (`openSent` ref) — before this, the effect re-fired
+  when `sessions.list` refreshed mid-load and the whole history was folded in
+  twice.
+- Measured on-device (flannel-myth, ~2 MB): `pipeline ≈ 15–20 ms`,
+  `total ≈ 2.7–4.5 s` → ~97% of remaining latency is inside the agent's
+  `loadSession` (SQLite + serialization), not our pipeline. Option 4 (batch fold)
+  is likely unnecessary; the real fix for 300k-context sessions is upstream
+  (`tailReplay`/`replayFrom`/`session/resume` in `devin acp`).

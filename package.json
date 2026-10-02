@@ -1,6 +1,6 @@
 {
   "name": "devin-pocket",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Mobile-first web client for Devin CLI over ACP. One command, runs on your phone (Termux), open it in the browser.",
   "license": "Apache-2.0",
   "packageManager": "pnpm@12.6.0",

@@ -159,6 +159,21 @@ test('queue can interrupt an active turn on mobile', async ({ page }) => {
   await expect(queue).toHaveCount(0);
 });
 
+test('long history renders the last page and expands on load earlier', async ({ page }) => {
+  await page.goto('/#/');
+  await page.getByText('Fix the flaky test').click();
+  const earlier = page.getByRole('button', { name: /Cargar.*anteriores|Load.*earlier/i });
+  await expect(earlier).toBeVisible({ timeout: 20_000 });
+  // newest items rendered; oldest stay out of the DOM
+  await expect(page.getByRole('button', { name: 'Filler call 80', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Filler call 1', exact: true })).toHaveCount(0);
+  await earlier.dispatchEvent('click'); // no scroll — it would auto-expand
+  await expect(page.getByRole('button', { name: 'Filler call 1', exact: true })).toBeVisible();
+  await expect(earlier).toHaveCount(0);
+  // a double session.open would have replayed the history twice
+  await expect(page.getByText('package.json is 22 lines.')).toHaveCount(1);
+});
+
 test('side question works alongside an active turn', async ({ page }) => {
   await page.goto('/#/');
   await page

@@ -68,6 +68,8 @@ export class SessionManager {
   private sideActive = new Set<string>();
   /** sessionId → counters while a session/load replay is in flight */
   private loadStats = new Map<string, { updates: number; events: number; pipelineMs: number }>();
+  /** sessionId → in-flight open() so concurrent requests share one replay */
+  private opening = new Map<string, Promise<SessionState>>();
 
   constructor(
     private agent: AgentProcess,
@@ -274,7 +276,19 @@ export class SessionManager {
     return this.sessions.get(res.sessionId)!;
   }
 
-  async open(sessionId: string, cwd: string): Promise<SessionState> {
+  open(sessionId: string, cwd: string): Promise<SessionState> {
+    // Clients can send duplicate session.open (effect re-runs, reconnects);
+    // a second loadSession would replay the whole history into the same state.
+    const pending = this.opening.get(sessionId);
+    if (pending) return pending;
+    const p = this.doOpen(sessionId, cwd);
+    this.opening.set(sessionId, p);
+    const clear = () => this.opening.delete(sessionId);
+    p.then(clear, clear);
+    return p;
+  }
+
+  private async doOpen(sessionId: string, cwd: string): Promise<SessionState> {
     this.ensure(sessionId, cwd);
     this.emitEvent(sessionId, { type: 'loading', loading: true });
     const stat = { updates: 0, events: 0, pipelineMs: 0 };

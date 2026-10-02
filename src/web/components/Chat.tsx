@@ -1,5 +1,5 @@
 import { ChevronLeft, Loader2, MessageCircleQuestion, MoreVertical, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Composer } from '@/components/Composer';
 import { PermissionSheet } from '@/components/PermissionSheet';
 import { PlanPanel } from '@/components/PlanPanel';
@@ -41,9 +41,13 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
   const [asideQuestion, setAsideQuestion] = useState('');
 
   // Open the session if the server has it listed but not loaded (e.g. deep link).
+  const openSent = useRef<string | null>(null);
   useEffect(() => {
-    if (hydrated && !state && summary && !summary.locked) {
-      send({ type: 'session.open', sessionId, cwd: summary.cwd }).catch(() => {});
+    if (hydrated && !state && summary && !summary.locked && openSent.current !== sessionId) {
+      openSent.current = sessionId;
+      send({ type: 'session.open', sessionId, cwd: summary.cwd }).catch(() => {
+        if (openSent.current === sessionId) openSent.current = null;
+      });
     }
   }, [hydrated, state, summary, sessionId]);
 
@@ -154,7 +158,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
             <p className="text-sm text-muted-foreground">{t('chat.emptyHint')}</p>
           </div>
         ) : (
-          <Transcript state={state} />
+          <Transcript key={sessionId} state={state} />
         )}
       </div>
 
