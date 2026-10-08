@@ -6,6 +6,7 @@ import { type WebSocket, WebSocketServer } from 'ws';
 import { z } from 'zod';
 import { estimateCost } from '../shared/cost.js';
 import type {
+  BillingInfo,
   ClientEnvelope,
   ErrorCode,
   LocalPort,
@@ -14,6 +15,7 @@ import type {
 } from '../shared/protocol.js';
 import { PROTOCOL_VERSION } from '../shared/protocol.js';
 import type { AgentProcess } from './acp/agent.js';
+import { readBillingCache } from './acp/user-status.js';
 import { getCatalog, loadCatalog } from './catalog.js';
 import { doctorReport } from './doctor.js';
 import { browse, browsePath, cwdAllowed, homeDir, search } from './fs-search.js';
@@ -71,6 +73,7 @@ export class PocketServer {
   private clients = new Set<WebSocket>();
   private portsTimer?: NodeJS.Timeout;
   private lastPorts: LocalPort[] = [];
+  private lastBillingCache?: BillingInfo | null;
 
   constructor(private deps: ServerDeps) {}
 
@@ -151,7 +154,7 @@ export class PocketServer {
       sessions: this.deps.sessions.summaries(),
       catalog: getCatalog(),
       workspaces: c.workspaces,
-      billing: this.deps.agent.billingInfo,
+      billing: this.deps.agent.billingInfo ?? readBillingCache() ?? undefined,
       open: this.deps.sessions.openStates(),
     });
     ws.on('message', (data) => void this.onMessage(ws, data));
@@ -303,6 +306,15 @@ export class PocketServer {
       if (JSON.stringify(ports) !== JSON.stringify(this.lastPorts)) {
         this.lastPorts = ports;
         this.broadcast({ type: 'ports', ports });
+      }
+      // the agent never pushes billingInformation on this client — refresh
+      // from the local user_status cache (rewritten on each `devin acp` boot)
+      if (!this.deps.agent.billingInfo) {
+        const b = readBillingCache();
+        if (b !== this.lastBillingCache) {
+          this.lastBillingCache = b;
+          if (b) this.broadcast({ type: 'billing', billing: b });
+        }
       }
     }, 5000);
     this.portsTimer.unref();

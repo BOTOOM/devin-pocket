@@ -132,6 +132,7 @@ function BillingCard({ billing, t }: { billing: BillingInfo; t: ReturnType<typeo
           {t('settings.billing.updated', {
             time: new Date(billing.updatedAt).toLocaleTimeString(),
           })}
+          {billing.source === 'cache' ? ` · ${t('settings.billing.cache')}` : ''}
         </p>
       </CardContent>
     </Card>

@@ -48,6 +48,7 @@ export function parseBillingInfo(params: unknown): BillingInfo | null {
 
   const info: BillingInfo = {
     updatedAt: Date.now(),
+    source: 'push',
     planName: str('plan_name', 'planName'),
     accountName: str('account_display_name', 'accountDisplayName'),
     dailyQuotaPct: num('daily_quota_remaining_percent', 'dailyQuotaRemainingPercent'),

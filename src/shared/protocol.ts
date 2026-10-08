@@ -347,8 +347,10 @@ export interface ServerSettings {
  * (snake_case or camelCase) anywhere in the params tree.
  */
 export interface BillingInfo {
-  /** server ms epoch when the push arrived */
+  /** server ms epoch when the push arrived / the cache was fetched */
   updatedAt: number;
+  /** 'push' = billingInformation notification; 'cache' = local user_status bin */
+  source?: 'push' | 'cache';
   planName?: string;
   accountName?: string;
   /** percent 0–100 remaining */
