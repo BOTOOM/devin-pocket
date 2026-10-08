@@ -80,6 +80,13 @@ export class SessionManager {
       if (s.phase === 'ready') {
         // populate the session list at startup and after (re)authentication
         void this.list().catch((e) => this.log.warn(`session/list: ${(e as Error).message}`));
+        // never auto-send queued prompts after an agent error — re-render the
+        // queue so the UI shows its send-now action
+        for (const sess of this.sessions.values()) {
+          if (sess.queue.length > 0) {
+            this.emitEvent(sess.sessionId, { type: 'queueChanged', queue: [...sess.queue] });
+          }
+        }
       } else if (s.phase === 'restarting' || s.phase === 'error' || s.phase === 'starting') {
         // the ACP connection is gone — pending permission RPCs would hang forever
         this.cancelAllPermissions();
@@ -424,6 +431,10 @@ export class SessionManager {
       this.interrupting.add(sessionId);
       try {
         await this.cancel(sessionId);
+        // wait for the cancelled turn to unwind — prompt's finally clears `active`
+        for (let i = 0; i < 100 && this.active.has(sessionId); i++) {
+          await new Promise((r) => setTimeout(r, 50));
+        }
       } finally {
         this.interrupting.delete(sessionId);
         this.startNext(sessionId);
@@ -459,9 +470,11 @@ export class SessionManager {
     if (text) this.echoExpect.set(sessionId, { text, buf: '' });
     for (const b of blocks) this.emitEvent(sessionId, { type: 'userChunk', block: b });
     let success = false;
+    let stopReason: string | undefined;
     try {
       const res = await this.agent.prompt(sessionId, blocks as ContentBlock[]);
       success = true;
+      stopReason = res.stopReason;
       this.emitEvent(sessionId, { type: 'turnEnded', stopReason: res.stopReason });
       return { stopReason: res.stopReason };
     } catch (e) {
@@ -475,7 +488,9 @@ export class SessionManager {
     } finally {
       this.echoExpect.delete(sessionId);
       this.active.delete(sessionId);
-      if (success) this.startNext(sessionId);
+      // a cancelled turn (Stop) must not drain the queue — the user resumes
+      // via "Enviar ahora"
+      if (success && stopReason !== 'cancelled') this.startNext(sessionId);
     }
   }
 

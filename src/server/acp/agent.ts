@@ -27,7 +27,7 @@ import {
   type SessionNotification,
 } from '@agentclientprotocol/sdk';
 import type { AgentInfo, AgentStatus, BillingInfo, TurnStat } from '../../shared/protocol.js';
-import type { Logger, StderrSink } from '../log.js';
+import { type Logger, redact, type StderrSink } from '../log.js';
 import { VERSION } from '../paths.js';
 import { parseBillingInfo } from './billing.js';
 
@@ -269,7 +269,7 @@ export class AgentProcess {
             this.ev.onBillingInfo(info);
           }
           // full params → log: the payload shape is undocumented, keep it discoverable
-          this.opts.log.info(`billingInformation ${JSON.stringify(params).slice(0, 4000)}`);
+          this.opts.log.info(`billingInformation ${JSON.stringify(redact(params)).slice(0, 4000)}`);
         } else {
           const p = params as { channel?: string; message?: string; level?: string };
           if (method === '_cognition.ai/output') {

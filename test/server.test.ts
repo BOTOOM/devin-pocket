@@ -504,6 +504,23 @@ describe('devin-pocket server', () => {
     c.ws.close();
   });
 
+  it('does not resume the queue after a cancelled (Stop) turn', async () => {
+    const s = await h.sessions.create(process.cwd());
+    const p = h.sessions
+      .prompt(s.sessionId, [{ type: 'text', text: 'STOP_QUEUE_TEST' }])
+      .catch((e) => ({ stopReason: `error:${(e as Error).message}` }));
+    await poll(
+      () => h.sessions.openStates().find((x) => x.sessionId === s.sessionId)?.turn === 'working',
+    );
+    h.sessions.enqueue(s.sessionId, [{ type: 'text', text: 'QUEUED_AFTER_STOP' }]);
+    await h.sessions.cancel(s.sessionId);
+    await p;
+    // a buggy finally would drain the queue right here
+    await new Promise((r) => setTimeout(r, 800));
+    const state = h.sessions.openStates().find((x) => x.sessionId === s.sessionId);
+    expect(state?.queue).toHaveLength(1);
+  });
+
   it('app-created sessions survive restart via the global session/list', async () => {
     const otherCwd = mkdtempSync(path.join(os.tmpdir(), 'devin-pocket-cwd-'));
     const s = await h.sessions.create(otherCwd);
