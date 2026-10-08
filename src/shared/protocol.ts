@@ -341,6 +341,29 @@ export interface ServerSettings {
   platform: { termux: boolean; proot: boolean; os: string; arch: string; node: string };
 }
 
+/**
+ * Latest `_cognition.ai/billingInformation` push, distilled. The agent's exact
+ * payload is undocumented — `parseBillingInfo` scans for PlanStatus field names
+ * (snake_case or camelCase) anywhere in the params tree.
+ */
+export interface BillingInfo {
+  /** server ms epoch when the push arrived */
+  updatedAt: number;
+  planName?: string;
+  accountName?: string;
+  /** percent 0–100 remaining */
+  dailyQuotaPct?: number;
+  weeklyQuotaPct?: number;
+  /** unix seconds */
+  dailyResetAt?: number;
+  weeklyResetAt?: number;
+  acuConsumed?: number;
+  acuLimit?: number;
+  credits?: { kind: string; available?: number; used?: number }[];
+  /** overage balance in micro-dollars */
+  overageMicros?: number;
+}
+
 // ---------------------------------------------------------------------------
 // WebSocket messages
 // ---------------------------------------------------------------------------
@@ -355,6 +378,8 @@ export type ServerMessage =
       sessions: SessionSummary[];
       catalog: CatalogState;
       workspaces: Workspace[];
+      /** latest billing/quota push, if the agent sent one */
+      billing?: BillingInfo;
       /** sessions this server has open (full state) */
       open: SessionState[];
     }
@@ -364,6 +389,7 @@ export type ServerMessage =
   | { type: 'session.event'; sessionId: string; seq: number; event: SessionEvent }
   | { type: 'session.closed'; sessionId: string }
   | { type: 'catalog'; catalog: CatalogState }
+  | { type: 'billing'; billing: BillingInfo }
   | { type: 'ports'; ports: LocalPort[] }
   | { type: 'workspaces'; workspaces: Workspace[] }
   | { type: 'toast'; level: 'info' | 'success' | 'warn' | 'error'; text: string }

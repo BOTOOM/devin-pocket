@@ -100,6 +100,16 @@ test('enter inserts a newline when enter-to-send is off', async ({ page }) => {
   await page.getByRole('switch', { name: /Enter envía|Enter sends/i }).click();
 });
 
+test('settings shows the plan & quota card when the agent pushes billing info', async ({
+  page,
+}) => {
+  await page.goto('/#/settings');
+  await expect(page.getByText(/Plan y cuota|Plan & quota/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Fake Dev')).toBeVisible();
+  await expect(page.getByText(/Cuota diaria|Daily quota/i)).toBeVisible();
+  await expect(page.getByText('82%')).toBeVisible();
+});
+
 test('queued message edits in place keeping its position', async ({ page }) => {
   await page.goto('/#/');
   await page

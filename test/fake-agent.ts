@@ -559,6 +559,29 @@ const NOT_AUTHENTICATED = () =>
 
 const agent: Agent = {
   async initialize() {
+    // pushes account quota like the real agent's billingInformation notification
+    setTimeout(
+      () =>
+        void conn
+          ?.extNotification('_cognition.ai/billingInformation', {
+            billingInformation: {
+              plan_info: {
+                plan_name: 'Max',
+                account_display_name: 'Fake Dev',
+                daily_quota_remaining_percent: 82,
+                weekly_quota_remaining_percent: 47,
+                daily_quota_reset_at_unix: 1791676800,
+                weekly_quota_reset_at_unix: 1792022400,
+                acu_consumed: 12.4,
+                acu_limit: 100,
+                available_prompt_credits: 250,
+                used_prompt_credits: 50,
+              },
+            },
+          })
+          .catch(() => {}),
+      60,
+    );
     return {
       protocolVersion: 1,
       agentCapabilities: {

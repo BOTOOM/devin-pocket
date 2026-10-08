@@ -1,6 +1,7 @@
 import type {
   AgentInfo,
   AgentStatus,
+  BillingInfo,
   CatalogState,
   LocalPort,
   ServerMessage,
@@ -25,6 +26,7 @@ export interface AppState {
   settings?: ServerSettings;
   agent: AgentStatus;
   agentInfo?: AgentInfo;
+  billing?: BillingInfo;
   sessions: SessionSummary[];
   catalog: CatalogState;
   workspaces: Workspace[];
@@ -125,6 +127,7 @@ function handle(msg: ServerMessage) {
         settings: msg.settings,
         agent: msg.agent,
         agentInfo: msg.agentInfo,
+        billing: msg.billing,
         sessions: msg.sessions,
         catalog: msg.catalog,
         workspaces,
@@ -176,6 +179,9 @@ function handle(msg: ServerMessage) {
     }
     case 'catalog':
       set({ catalog: msg.catalog });
+      break;
+    case 'billing':
+      set({ billing: msg.billing });
       break;
     case 'ports':
       set({ ports: msg.ports });

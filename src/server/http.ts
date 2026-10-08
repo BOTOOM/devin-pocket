@@ -151,6 +151,7 @@ export class PocketServer {
       sessions: this.deps.sessions.summaries(),
       catalog: getCatalog(),
       workspaces: c.workspaces,
+      billing: this.deps.agent.billingInfo,
       open: this.deps.sessions.openStates(),
     });
     ws.on('message', (data) => void this.onMessage(ws, data));

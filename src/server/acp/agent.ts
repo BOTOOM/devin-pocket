@@ -26,9 +26,10 @@ import {
   type SessionInfo,
   type SessionNotification,
 } from '@agentclientprotocol/sdk';
-import type { AgentInfo, AgentStatus, TurnStat } from '../../shared/protocol.js';
+import type { AgentInfo, AgentStatus, BillingInfo, TurnStat } from '../../shared/protocol.js';
 import type { Logger, StderrSink } from '../log.js';
 import { VERSION } from '../paths.js';
+import { parseBillingInfo } from './billing.js';
 
 export { resolveBin, splitCommand };
 
@@ -128,6 +129,7 @@ export interface AgentEvents {
   onStatus: (status: AgentStatus) => void;
   onSessionNotification: (n: SessionNotification) => void;
   onTurnStats: (sessionId: string, stat: TurnStat) => void;
+  onBillingInfo: (info: BillingInfo) => void;
   /** requestId → resolve with the response; caller owns PermissionRequest lifecycle */
   onPermissionRequest: (
     sessionId: string,
@@ -139,6 +141,8 @@ export interface AgentEvents {
 
 export class AgentProcess {
   status: AgentStatus = { phase: 'starting' };
+  /** latest `_cognition.ai/billingInformation` push, if any */
+  billingInfo?: BillingInfo;
   private child?: ChildProcessWithoutNullStreams;
   private conn?: ClientSideConnection;
   private init?: InitializeResponse;
@@ -258,6 +262,14 @@ export class AgentProcess {
         if (method === '_cognition.ai/turn_stats') {
           const ts = parseTurnStats(params);
           if (ts) this.ev.onTurnStats(ts.sessionId, ts.stat);
+        } else if (method === '_cognition.ai/billingInformation') {
+          const info = parseBillingInfo(params);
+          if (info) {
+            this.billingInfo = info;
+            this.ev.onBillingInfo(info);
+          }
+          // full params → log: the payload shape is undocumented, keep it discoverable
+          this.opts.log.info(`billingInformation ${JSON.stringify(params).slice(0, 4000)}`);
         } else {
           const p = params as { channel?: string; message?: string; level?: string };
           if (method === '_cognition.ai/output') {

@@ -1,4 +1,4 @@
-import type { Workspace } from '@shared/protocol';
+import type { BillingInfo, Workspace } from '@shared/protocol';
 import { ChevronLeft, ExternalLink, FolderPlus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,120 @@ const CAP_LABELS: Record<string, string> = {
   editableCommands: 'editableCommands',
 };
 
+function quotaColor(pct: number): string {
+  if (pct > 50) return 'var(--usage-low)';
+  if (pct > 25) return 'var(--usage-mid)';
+  if (pct > 10) return 'var(--usage-warm)';
+  return 'var(--usage-high)';
+}
+
+function QuotaRow({
+  label,
+  pct,
+  resetAt,
+  t,
+}: {
+  label: string;
+  pct: number;
+  resetAt?: number;
+  t: ReturnType<typeof useT>;
+}) {
+  const clamped = Math.max(0, Math.min(100, pct));
+  return (
+    <div>
+      <div className="mb-1 flex items-baseline justify-between gap-2">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="shrink-0 text-xs">
+          {Math.round(clamped)}%
+          {resetAt != null &&
+            ` · ${t('settings.billing.reset', { date: new Date(resetAt * 1000).toLocaleDateString() })}`}
+        </span>
+      </div>
+      <div
+        className="h-1.5 overflow-hidden rounded-full"
+        style={{ background: 'var(--usage-track)' }}
+      >
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${clamped}%`, background: quotaColor(clamped) }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function BillingCard({ billing, t }: { billing: BillingInfo; t: ReturnType<typeof useT> }) {
+  const fmt = (n: number) => (Math.abs(n) >= 1000 ? n.toLocaleString() : Math.round(n * 100) / 100);
+  return (
+    <Card>
+      <CardHeader className="p-4 pb-1">
+        <CardTitle className="text-base">{t('settings.billing')}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 p-4 pt-0 text-sm">
+        {(billing.planName || billing.accountName) && (
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t('settings.billing.plan')}</span>
+            <span className="truncate font-medium">
+              {[billing.planName, billing.accountName].filter(Boolean).join(' · ')}
+            </span>
+          </div>
+        )}
+        {billing.dailyQuotaPct != null && (
+          <QuotaRow
+            label={t('settings.billing.daily')}
+            pct={billing.dailyQuotaPct}
+            resetAt={billing.dailyResetAt}
+            t={t}
+          />
+        )}
+        {billing.weeklyQuotaPct != null && (
+          <QuotaRow
+            label={t('settings.billing.weekly')}
+            pct={billing.weeklyQuotaPct}
+            resetAt={billing.weeklyResetAt}
+            t={t}
+          />
+        )}
+        {(billing.acuConsumed != null || billing.acuLimit != null) && (
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t('settings.billing.acu')}</span>
+            <span className="font-mono">
+              {fmt(billing.acuConsumed ?? 0)}
+              {billing.acuLimit != null ? ` / ${fmt(billing.acuLimit)}` : ''}
+            </span>
+          </div>
+        )}
+        {billing.credits?.map((c) => (
+          <div key={c.kind} className="flex justify-between gap-2">
+            <span className="text-muted-foreground">
+              {t('settings.billing.credits', { kind: c.kind })}
+            </span>
+            <span className="font-mono">
+              {[
+                c.available != null ? `${fmt(c.available)} ${t('settings.billing.left')}` : null,
+                c.used != null ? `${fmt(c.used)} ${t('settings.billing.used')}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </div>
+        ))}
+        {billing.overageMicros != null && billing.overageMicros > 0 && (
+          <div className="flex justify-between gap-2">
+            <span className="text-muted-foreground">{t('settings.billing.overage')}</span>
+            <span className="font-mono">${(billing.overageMicros / 1e6).toFixed(2)}</span>
+          </div>
+        )}
+        <p className="pt-1 text-xs text-muted-foreground">
+          {t('settings.billing.updated', {
+            time: new Date(billing.updatedAt).toLocaleTimeString(),
+          })}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function SettingsScreen() {
   const t = useT();
   const { theme } = useTheme();
@@ -31,6 +145,7 @@ export function SettingsScreen() {
   const ports = useStore((s) => s.ports);
   const settings = useStore((s) => s.settings);
   const agentInfo = useStore((s) => s.agentInfo);
+  const billing = useStore((s) => s.billing);
   const [wsOpen, setWsOpen] = useState(false);
 
   return (
@@ -107,6 +222,8 @@ export function SettingsScreen() {
             </div>
           </CardContent>
         </Card>
+
+        {billing && <BillingCard billing={billing} t={t} />}
 
         <Card>
           <CardHeader className="p-4 pb-1">

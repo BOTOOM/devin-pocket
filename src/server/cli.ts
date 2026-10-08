@@ -2,7 +2,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { AgentStatus } from '../shared/protocol.js';
+import type { AgentStatus, BillingInfo } from '../shared/protocol.js';
 import { AgentProcess } from './acp/agent.js';
 import { type Args, parseArgs, serializeArgs } from './args.js';
 import { loadCatalog } from './catalog.js';
@@ -167,6 +167,8 @@ async function runServer(args: Args): Promise<ServerHandle> {
 
   // agent.status listeners: SessionManager + (once up) the WS broadcast
   const statusListeners = new Set<(s: AgentStatus) => void>();
+  // billing push listeners — WS broadcast attaches once the server is up
+  const billingListeners = new Set<(b: BillingInfo) => void>();
   // created after agent — SessionManager takes the agent in its ctor
   let sessions!: SessionManager;
   const agent = new AgentProcess(
@@ -177,6 +179,9 @@ async function runServer(args: Args): Promise<ServerHandle> {
       },
       onSessionNotification: (n) => sessions.handleNotification(n),
       onTurnStats: (sid, st) => sessions.handleTurnStats(sid, st),
+      onBillingInfo: (b) => {
+        for (const l of billingListeners) l(b);
+      },
       onPermissionRequest: (sid, req) => sessions.requestPermission(sid, req),
       onSessionsReopened: () => void sessions.reopenAll(),
     },
@@ -194,6 +199,7 @@ async function runServer(args: Args): Promise<ServerHandle> {
   statusListeners.add((s) =>
     server.broadcast({ type: 'agent.status', status: s, info: agent.agentInfo }),
   );
+  billingListeners.add((b) => server.broadcast({ type: 'billing', billing: b }));
   try {
     await server.start();
   } catch (e) {

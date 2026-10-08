@@ -62,6 +62,7 @@ async function boot(): Promise<Harness> {
       onStatus: () => {},
       onSessionNotification: (n) => sessions.handleNotification(n),
       onTurnStats: (sid, st) => sessions.handleTurnStats(sid, st),
+      onBillingInfo: () => {},
       onPermissionRequest: (sid, req) => sessions.requestPermission(sid, req),
       onSessionsReopened: () => {},
     },
