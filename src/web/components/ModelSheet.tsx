@@ -2,7 +2,7 @@ import { matchEntry } from '@shared/catalog-match';
 import type { CatalogEntry, SessionConfigOption } from '@shared/protocol';
 import { pickModelOptions } from '@shared/reducer';
 import { Check, ImageOff, Search, Zap } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { currentValue, type FlatOption, selectOptions } from '@/components/StatusStrip';
 import { Badge } from '@/components/ui/badge';
@@ -267,12 +267,46 @@ export function ModelSheet({
   );
 }
 
+/** Structured $ price, falling back to the raw cost summary, else `empty`. */
+function SidePrice({
+  entry,
+  field,
+  empty,
+}: {
+  entry?: CatalogEntry;
+  field: 'input' | 'cached' | 'output';
+  empty: ReactNode;
+}) {
+  const price = entry?.prices?.[field];
+  if (price !== undefined) return <span className="tabular-nums">${price}</span>;
+  if (entry?.costSummary)
+    return (
+      <span
+        className="inline-block max-w-28 truncate align-middle text-[11px] leading-tight text-muted-foreground"
+        title={entry.costSummary}
+      >
+        {entry.costSummary}
+      </span>
+    );
+  return <>{empty}</>;
+}
+
 /** Price cell with "old → new (±%)" delta on the new side. */
-function PriceCell({ from, to }: { from?: number; to?: number }) {
+function PriceCell({ from, to, toSummary }: { from?: number; to?: number; toSummary?: string }) {
   const t = useT();
-  if (from === undefined || to === undefined)
-    return <span className="text-muted-foreground">{t('model.noPrice')}</span>;
-  if (from === to) return <span className="tabular-nums">${to}</span>;
+  if (to === undefined)
+    return toSummary ? (
+      <span
+        className="inline-block max-w-28 truncate align-middle text-[11px] leading-tight text-muted-foreground"
+        title={toSummary}
+      >
+        {toSummary}
+      </span>
+    ) : (
+      <span className="text-muted-foreground">{t('model.noPrice')}</span>
+    );
+  // comparing from a free model: show the new price on its own
+  if (from === undefined || from === to) return <span className="tabular-nums">${to}</span>;
   const pct = Math.round(((to - from) / from) * 100);
   const color = to < from ? 'var(--success)' : 'var(--usage-high)';
   return (
@@ -331,29 +365,43 @@ function ComparePanel({
         </span>
 
         <span className="text-xs text-muted-foreground">{t('model.table.input')}</span>
-        <span>{from?.entry?.prices ? `$${from.entry.prices.input}` : t('model.noPrice')}</span>
         <span>
-          <PriceCell from={from?.entry?.prices?.input} to={to.entry?.prices?.input} />
+          <SidePrice entry={from?.entry} field="input" empty={t('model.noPrice')} />
+        </span>
+        <span>
+          <PriceCell
+            from={from?.entry?.prices?.input}
+            to={to.entry?.prices?.input}
+            toSummary={to.entry?.costSummary}
+          />
         </span>
 
         {showCached && (
           <>
             <span className="text-xs text-muted-foreground">{t('model.cached')}</span>
             <span>
-              {from?.entry?.prices?.cached !== undefined
-                ? `$${from.entry.prices.cached}`
-                : t('model.noPrice')}
+              <SidePrice entry={from?.entry} field="cached" empty={t('model.noPrice')} />
             </span>
             <span>
-              <PriceCell from={from?.entry?.prices?.cached} to={to.entry?.prices?.cached} />
+              <PriceCell
+                from={from?.entry?.prices?.cached}
+                to={to.entry?.prices?.cached}
+                toSummary={to.entry?.costSummary}
+              />
             </span>
           </>
         )}
 
         <span className="text-xs text-muted-foreground">{t('model.table.output')}</span>
-        <span>{from?.entry?.prices ? `$${from.entry.prices.output}` : t('model.noPrice')}</span>
         <span>
-          <PriceCell from={from?.entry?.prices?.output} to={to.entry?.prices?.output} />
+          <SidePrice entry={from?.entry} field="output" empty={t('model.noPrice')} />
+        </span>
+        <span>
+          <PriceCell
+            from={from?.entry?.prices?.output}
+            to={to.entry?.prices?.output}
+            toSummary={to.entry?.costSummary}
+          />
         </span>
 
         <span className="text-xs text-muted-foreground">{t('model.table.context')}</span>
@@ -401,10 +449,10 @@ function CompareTable({
           >
             <td className="max-w-[40%] truncate py-2 pr-2 font-medium">{o.name}</td>
             <td className="py-2 text-right">
-              {o.entry?.prices ? `$${o.entry.prices.input}` : '—'}
+              <SidePrice entry={o.entry} field="input" empty="—" />
             </td>
             <td className="py-2 text-right">
-              {o.entry?.prices ? `$${o.entry.prices.output}` : '—'}
+              <SidePrice entry={o.entry} field="output" empty="—" />
             </td>
             <td className="py-2 text-right">
               {o.entry?.maxContext ? fmtTokens(o.entry.maxContext) : '—'}
