@@ -162,6 +162,19 @@ export function ModelSheet({
           <SheetDescription className="sr-only">{t('model.title')}</SheetDescription>
         </SheetHeader>
 
+        {catalog.status === 'unavailable' && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs text-muted-foreground">
+            <span className="min-w-0">{t('model.catalogDown')}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => void send({ type: 'catalog.refresh' }).catch(() => {})}
+            >
+              {t('common.retry')}
+            </Button>
+          </div>
+        )}
         <div className="relative mb-2">
           <Search className="absolute top-3 left-3 size-4 text-muted-foreground" />
           <Input

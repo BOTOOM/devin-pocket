@@ -351,6 +351,10 @@ export function loadCatalog(refresh = false, log?: Logger): Promise<CatalogState
     };
     return state;
   })();
+  const p = pending;
+  void p.finally(() => {
+    if (pending === p) pending = null;
+  });
   return pending;
 }
 

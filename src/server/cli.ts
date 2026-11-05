@@ -5,7 +5,7 @@ import path from 'node:path';
 import type { AgentStatus, BillingInfo } from '../shared/protocol.js';
 import { AgentProcess } from './acp/agent.js';
 import { type Args, parseArgs, serializeArgs } from './args.js';
-import { loadCatalog } from './catalog.js';
+import { getCatalog, loadCatalog } from './catalog.js';
 import { doctorReport } from './doctor.js';
 import { PocketServer } from './http.js';
 import { Logger, readLogs, StderrSink } from './log.js';
@@ -217,11 +217,13 @@ async function runServer(args: Args): Promise<ServerHandle> {
       void loadCatalog(true, log).then((c) => server.broadcast({ type: 'catalog', catalog: c })),
     24 * 3600 * 1000,
   ).unref();
-  // re-fetch pricing once login completes (models list needs auth)
+  // re-fetch pricing once the agent is usable — covers login completing
+  // (models list needs auth) and transient CLI failures at startup;
+  // loadCatalog(false) joins the initial load while it is still in flight.
   let prevPhase: AgentStatus['phase'] = 'starting';
   statusListeners.add((s) => {
-    if (s.phase === 'ready' && prevPhase === 'needsAuth') {
-      void loadCatalog(true, log).then((c) => server.broadcast({ type: 'catalog', catalog: c }));
+    if (s.phase === 'ready' && prevPhase !== 'ready' && getCatalog().status !== 'ready') {
+      void loadCatalog(false, log).then((c) => server.broadcast({ type: 'catalog', catalog: c }));
     }
     prevPhase = s.phase;
   });
