@@ -1,4 +1,5 @@
 import type { ContentBlock, FsEntry, SessionState } from '@shared/protocol';
+import { pickModelOptions } from '@shared/reducer';
 import {
   AtSign,
   Check,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CommandPalette } from '@/components/CommandPalette';
+import { currentValue, selectOptions } from '@/components/StatusStrip';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,6 +41,7 @@ export function Composer({
 }) {
   const t = useT();
   const enterToSend = useStore((s) => s.prefs.enterToSend);
+  const agentInfo = useStore((s) => s.agentInfo);
   const [text, setText] = useState('');
   const [images, setImages] = useState<{ data: string; mimeType: string; name: string }[]>([]);
   const [mentions, setMentions] = useState<Mention[]>([]);
@@ -63,6 +66,13 @@ export function Composer({
     state?.turn === 'awaitingPermission' ||
     state?.turn === 'cancelling';
   const cwd = state?.cwd ?? '';
+  // /btw works via declared chains support too — the real agent doesn't list it
+  // in availableCommands.
+  const btwOk = state?.commands.some((c) => c.name === 'btw') || agentInfo?.caps.chains === true;
+  const modelOpt = state ? pickModelOptions(state).model : undefined;
+  const modelImages = modelOpt
+    ? selectOptions(modelOpt).find((o) => o.value === currentValue(modelOpt))?.supportsImages
+    : undefined;
 
   // Debounced /api/fs lookup; fsSeq discards out-of-order responses.
   const fetchMention = useCallback(
@@ -130,12 +140,7 @@ export function Composer({
     if (submitting.current) return;
     const blocks: ContentBlock[] = [];
     const trimmed = text.trim();
-    if (
-      trimmed.startsWith('/btw ') &&
-      state?.commands.some((c) => c.name === 'btw') &&
-      !images.length &&
-      !mentions.length
-    ) {
+    if (trimmed.startsWith('/btw ') && btwOk && !images.length && !mentions.length) {
       submitting.current = true;
       try {
         await send({ type: 'aside.ask', sessionId, question: trimmed.slice(5) });
@@ -174,7 +179,7 @@ export function Composer({
     } finally {
       submitting.current = false;
     }
-  }, [text, mentions, images, sessionId, state?.commands, editingId, t]);
+  }, [text, mentions, images, sessionId, btwOk, editingId, t]);
 
   const cancelEdit = () => {
     draftEpoch.current++;
@@ -439,6 +444,8 @@ export function Composer({
               size="icon"
               className="size-10 shrink-0"
               aria-label={t('composer.attach')}
+              disabled={modelImages === false}
+              title={modelImages === false ? t('composer.noImages') : undefined}
               onClick={() => fileRef.current?.click()}
             >
               <ImageIcon className="size-5" />
@@ -509,7 +516,7 @@ export function Composer({
           aria-label={
             editingId
               ? t('composer.saveEdit')
-              : text.trim().startsWith('/btw ') && state?.commands.some((c) => c.name === 'btw')
+              : text.trim().startsWith('/btw ') && btwOk
                 ? t('aside.ask')
                 : working
                   ? t('composer.queued')

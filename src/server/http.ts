@@ -200,7 +200,7 @@ export class PocketServer {
           break;
         }
         case 'sessions.refresh': {
-          const list = await sessions.list(cmd.cwd);
+          const list = await sessions.list(cmd.cwd, cmd.query);
           this.ack(ws, env.id, true, list);
           break;
         }
@@ -216,6 +216,11 @@ export class PocketServer {
         }
         case 'session.close': {
           sessions.close(cmd.sessionId);
+          this.ack(ws, env.id, true);
+          break;
+        }
+        case 'session.forceClose': {
+          await sessions.forceClose(cmd.sessionId);
           this.ack(ws, env.id, true);
           break;
         }

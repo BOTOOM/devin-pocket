@@ -1,9 +1,10 @@
 import { matchEntry } from '@shared/catalog-match';
 import type { CatalogEntry, SessionConfigOption } from '@shared/protocol';
-import { Check, Search } from 'lucide-react';
+import { pickModelOptions } from '@shared/reducer';
+import { Check, ImageOff, Search, Zap } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { type FlatOption, selectOptions } from '@/components/StatusStrip';
+import { currentValue, type FlatOption, selectOptions } from '@/components/StatusStrip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,7 +75,13 @@ export function ModelSheet({
 
   const current = (option as { currentValue?: string }).currentValue;
   const currentRow = flat.find((o) => o.value === current);
-  const hasFast = flat.some(isFast);
+  // CLI ≥3000.11 exposes `speed` (standard/fast) as its own config option;
+  // older agents folded Fast into `-fast` model variants.
+  const sessionState = useStore((s) => s.open.get(sessionId));
+  const speedOpt = sessionState ? pickModelOptions(sessionState).speed : undefined;
+  const speedValue = speedOpt ? currentValue(speedOpt) : undefined;
+  const fastOn = speedOpt ? speedValue === 'fast' : currentRow ? isFast(currentRow) : false;
+  const hasFast = !!speedOpt || flat.some(isFast);
 
   const pick = async (value: string) => {
     await send({ type: 'config.set', sessionId, configId: option.id, value }).catch(() => {});
@@ -88,7 +95,16 @@ export function ModelSheet({
     else setComparing(o);
   };
 
-  const toggleFast = () => {
+  const toggleFast = async () => {
+    if (speedOpt) {
+      await send({
+        type: 'config.set',
+        sessionId,
+        configId: speedOpt.id,
+        value: fastOn ? 'standard' : 'fast',
+      }).catch(() => {});
+      return;
+    }
     if (!currentRow) return;
     const wantFast = !isFast(currentRow);
     const candidates = flat.filter(
@@ -123,8 +139,8 @@ export function ModelSheet({
                   Fast
                   <Switch
                     id="model-fast"
-                    checked={currentRow ? isFast(currentRow) : false}
-                    onCheckedChange={toggleFast}
+                    checked={fastOn}
+                    onCheckedChange={() => void toggleFast()}
                   />
                 </label>
               )}
@@ -194,7 +210,12 @@ export function ModelSheet({
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
                         <span className="truncate font-medium">{o.name}</span>
-                        {isFast(o) && <Badge variant="outline">Fast</Badge>}
+                        {isFast(o) && <Zap className="size-3.5 shrink-0 text-warning" />}
+                        {o.supportsImages === false && (
+                          <span title={t('model.noImages')}>
+                            <ImageOff className="size-3.5 shrink-0 text-muted-foreground" />
+                          </span>
+                        )}
                         {o.entry?.isNew && <Badge variant="secondary">{t('model.new')}</Badge>}
                         {o.entry?.isBeta && <Badge variant="outline">{t('model.beta')}</Badge>}
                         {/fusion/i.test(o.entry?.familyLabel ?? o.name) && (

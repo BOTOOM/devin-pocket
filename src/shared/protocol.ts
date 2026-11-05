@@ -62,6 +62,15 @@ export interface AgentInfo {
     embeddedContext: boolean;
     rename: boolean;
     editableCommands: boolean;
+    /** session/close exists; force = `cognition.ai/force` closes other holders */
+    closeSession: boolean;
+    forceClose: boolean;
+    /** concurrent prompt during a turn steers it (CLI ≥3000.11.92) */
+    midTurnPrompts: boolean;
+    /** side-chain support for /btw (client must declare it too) */
+    chains: boolean;
+    /** session/list accepts `_meta["cognition.ai/content"]` search */
+    contentSearch: boolean;
     /** raw `_meta` from agentCapabilities (cognition.ai/* flags) */
     meta: Record<string, unknown>;
   };
@@ -88,6 +97,8 @@ export interface SessionSummary {
   createdAt?: string;
   locked: boolean;
   lockHolderPid?: number | null;
+  /** _meta["cognition.ai/hasUserMessages"] — false = empty session (CLI ≥3000.11.205) */
+  hasUserMessages?: boolean;
   /** true when this server process currently has it loaded */
   open: boolean;
 }
@@ -147,6 +158,10 @@ export interface PermissionRequest {
   options: PermissionOption[];
   /** _meta["cognition.ai/editableCommand"] — user may edit before approving */
   editableCommand?: string;
+  /** _meta["cognition.ai/permissionRule"] — the exact rule being allowed */
+  permissionRule?: string;
+  /** _meta["cognition.ai/permissionReason"] — why approval is required */
+  permissionReason?: string;
   content?: ToolCallContent[];
   locations?: ToolCallLocation[];
   rawInput?: unknown;
@@ -212,8 +227,8 @@ export interface SessionState {
 
 export type SessionEvent =
   | { type: 'userChunk'; block: ContentBlock }
-  | { type: 'agentChunk'; text: string }
-  | { type: 'thoughtChunk'; text: string }
+  | { type: 'agentChunk'; text: string; at?: number }
+  | { type: 'thoughtChunk'; text: string; at?: number }
   | {
       type: 'toolCall';
       toolCallId: string;
@@ -402,10 +417,11 @@ export type ClientCommand =
   | { type: 'auth.login'; methodId: string }
   | { type: 'auth.logout' }
   | { type: 'agent.restart' }
-  | { type: 'sessions.refresh'; cwd?: string }
+  | { type: 'sessions.refresh'; cwd?: string; query?: string }
   | { type: 'session.new'; cwd: string }
   | { type: 'session.open'; sessionId: string; cwd: string }
   | { type: 'session.close'; sessionId: string }
+  | { type: 'session.forceClose'; sessionId: string }
   | { type: 'session.delete'; sessionId: string; cwd: string }
   | { type: 'session.rename'; sessionId: string; title: string }
   | { type: 'prompt'; sessionId: string; blocks: ContentBlock[] }

@@ -31,6 +31,17 @@ function commandOf(rawInput: unknown, editable?: string): string | undefined {
   return typeof cmd === 'string' ? cmd : undefined;
 }
 
+/** _meta["cognition.ai/timestamp"] (CLI ≥3000.11.92) → epoch ms for item.at. */
+function metaAt(u: { _meta?: unknown }): number | undefined {
+  const t = (u._meta as Record<string, unknown> | undefined)?.['cognition.ai/timestamp'];
+  if (typeof t === 'number') return t;
+  if (typeof t === 'string') {
+    const ms = Date.parse(t);
+    return Number.isNaN(ms) ? undefined : ms;
+  }
+  return undefined;
+}
+
 /** Map one ACP SessionUpdate to zero+ SessionEvents. Unknown variants → []. */
 export function normalizeUpdate(update: SessionUpdate): SessionEvent[] {
   switch (update.sessionUpdate) {
@@ -38,7 +49,7 @@ export function normalizeUpdate(update: SessionUpdate): SessionEvent[] {
       return [{ type: 'userChunk', block: update.content }];
     case 'agent_message_chunk': {
       const b: ContentBlock = update.content;
-      if (b.type === 'text') return [{ type: 'agentChunk', text: b.text }];
+      if (b.type === 'text') return [{ type: 'agentChunk', text: b.text, at: metaAt(update) }];
       return [
         {
           type: 'system',
@@ -49,7 +60,7 @@ export function normalizeUpdate(update: SessionUpdate): SessionEvent[] {
     }
     case 'agent_thought_chunk': {
       const b = update.content;
-      if (b.type === 'text') return [{ type: 'thoughtChunk', text: b.text }];
+      if (b.type === 'text') return [{ type: 'thoughtChunk', text: b.text, at: metaAt(update) }];
       return [];
     }
     case 'tool_call': {

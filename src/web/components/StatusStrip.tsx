@@ -27,10 +27,11 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
   const t = useT();
   const [sheet, setSheet] = useState<'mode' | 'model' | 'reason' | null>(null);
   if (!state) return null;
-  const { model, reasoning } = pickModelOptions(state);
+  const { model, reasoning, speed } = pickModelOptions(state);
   const modelValue = currentValue(model);
   const modelName = model && selectOptions(model).find((o) => o.value === modelValue)?.name;
   const reasonValue = currentValue(reasoning);
+  const speedValue = currentValue(speed);
   const modeName =
     state.modes.find((m) => m.id === state.currentMode)?.name ?? state.currentMode ?? '';
   const controls = Number(state.modes.length > 0) + Number(!!model) + Number(!!reasonValue);
@@ -53,10 +54,13 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
         {model && (
           <Chip
             chip="model"
-            label={`${t('model.title')}: ${modelName ?? modelValue ?? ''}`}
+            label={`${t('model.title')}: ${modelName ?? modelValue ?? ''}${speedValue === 'fast' ? ' · Fast' : ''}`}
             onClick={() => setSheet('model')}
           >
             {modelName ?? modelValue ?? t('model.title')}
+            {speedValue === 'fast' && (
+              <span className="shrink-0 text-warning-foreground dark:text-warning"> ⚡</span>
+            )}
           </Chip>
         )}
         {reasoning && reasonValue && (
@@ -199,17 +203,24 @@ export interface FlatOption {
   name: string;
   description?: string;
   group?: string;
+  /** _meta["cognition.ai/supportsImages"] on the option (CLI ≥3000.11.92) */
+  supportsImages?: boolean;
 }
 
 export function selectOptions(opt: SessionConfigOption): FlatOption[] {
   const raw = (opt.type === 'select' ? opt.options : []) as unknown[];
   const out: FlatOption[] = [];
+  const images = (m: unknown): boolean | undefined => {
+    const v = (m as Record<string, unknown> | undefined)?.['cognition.ai/supportsImages'];
+    return typeof v === 'boolean' ? v : undefined;
+  };
   for (const o of raw) {
     const item = o as {
       value?: string;
       name?: string;
       description?: string;
-      options?: { value: string; name: string; description?: string }[];
+      _meta?: unknown;
+      options?: { value: string; name: string; description?: string; _meta?: unknown }[];
     };
     if (Array.isArray(item.options)) {
       for (const sub of item.options)
@@ -218,9 +229,15 @@ export function selectOptions(opt: SessionConfigOption): FlatOption[] {
           name: sub.name,
           description: sub.description,
           group: item.name,
+          supportsImages: images(sub._meta),
         });
     } else if (item.value !== undefined) {
-      out.push({ value: item.value, name: item.name ?? item.value, description: item.description });
+      out.push({
+        value: item.value,
+        name: item.name ?? item.value,
+        description: item.description,
+        supportsImages: images(item._meta),
+      });
     }
   }
   return out;

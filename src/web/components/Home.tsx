@@ -3,13 +3,15 @@ import {
   FolderOpen,
   Loader2,
   Lock,
+  LockOpen,
   MoreVertical,
   Plus,
   RefreshCw,
+  Search,
   Settings as SettingsIcon,
   Sparkles,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RenameDialog } from '@/components/RenameDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -27,6 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { WorkspaceSheet } from '@/components/WorkspaceSheet';
@@ -49,6 +52,19 @@ export function HomeScreen() {
   const [del, setDel] = useState<SessionSummary | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
+  const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Content search is agent-side (sessionListContentSearch); debounce it.
+  useEffect(() => {
+    if (!hydrated) return;
+    clearTimeout(debounce.current);
+    debounce.current = setTimeout(
+      () => void send({ type: 'sessions.refresh', query }).catch(() => {}),
+      query ? 300 : 0,
+    );
+    return () => clearTimeout(debounce.current);
+  }, [query, hydrated]);
 
   // Workspace pick only affects "Nueva sesión" — the list itself is global.
   const cwd = prefs.workspace ?? workspaces[0]?.path ?? serverCwd ?? '';
@@ -123,6 +139,18 @@ export function HomeScreen() {
           {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
           {creating ? t('home.newSession.creating') : t('home.newSession')}
         </Button>
+      </div>
+
+      <div className="safe-x px-4 pb-2">
+        <div className="relative">
+          <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t('home.search')}
+            className="h-9 pl-9"
+          />
+        </div>
       </div>
 
       <div className="safe-x flex items-center justify-between px-4 pb-1">
@@ -242,6 +270,11 @@ function SessionRow({
                 <TooltipContent>{t('home.locked')}</TooltipContent>
               </Tooltip>
             )}
+            {s.hasUserMessages === false && (
+              <span className="shrink-0 rounded border px-1 text-[10px] text-muted-foreground">
+                {t('home.emptySession')}
+              </span>
+            )}
           </span>
           <span className="block truncate text-xs text-muted-foreground">
             {relTime(s.updatedAt ?? s.createdAt)} · {baseName(s.cwd)}
@@ -263,6 +296,21 @@ function SessionRow({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onRename}>{t('common.rename')}</DropdownMenuItem>
+          {s.locked && (
+            <DropdownMenuItem
+              onClick={async () => {
+                try {
+                  await send({ type: 'session.forceClose', sessionId: s.sessionId });
+                  void import('sonner').then(({ toast }) => toast.success(t('home.unlockDone')));
+                } catch (e) {
+                  void import('sonner').then(({ toast }) => toast.error((e as Error).message));
+                }
+              }}
+            >
+              <LockOpen className="size-4" />
+              {t('home.unlock')}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem variant="destructive" onClick={onDelete}>
             {t('common.delete')}
           </DropdownMenuItem>

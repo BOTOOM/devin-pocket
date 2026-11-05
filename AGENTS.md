@@ -153,18 +153,29 @@ notifications `_cognition.ai/turn_stats` and `_cognition.ai/output`.
 
 - **Queued messages + "send now"**: `SessionManager` holds a per-session in-memory
   queue (`SessionState.queue`) and serializes normal ACP prompts; Composer shows
-  queued drafts with edit/remove/send-now actions. Send now cancels the active
-  prompt first; Stop is separate. Queue survives browser reconnects but not a
-  server restart. Tests cover ordering, cancellation and mobile UI with fake ACP.
-- **`/btw` side questions**: Devin CLI docs advertise it as an ACP agent-side
-  slash command. Pocket sends it via concurrent `session/prompt` in a separate
-  panel without changing the main turn state. The fake agent marks side updates
-  with `_meta['cognition.ai/channel']='btw'`; the real Devin ACP response shape
-  and concurrency behavior are **unverified**. Unmarked chunks while a main
-  turn runs stay in the main transcript rather than being misattributed. Test
-  on a separate real session; do not use another agent process or the user's
-  active chat to experiment. Do not restart/install while a user is actively
-  chatting through this app without arranging a safe moment.
+  queued drafts with edit/remove/send-now actions. With `midTurnPrompts`
+  (CLI ≥3000.11.92) send-now **steers**: `SessionManager.steer()` sends the
+  prompt mid-turn without cancelling — one merged turn, one `turnEnded`.
+  Stop is separate. Queue survives browser reconnects but not a server restart.
+- **`/btw` side questions (verified vs real agent 3000.11.234)**: handshake is
+  (1) declare `clientCapabilities._meta['cognition.ai/chains']=true` at
+  initialize (the agent logs `chains=true`), and (2) send the `/btw` prompt with
+  `_meta['cognition.ai/chain']='<id>'`. Without the chain meta the agent replies
+  instantly "needs side-chain support…". `/btw` is NOT in `availableCommands`;
+  availability = `agentInfo.caps.chains`. Side-chunk routing: `_meta
+  ['cognition.ai/channel']=='btw'` (fake agent), `_meta['cognition.ai/instant']`,
+  or no active main turn; unmarked chunks during a main turn stay in the main
+  transcript (documented caveat).
+- **CLI ≥3000.11.234 surface adopted**: `session/close` on local close +
+  `session.forceClose` (`_meta['cognition.ai/force']`) for locks held by other
+  processes; `session/list` `_meta['cognition.ai/content']` global content
+  search; `_meta['cognition.ai/hasUserMessages']` badge; `speed` config option
+  (`category:'model_config'`, standard/fast — the Fast switch is wired to it,
+  NOT to `-fast` model values); `_meta['cognition.ai/supportsImages']` per model
+  option; `cognition.ai/permissionRule|permissionReason` on permission requests;
+  `cognition.ai/timestamp` on streamed chunks → `item.at`; `/rename` with no
+  title auto-generates one. `/loop` is gone; `/goal` and `/billing` arrive via
+  `availableCommands` for free.
 - Real-account catalog/pricing JSON shape is **unverified** — inspect via the
   Diagnostics "Modelos y precios" card or `devin-pocket models`. The parser is
   tolerant (families / array / `{models}`) and reports `parseError` on unknown shapes.

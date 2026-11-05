@@ -35,9 +35,9 @@ export function applyEvent(state: SessionState, ev: SessionEvent, now = Date.now
       return s;
     }
     case 'agentChunk':
-      return appendText(s, 'agent', ev.text, now);
+      return appendText(s, 'agent', ev.text, ev.at ?? now);
     case 'thoughtChunk':
-      return appendText(s, 'thought', ev.text, now);
+      return appendText(s, 'thought', ev.text, ev.at ?? now);
     case 'toolCall': {
       s.items = finishStreaming(s.items);
       const idx = s.items.findIndex((i) => i.kind === 'tool' && i.toolCallId === ev.toolCallId);
@@ -217,7 +217,10 @@ export function pickModelOptions(state: SessionState) {
       o.id === 'thought_level' || o.category === 'thought_level' || /reason|thought/i.test(o.id),
   );
   const mode = state.configOptions.find((o) => o.id === 'mode' || o.category === 'mode');
-  return { model, reasoning, mode };
+  // CLI ≥3000.11: speed is its own select (category 'model_config'), not a
+  // `-fast` model variant.
+  const speed = state.configOptions.find((o) => o.id === 'speed' || o.category === 'model_config');
+  return { model, reasoning, mode, speed };
 }
 
 export function sumTurnStats(stats: readonly { input: number; cached: number; output: number }[]) {

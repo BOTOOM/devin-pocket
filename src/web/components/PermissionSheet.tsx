@@ -56,6 +56,18 @@ export function PermissionSheet({
         </SheetHeader>
 
         <div className="space-y-2 pb-2">
+          {(request.permissionRule || request.permissionReason) && (
+            <p className="text-xs text-muted-foreground">
+              {request.permissionRule && (
+                <>
+                  {t('perm.rule')}:{' '}
+                  <code className="rounded bg-muted px-1">{request.permissionRule}</code>
+                </>
+              )}
+              {request.permissionRule && request.permissionReason && ' · '}
+              {request.permissionReason}
+            </p>
+          )}
           {request.editableCommand && (
             <code className="block overflow-x-auto rounded-md bg-muted px-3 py-2 text-sm">
               $ {request.editableCommand}

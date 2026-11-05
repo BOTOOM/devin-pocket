@@ -35,6 +35,9 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
   const summary = useStore((s) => s.sessions.find((x) => x.sessionId === sessionId));
   const hydrated = useStore((s) => s.hydrated);
   const agent = useStore((s) => s.agent);
+  const agentInfo = useStore((s) => s.agentInfo);
+  // /btw needs side-chain support; the real agent doesn't list it in commands.
+  const btwOk = state?.commands.some((c) => c.name === 'btw') || agentInfo?.caps.chains === true;
   const [renameOpen, setRenameOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [asideOpen, setAsideOpen] = useState(false);
@@ -91,7 +94,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
           <div className="truncate font-semibold">{title}</div>
           <div className="truncate text-xs text-muted-foreground">{baseName(cwd) || cwd}</div>
         </button>
-        {state?.commands.some((c) => c.name === 'btw') && (
+        {btwOk && (
           <Button
             variant={asideOpen ? 'secondary' : 'ghost'}
             size="icon"
@@ -162,7 +165,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
         )}
       </div>
 
-      {state?.commands.some((c) => c.name === 'btw') && asideOpen && (
+      {state && btwOk && asideOpen && (
         <section
           className="safe-x max-h-[42dvh] space-y-2 overflow-y-auto border-t bg-card px-4 py-2"
           aria-label={t('aside.title')}

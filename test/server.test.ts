@@ -304,11 +304,14 @@ describe('devin-pocket server', () => {
           i.blocks.some((b) => b.type === 'text' && b.text === 'QUEUE_RESULT_second'),
       ),
     ).toBe(false);
-    expect(
-      c.msgs.filter(
-        (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
-      ),
-    ).toHaveLength(2);
+    // send-now steers into the running turn (midTurnPrompts) — one merged turn
+    // ends exactly once (no cancel+resend pair); wait for it to wind down.
+    await poll(
+      () =>
+        c.msgs.filter(
+          (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
+        ).length >= 1,
+    );
     c.ws.close();
     other.ws.close();
   });

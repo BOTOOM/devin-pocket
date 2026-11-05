@@ -92,6 +92,7 @@ const AVAILABLE_COMMANDS = [
 let currentModel = 'swe-2';
 let currentEffort = 'max';
 let currentMode = 'normal';
+let currentSpeed = 'standard';
 
 const EFFORT_BY_MODEL: Record<string, { value: string; name: string }[]> = {
   'gpt-6-sol': [
@@ -239,9 +240,17 @@ function buildConfig(): SessionConfigOption[] {
           group: 'devin',
           name: 'Devin',
           options: [
-            { value: 'gpt-6-sol', name: 'GPT-6 Sol' },
-            { value: 'swe-2', name: 'SWE-2' },
-            { value: 'swe-1-6', name: 'SWE-1.6' },
+            {
+              value: 'gpt-6-sol',
+              name: 'GPT-6 Sol',
+              _meta: { 'cognition.ai/supportsImages': true },
+            },
+            { value: 'swe-2', name: 'SWE-2', _meta: { 'cognition.ai/supportsImages': true } },
+            {
+              value: 'swe-1-6',
+              name: 'SWE-1.6',
+              _meta: { 'cognition.ai/supportsImages': false },
+            },
             { value: 'swe-1-6-fast', name: 'SWE-1.6 Fast' },
           ],
         },
@@ -250,7 +259,11 @@ function buildConfig(): SessionConfigOption[] {
           name: 'Other models',
           options: [
             { value: 'opus-5', name: 'Claude Opus 5' },
-            { value: 'gemini-4', name: 'Gemini 4' },
+            {
+              value: 'gemini-4',
+              name: 'Gemini 4',
+              _meta: { 'cognition.ai/supportsImages': true },
+            },
           ],
         },
         { group: 'fusion', name: 'Fusion', options: FUSION_OPTS },
@@ -268,6 +281,17 @@ function buildConfig(): SessionConfigOption[] {
           } satisfies SessionConfigOption,
         ]
       : []),
+    {
+      id: 'speed',
+      name: 'Speed',
+      type: 'select',
+      category: 'model_config',
+      currentValue: currentSpeed,
+      options: [
+        { value: 'standard', name: 'Standard' },
+        { value: 'fast', name: 'Fast' },
+      ],
+    },
   ];
 }
 
@@ -542,6 +566,14 @@ const FAKE_SESSIONS = () => [
     cwd: AGENT_CWD,
     title: 'Fix the flaky test',
     updatedAt: new Date(Date.now() - 2 * 3600_000).toISOString(),
+    _meta: { 'cognition.ai/hasUserMessages': true },
+  },
+  {
+    sessionId: 'fake-session-empty',
+    cwd: AGENT_CWD,
+    title: null,
+    updatedAt: new Date(Date.now() - 3600_000).toISOString(),
+    _meta: { 'cognition.ai/hasUserMessages': false },
   },
   {
     sessionId: 'fake-session-oldest',
@@ -587,10 +619,17 @@ const agent: Agent = {
       agentCapabilities: {
         loadSession: true,
         promptCapabilities: { image: true },
-        sessionCapabilities: { list: {}, delete: {} },
+        sessionCapabilities: {
+          list: {},
+          delete: {},
+          close: { _meta: { 'cognition.ai/force': true } },
+        },
         logout: {},
         _meta: {
           'cognition.ai/sessionListOrderBy': ['updated_at', 'created_at'],
+          'cognition.ai/midTurnPrompts': true,
+          'cognition.ai/chains': true,
+          'cognition.ai/sessionListContentSearch': true,
         },
       },
       authMethods: authenticated
@@ -637,9 +676,17 @@ const agent: Agent = {
   },
   async listSessions(params) {
     if (!authenticated) throw NOT_AUTHENTICATED();
-    const all = FAKE_SESSIONS();
+    let all = FAKE_SESSIONS();
     // no cwd → global list; with cwd → only sessions in that directory
-    const sessions = params?.cwd ? all.filter((s) => s.cwd === params.cwd) : all;
+    if (params?.cwd) all = all.filter((s) => s.cwd === params.cwd);
+    // cognition.ai/content — global content search (CLI ≥3000.11.205)
+    const content = (params?._meta as Record<string, unknown> | undefined)?.[
+      'cognition.ai/content'
+    ];
+    const sessions =
+      typeof content === 'string' && content
+        ? all.filter((s) => (s.title ?? s.sessionId).toLowerCase().includes(content.toLowerCase()))
+        : all;
     process.stderr.write(
       `fake-agent: list_sessions cwd=${params?.cwd ?? '(all)'} → ${sessions.length} sessions\n`,
     );
@@ -724,6 +771,12 @@ const agent: Agent = {
       configOptions: buildConfig(),
     };
   },
+  async closeSession(params) {
+    process.stderr.write(
+      `fake-agent: close_session ${params.sessionId} force=${JSON.stringify(params._meta ?? {})}\n`,
+    );
+    return {};
+  },
   async deleteSession(params) {
     process.stderr.write(`fake-agent: delete_session ${params.sessionId}\n`);
     const i = created.findIndex((s) => s.sessionId === params.sessionId);
@@ -744,6 +797,7 @@ const agent: Agent = {
     if (params.configId === 'model') currentModel = v;
     else if (params.configId === 'thought_level') currentEffort = v;
     else if (params.configId === 'mode') currentMode = v;
+    else if (params.configId === 'speed') currentSpeed = v;
     const configOptions = buildConfig();
     setTimeout(() => void update({ sessionUpdate: 'config_option_update', configOptions }), 20);
     return { configOptions };
@@ -758,6 +812,19 @@ const agent: Agent = {
     if (!authenticated) throw NOT_AUTHENTICATED();
     const ptext = params.prompt.map((b) => (b.type === 'text' ? b.text : '')).join('');
     if (ptext.startsWith('/btw ')) {
+      // real agent: /btw only works on a declared side chain; without the
+      // `cognition.ai/chain` prompt meta it answers with a refusal.
+      const chain = (params._meta as Record<string, unknown> | undefined)?.['cognition.ai/chain'];
+      if (typeof chain !== 'string') {
+        await update({
+          sessionUpdate: 'agent_message_chunk',
+          content: text(
+            "/btw needs side-chain support (`cognition.ai/chains`), which this client doesn't use.",
+          ),
+          _meta: { 'cognition.ai/instant': true },
+        });
+        return { stopReason: 'end_turn' };
+      }
       const sideMeta = { 'cognition.ai/channel': 'btw' };
       await update({ sessionUpdate: 'user_message_chunk', content: text(ptext), _meta: sideMeta });
       await update({
@@ -780,7 +847,7 @@ const agent: Agent = {
         sessionUpdate: 'agent_message_chunk',
         content: text('Working on queued task'),
       });
-      for (let i = 0; i < 100 && !cancelled; i++) await sleep(FAST ? 40 : 100);
+      for (let i = 0; i < 150 && !cancelled; i++) await sleep(FAST ? 40 : 100);
       return { stopReason: cancelled ? 'cancelled' : 'end_turn' };
     }
     if (ptext.startsWith('QUEUE_RESULT_')) {

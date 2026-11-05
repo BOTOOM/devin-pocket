@@ -138,7 +138,9 @@ export class SessionManager {
     const stat = this.loadStats.get(sid);
     if (stat) stat.updates++;
     const channel = n.update._meta?.['cognition.ai/channel'] ?? n._meta?.['cognition.ai/channel'];
-    const isAside = this.sideActive.has(sid) && (channel === 'btw' || !this.active.has(sid));
+    const instant = n.update._meta?.['cognition.ai/instant'] === true;
+    const isAside =
+      this.sideActive.has(sid) && (channel === 'btw' || instant || !this.active.has(sid));
     if (
       isAside &&
       n.update.sessionUpdate === 'agent_message_chunk' &&
@@ -195,7 +197,7 @@ export class SessionManager {
   }
 
   /** session/list globally, then per configured workspace (+ cwd when different). */
-  async list(cwd?: string): Promise<SessionSummary[]> {
+  async list(cwd?: string, query?: string): Promise<SessionSummary[]> {
     const cwds = new Set<string>();
     for (const w of this.workspaces) cwds.add(w.path);
     if (cwd) cwds.add(cwd);
@@ -211,6 +213,7 @@ export class SessionManager {
         const locked =
           meta['cognition.ai/isLocked'] === true || meta['cognition.ai/isLocked'] === 'true';
         const pid = meta['cognition.ai/lockHolderPid'];
+        const hum = meta['cognition.ai/hasUserMessages'];
         out.push({
           sessionId: si.sessionId,
           cwd: si.cwd ?? c ?? process.cwd(),
@@ -218,17 +221,20 @@ export class SessionManager {
           updatedAt: si.updatedAt ?? undefined,
           locked,
           lockHolderPid: typeof pid === 'number' ? pid : null,
+          hasUserMessages: typeof hum === 'boolean' ? hum : undefined,
           open: this.sessions.has(si.sessionId),
         });
       }
     };
-    // ACP allows omitting cwd — one global query first, then per-cwd merge
+    // ACP allows omitting cwd — one global query first, then per-cwd merge.
+    // `query` searches session content (`cognition.ai/content`), global only.
+    const q = query?.trim() || undefined;
     try {
-      pushInfos(await this.agent.listSessions());
+      pushInfos(await this.agent.listSessions(undefined, q));
     } catch (e) {
       this.log.debug(`session/list (no cwd): ${(e as Error).message}`);
     }
-    for (const c of cwds) {
+    for (const c of q ? [] : cwds) {
       try {
         pushInfos(await this.agent.listSessions(c), c);
       } catch (e) {
@@ -241,7 +247,7 @@ export class SessionManager {
     }
     // sessions we just created may not be in the agent's list yet — merge them in
     for (const s of this.sessions.values()) {
-      if (!seen.has(s.sessionId)) {
+      if (!seen.has(s.sessionId) && (!q || (s.title ?? '').toLowerCase().includes(q))) {
         seen.add(s.sessionId);
         out.push({
           sessionId: s.sessionId,
@@ -342,7 +348,23 @@ export class SessionManager {
     this.echoExpect.delete(sessionId);
     this.sideActive.delete(sessionId);
     this.agent.untrack(sessionId);
+    // release the agent-side lock so other clients can open it (best-effort)
+    if (this.agent.agentInfo?.caps.closeSession) {
+      void this.agent
+        .closeSession(sessionId)
+        .catch((e) => this.log.debug(`session/close ${sessionId}: ${(e as Error).message}`));
+    }
     this.emit({ type: 'session.closed', sessionId });
+  }
+
+  /** Force-close a session held by another process (`cognition.ai/force`),
+   *  e.g. a stale lock left by a crashed client. */
+  async forceClose(sessionId: string): Promise<void> {
+    if (!this.agent.agentInfo?.caps.closeSession) {
+      throw new Error('agent does not support session/close');
+    }
+    await this.agent.closeSession(sessionId, true);
+    void this.list().catch((e) => this.log.warn(`session/list: ${(e as Error).message}`));
   }
 
   async delete(sessionId: string): Promise<void> {
@@ -352,13 +374,18 @@ export class SessionManager {
   }
 
   /** Prefer the agent's own `/rename` slash command; fall back to a local
-   *  title override persisted in <state>/titles.json (agent can't rename). */
+   *  title override persisted in <state>/titles.json (agent can't rename).
+   *  An empty title asks the agent to generate one (CLI ≥3000.11.205). */
   async rename(sessionId: string, title: string): Promise<void> {
     const s = this.sessions.get(sessionId);
     const hasRenameCmd = s?.commands.some((c) => c.name === 'rename');
     if (hasRenameCmd && s) {
-      await this.prompt(sessionId, [{ type: 'text', text: `/rename ${title}` }]);
+      await this.prompt(sessionId, [
+        { type: 'text', text: title ? `/rename ${title}` : '/rename' },
+      ]);
+      if (!title) return; // agent generates + announces via session_info_update
     } else {
+      if (!title) throw new Error('auto-rename requires an open session');
       saveTitle(sessionId, title);
     }
     // update session state + the cached list so clients see the title at once
@@ -371,14 +398,21 @@ export class SessionManager {
     const s = this.sessions.get(sessionId);
     const q = question.trim();
     if (!s || s.loading) throw new Error('session is not open');
-    if (!s.commands.some((c) => c.name === 'btw')) throw new Error('/btw is not available');
+    // /btw runs on a side chain; the real agent doesn't list it in
+    // availableCommands but accepts it when we declared chains support.
+    const chains = this.agent.agentInfo?.caps.chains === true;
+    if (!s.commands.some((c) => c.name === 'btw') && !chains) {
+      throw new Error('/btw is not available');
+    }
     if (!q || q.length > 4000) throw new Error('invalid question');
     if (this.sideActive.has(sessionId)) throw new Error('side question already running');
     if (this.agent.status.phase !== 'ready') throw new Error('agent is not ready');
     this.sideActive.add(sessionId);
     this.emitEvent(sessionId, { type: 'asideStarted', question: q });
     void this.agent
-      .prompt(sessionId, [{ type: 'text', text: `/btw ${q}` }])
+      .prompt(sessionId, [{ type: 'text', text: `/btw ${q}` }], {
+        'cognition.ai/chain': 'btw',
+      })
       .then(() => {
         this.sideActive.delete(sessionId);
         this.emitEvent(sessionId, { type: 'asideEnded' });
@@ -422,6 +456,23 @@ export class SessionManager {
     const s = this.sessions.get(sessionId);
     const item = s?.queue.find((p) => p.id === id);
     if (!s || !item) throw new Error('queued message not found');
+    // Steering (CLI ≥3000.11.92): a mid-turn prompt joins the running turn —
+    // no cancel, no lost progress. Fall back to cancel+resend on old agents.
+    if (this.active.has(sessionId) && this.agent.agentInfo?.caps.midTurnPrompts) {
+      this.emitEvent(sessionId, {
+        type: 'queueChanged',
+        queue: s.queue.filter((p) => p.id !== id),
+      });
+      try {
+        await this.steer(sessionId, item.blocks);
+      } catch (e) {
+        // put it back at the head so the UI still shows the send-now action
+        const rest = this.sessions.get(sessionId)?.queue ?? [];
+        this.emitEvent(sessionId, { type: 'queueChanged', queue: [item, ...rest] });
+        throw e;
+      }
+      return;
+    }
     this.emitEvent(sessionId, {
       type: 'queueChanged',
       queue: [item, ...s.queue.filter((p) => p.id !== id)],
@@ -458,6 +509,25 @@ export class SessionManager {
     void this.prompt(sessionId, next.blocks).catch((e) => {
       this.log.warn(`queued prompt: ${(e as Error).message}`);
     });
+  }
+
+  /** Inject a message into the running turn (steering). Renders the user echo
+   *  locally like prompt() but does not take `active` or flip the turn phase —
+   *  the owning turn emits turnEnded when the merged turn finishes. */
+  private async steer(sessionId: string, blocks: CB[]): Promise<void> {
+    const s = this.sessions.get(sessionId);
+    if (!s || s.loading) throw new Error('session is not open');
+    const text = blocks.map((b) => (b.type === 'text' ? b.text : '')).join('');
+    if (text) this.echoExpect.set(sessionId, { text, buf: '' });
+    for (const b of blocks) this.emitEvent(sessionId, { type: 'userChunk', block: b });
+    try {
+      await this.agent.prompt(sessionId, blocks as ContentBlock[]);
+    } catch (e) {
+      this.emitEvent(sessionId, { type: 'error', message: (e as Error).message });
+      throw e;
+    } finally {
+      this.echoExpect.delete(sessionId);
+    }
   }
 
   async prompt(sessionId: string, blocks: CB[]): Promise<{ stopReason: string }> {
@@ -522,6 +592,8 @@ export class SessionManager {
     const requestId = `perm-${++this.permSeq}`;
     const meta = req.toolCall._meta as Record<string, unknown> | undefined;
     const editable = meta?.['cognition.ai/editableCommand'];
+    const rule = meta?.['cognition.ai/permissionRule'];
+    const reason = meta?.['cognition.ai/permissionReason'];
     const request: PermissionRequest = {
       requestId,
       toolCallId: req.toolCall.toolCallId,
@@ -529,6 +601,8 @@ export class SessionManager {
       toolKind: (req.toolCall.kind as string | undefined) ?? 'other',
       options: req.options as PermissionOption[],
       editableCommand: typeof editable === 'string' ? editable : undefined,
+      permissionRule: typeof rule === 'string' ? rule : undefined,
+      permissionReason: typeof reason === 'string' ? reason : undefined,
       content: req.toolCall.content as ToolCallContent[] | undefined,
       locations: req.toolCall.locations as ToolCallLocation[] | undefined,
       rawInput: req.toolCall.rawInput,

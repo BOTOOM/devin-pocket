@@ -178,6 +178,14 @@ export class AgentProcess {
         embeddedContext: caps?.promptCapabilities?.embeddedContext === true,
         rename: meta['cognition.ai/sessionRename'] === true || meta['cognition.ai/rename'] === true,
         editableCommands: meta['cognition.ai/editableCommands'] === true,
+        closeSession: caps?.sessionCapabilities?.close != null,
+        forceClose:
+          (caps?.sessionCapabilities?.close?._meta as Record<string, unknown> | undefined)?.[
+            'cognition.ai/force'
+          ] === true,
+        midTurnPrompts: meta['cognition.ai/midTurnPrompts'] === true,
+        chains: meta['cognition.ai/chains'] === true,
+        contentSearch: meta['cognition.ai/sessionListContentSearch'] === true,
         meta,
       },
     };
@@ -291,6 +299,13 @@ export class AgentProcess {
         clientCapabilities: {
           fs: { readTextFile: false, writeTextFile: false },
           terminal: false,
+          // Cognition extension features this client uses; the agent parses
+          // them into its "client capabilities" summary (verified in its log).
+          _meta: {
+            'cognition.ai/midTurnPrompts': true, // steering: prompt during a turn
+            'cognition.ai/queuedMessages': true,
+            'cognition.ai/chains': true, // side-chains; required for /btw
+          },
         },
         clientInfo: { name: 'devin-pocket', title: 'Devin Pocket', version: VERSION },
       });
@@ -372,8 +387,11 @@ export class AgentProcess {
     return this.c.loadSession({ cwd, mcpServers: [], sessionId });
   }
 
-  async listSessions(cwd?: string): Promise<SessionInfo[]> {
-    const res = await this.c.listSessions(cwd ? { cwd } : {});
+  async listSessions(cwd?: string, content?: string): Promise<SessionInfo[]> {
+    const res = await this.c.listSessions({
+      ...(cwd ? { cwd } : {}),
+      ...(content ? { _meta: { 'cognition.ai/content': content } } : {}),
+    });
     return res.sessions;
   }
 
@@ -381,8 +399,20 @@ export class AgentProcess {
     await this.c.deleteSession({ sessionId });
   }
 
-  async prompt(sessionId: string, blocks: ContentBlock[]): Promise<PromptResponse> {
-    return this.c.prompt({ sessionId, prompt: blocks });
+  /** session/close — `force` releases locks held by other processes. */
+  async closeSession(sessionId: string, force = false): Promise<void> {
+    await this.c.closeSession({
+      sessionId,
+      ...(force ? { _meta: { 'cognition.ai/force': true } } : {}),
+    });
+  }
+
+  async prompt(
+    sessionId: string,
+    blocks: ContentBlock[],
+    meta?: Record<string, unknown>,
+  ): Promise<PromptResponse> {
+    return this.c.prompt({ sessionId, prompt: blocks, ...(meta ? { _meta: meta } : {}) });
   }
 
   async cancel(sessionId: string): Promise<void> {
