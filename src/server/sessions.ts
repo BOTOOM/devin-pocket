@@ -68,6 +68,7 @@ export class SessionManager {
   private sideActive = new Set<string>();
   /** sessionId → counters while a session/load replay is in flight */
   private loadStats = new Map<string, { updates: number; events: number; pipelineMs: number }>();
+  private closing = new Map<string, Promise<void>>();
   /** sessionId → in-flight open() so concurrent requests share one replay */
   private opening = new Map<string, Promise<SessionState>>();
 
@@ -181,6 +182,17 @@ export class SessionManager {
     } else {
       for (const ev of events) this.emitEvent(sid, ev);
     }
+    // session_info_update can carry a generated title (bare /rename) — keep the
+    // session list in sync so Home shows it without a manual refresh.
+    const info = events.find((e) => e.type === 'info');
+    if (info?.type === 'info' && info.title) this.syncTitle(sid, info.title);
+  }
+
+  private syncTitle(sessionId: string, title: string): void {
+    const t = title.trim();
+    if (!t || !this.lastList.some((s) => s.sessionId === sessionId && s.title !== t)) return;
+    this.lastList = this.lastList.map((s) => (s.sessionId === sessionId ? { ...s, title: t } : s));
+    this.emit({ type: 'sessions.list', sessions: this.summaries() });
   }
 
   handleTurnStats(sessionId: string, stat: TurnStat): void {
@@ -229,12 +241,15 @@ export class SessionManager {
     // ACP allows omitting cwd — one global query first, then per-cwd merge.
     // `query` searches session content (`cognition.ai/content`), global only.
     const q = query?.trim() || undefined;
+    // content search only exists on agents that declare it; others ignore the
+    // meta and would return everything — fall back to a local title filter.
+    const agentSearch = this.agent.agentInfo?.caps.contentSearch === true;
     try {
-      pushInfos(await this.agent.listSessions(undefined, q));
+      pushInfos(await this.agent.listSessions(undefined, agentSearch ? q : undefined));
     } catch (e) {
       this.log.debug(`session/list (no cwd): ${(e as Error).message}`);
     }
-    for (const c of q ? [] : cwds) {
+    for (const c of q && agentSearch ? [] : cwds) {
       try {
         pushInfos(await this.agent.listSessions(c), c);
       } catch (e) {
@@ -246,8 +261,9 @@ export class SessionManager {
       }
     }
     // sessions we just created may not be in the agent's list yet — merge them in
+    const qLower = q?.toLowerCase();
     for (const s of this.sessions.values()) {
-      if (!seen.has(s.sessionId) && (!q || (s.title ?? '').toLowerCase().includes(q))) {
+      if (!seen.has(s.sessionId) && (!qLower || (s.title ?? '').toLowerCase().includes(qLower))) {
         seen.add(s.sessionId);
         out.push({
           sessionId: s.sessionId,
@@ -260,10 +276,14 @@ export class SessionManager {
       }
     }
     // newest first
-    out.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
-    this.lastList = out;
-    this.emit({ type: 'sessions.list', sessions: out });
-    return out;
+    const filtered =
+      qLower && !agentSearch
+        ? out.filter((s) => (s.title ?? s.sessionId).toLowerCase().includes(qLower))
+        : out;
+    filtered.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+    this.lastList = filtered;
+    this.emit({ type: 'sessions.list', sessions: filtered });
+    return filtered;
   }
 
   async create(cwd: string): Promise<SessionState> {
@@ -302,6 +322,9 @@ export class SessionManager {
   }
 
   private async doOpen(sessionId: string, cwd: string): Promise<SessionState> {
+    // a just-closed session may still have its session/close RPC in flight —
+    // wait for it so it can't release the lock we're about to take.
+    await this.closing.get(sessionId);
     this.ensure(sessionId, cwd);
     this.emitEvent(sessionId, { type: 'loading', loading: true });
     const stat = { updates: 0, events: 0, pipelineMs: 0 };
@@ -348,11 +371,14 @@ export class SessionManager {
     this.echoExpect.delete(sessionId);
     this.sideActive.delete(sessionId);
     this.agent.untrack(sessionId);
-    // release the agent-side lock so other clients can open it (best-effort)
+    // release the agent-side lock so other clients can open it. Tracked in
+    // `closing` so a fast reopen waits for it instead of racing session/load.
     if (this.agent.agentInfo?.caps.closeSession) {
-      void this.agent
+      const p = this.agent
         .closeSession(sessionId)
-        .catch((e) => this.log.debug(`session/close ${sessionId}: ${(e as Error).message}`));
+        .catch((e) => this.log.debug(`session/close ${sessionId}: ${(e as Error).message}`))
+        .finally(() => this.closing.delete(sessionId));
+      this.closing.set(sessionId, p);
     }
     this.emit({ type: 'session.closed', sessionId });
   }
@@ -360,8 +386,8 @@ export class SessionManager {
   /** Force-close a session held by another process (`cognition.ai/force`),
    *  e.g. a stale lock left by a crashed client. */
   async forceClose(sessionId: string): Promise<void> {
-    if (!this.agent.agentInfo?.caps.closeSession) {
-      throw new Error('agent does not support session/close');
+    if (!this.agent.agentInfo?.caps.forceClose) {
+      throw new Error('agent does not support forced session/close');
     }
     await this.agent.closeSession(sessionId, true);
     void this.list().catch((e) => this.log.warn(`session/list: ${(e as Error).message}`));

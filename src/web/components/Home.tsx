@@ -245,6 +245,8 @@ function SessionRow({
   onDelete: () => void;
 }) {
   const t = useT();
+  // "Forzar cierre" needs the agent's cognition.ai/force close capability.
+  const canForceClose = useStore((s) => s.agentInfo?.caps.forceClose === true);
   const title = s.title || t('session.untitled');
   return (
     <div className="flex min-h-14 w-full items-center rounded-lg hover:bg-accent/60">
@@ -296,7 +298,7 @@ function SessionRow({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onRename}>{t('common.rename')}</DropdownMenuItem>
-          {s.locked && (
+          {s.locked && canForceClose && (
             <DropdownMenuItem
               onClick={async () => {
                 try {

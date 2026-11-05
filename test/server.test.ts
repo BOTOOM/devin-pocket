@@ -312,6 +312,13 @@ describe('devin-pocket server', () => {
           (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
         ).length >= 1,
     );
+    // exactly one end — the steered message merged into the running turn
+    // (cancel+resend would emit a second turnEnded).
+    expect(
+      c.msgs.filter(
+        (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
+      ),
+    ).toHaveLength(1);
     c.ws.close();
     other.ws.close();
   });
