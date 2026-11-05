@@ -12,6 +12,7 @@
     "bin",
     "dist",
     "install.sh",
+    "install-termux.sh",
     "README.md",
     "LICENSE",
     "NOTICE"

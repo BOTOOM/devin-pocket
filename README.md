@@ -27,6 +27,48 @@ curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install.sh
 
 También puedes usar `npx devin-pocket` o instalar un tarball local con `DEVIN_POCKET_LOCAL=1 ./install.sh`.
 
+### Desde cero en Android/Termux, sin clonar
+
+**Disponibilidad:** los comandos `curl` siguientes requieren que el instalador esté subido a la rama indicada de un repositorio público. Actualmente `BOTOOM/devin-pocket` es privado: sus URLs no funcionan sin autenticación. Para ofrecer instalación pública sin cambiar la visibilidad, se puede alojar este script en otro repo público y usar `--package` con npm o un `.tgz` público. `--source` también requiere acceso público al código. Con el repo privado puedes descargar el script y el `.tgz` desde tu sesión de GitHub y ejecutar `bash install-termux.sh --package "$HOME/devin-pocket-0.1.5.tgz"` en Termux, sin clonar nada.
+
+1. Instala **Termux** desde [sus releases oficiales en GitHub](https://github.com/termux/termux-app/releases). Necesitas Android 7+ y un entorno ARM64 o x86_64; el binario de Devin CLI no soporta Android/Termux de 32 bits. Si usas Termux:Widget o Termux:API, instala también sus APK desde la misma fuente que Termux; no mezcles firmas de GitHub y F-Droid. Instalar los APK y autorizar tu cuenta de Devin son pasos manuales.
+2. Abre **Termux normal**, no una sesión de Ubuntu, y ejecuta:
+
+```sh
+pkg update -y && pkg install -y curl && \
+  curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash
+```
+
+El script actualiza los paquetes de Termux, instala `proot-distro`, crea Ubuntu (24.04 en versiones actuales de proot-distro) o reutiliza el existente, actualiza sus paquetes, instala Node.js 22+ y sus herramientas y descarga el instalador oficial de Devin CLI si falta. Para Pocket elige la versión estable de npm más alta publicada hace al menos siete días. Si el paquete aún no existe en npm, descarga una copia comprimida de `main` y la compila con el lockfile y las reglas de seguridad del repositorio. **No usa `git clone`, no borra Ubuntu ni pide contraseñas o claves API.**
+
+Mientras la app esté en una rama y aún no esté publicada, usa la referencia de esa rama tanto para descargar el script como para compilar:
+
+```sh
+pkg update -y && pkg install -y curl && \
+  curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/devin/1790558006-devin-pocket-mvp/install-termux.sh | \
+  bash -s -- --source devin/1790558006-devin-pocket-mvp
+```
+
+También puedes instalar una versión específica, un paquete `.tgz` descargado, o compilar un tag/commit sin clonar:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash -s -- --package devin-pocket@0.1.5
+curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash -s -- --package "$HOME/devin-pocket-0.1.5.tgz"
+curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash -s -- --source main --no-upgrade
+```
+
+`--distro NOMBRE` permite elegir otro Ubuntu. `--no-upgrade` omite las actualizaciones generales, pero instala los requisitos necesarios. Si Pocket está corriendo dentro del Ubuntu elegido, el script se detiene antes de modificar sus paquetes: vuelve a intentarlo cuando puedas detener la app de forma segura. Se conservan los lanzadores existentes, y la app **no se inicia ni se reinicia automáticamente**.
+
+3. Al terminar, abre Pocket desde Termux:
+
+```sh
+devin-pocket-ubuntu
+devin-pocket-ubuntu doctor
+devin-pocket-ubuntu logs
+```
+
+El lanzador entra a Ubuntu y prepara el PATH; no necesitas recordar el comando de proot. Abre `http://127.0.0.1:7777` y pulsa **Inicia sesión en Devin**. Se crea también `~/.shortcuts/Devin Pocket` para Termux:Widget, si instalas ese complemento. Desactiva la optimización de batería de Termux; Android todavía puede finalizar procesos por falta de memoria. La instalación desde código fuente tarda y consume más recursos que instalar un paquete de npm, y requiere conexión para las descargas.
+
 ## Uso
 
 ```sh
