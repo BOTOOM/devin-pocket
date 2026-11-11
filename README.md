@@ -1,162 +1,327 @@
 # Devin Pocket
 
-## Qué es
+[English](https://github.com/BOTOOM/devin-pocket/blob/main/README.md) · [Español](https://github.com/BOTOOM/devin-pocket/blob/main/README.es.md)
 
-Devin Pocket es un cliente web móvil para Devin CLI sobre Agent Client Protocol (ACP). Sirve una PWA y maneja el proceso `devin acp` desde un único proceso Node.js. En el uso diario puedes trabajar desde el navegador del teléfono sin abrir una terminal; el servidor sigue siendo local y está pensado para Android con Termux, así como Linux y macOS.
+A mobile-first browser UI for Devin CLI over ACP, on Android/Termux, Linux and macOS.
 
-## Requisitos
+[![npm version](https://img.shields.io/npm/v/devin-pocket)](https://www.npmjs.com/package/devin-pocket)
+[![npm downloads](https://img.shields.io/npm/dm/devin-pocket)](https://www.npmjs.com/package/devin-pocket)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/BOTOOM/devin-pocket/blob/main/LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/BOTOOM/devin-pocket/ci.yml?branch=main&label=CI)](https://github.com/BOTOOM/devin-pocket/actions/workflows/ci.yml)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D22-green)](https://nodejs.org/)
 
-- Node.js 22 o posterior.
-- Android: Termux y, si el CLI requiere glibc, una distro Ubuntu/Debian mediante `proot-distro`.
-- Devin CLI instalado y autenticado. Linux/macOS también son compatibles.
-- Termux:API es opcional, pero permite mantener el proceso despierto.
+**Unofficial community project. Not affiliated with Cognition.**
 
-## Instalación
+## What it is and features
 
-Con pnpm o npm:
+One local Node.js process serves a React PWA over HTTP/WebSocket and manages a
+`devin acp` child over stdio using Agent Client Protocol. After installation,
+everyday interaction happens in the browser, not a terminal. The host and CLI
+must remain running; the PWA is not an offline agent.
+
+- Create, list, search, resume, rename and close sessions; workspace selection.
+- Streaming Markdown, tools/code/diffs, permission requests and task plans.
+- Queued messages, cancellation and capability-dependent send-now steering.
+- Model, reasoning and Fast controls when exposed by the agent; price comparison.
+- File mentions, image attachments and an agent command palette.
+- Light/dark/system themes, Spanish and English UI (Spanish by default).
+- Diagnostics, logs, model/pricing reports and an installable PWA shell.
+
+Features depend on CLI/model capabilities. Prices come from authenticated
+`devin models list --format json`; missing prices are not invented. Session
+history comes from ACP, not a separate Pocket database.
+
+## Requirements
+
+- Node.js **22+** for the installed app, npm or pnpm, and a modern browser.
+- [Devin CLI](https://cli.devin.ai/) and a Devin account authorized in the app or
+  with `devin auth login`. No separate Pocket account or API key.
+- Linux/macOS; Android uses Termux with Ubuntu/proot for the glibc CLI.
+  The Android installer accepts **ARM64 or x86_64**, not 32-bit devices.
+- Internet access for installation, authentication and agent operation.
+- Optional Termux:API plus the `termux-api` package for wake lock.
+
+## Installation
+
+### npm, npx or pnpm
 
 ```sh
-pnpm add -g devin-pocket   # o: npm install -g devin-pocket
+npx devin-pocket
+# Or install globally:
+npm i -g devin-pocket
+# Or:
+pnpm add -g devin-pocket
 ```
 
-Instalador (Linux, macOS, Termux o proot):
+For pnpm global-bin/PATH errors, run `pnpm setup`, then open a new shell or load
+its environment changes. In proot, `~/.profile` may not be sourced: ensure the
+global bin directory is on PATH. npm global installs need a writable prefix.
+
+### General installer
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install.sh | bash
 ```
 
-También puedes usar `npx devin-pocket` o instalar un tarball local con `DEVIN_POCKET_LOCAL=1 ./install.sh`.
+Review scripts before executing them. Supports Linux, macOS, Termux and proot;
+installs Node.js if needed (macOS needs Homebrew already installed), prefers pnpm
+and falls back to npm. It only prints installation instructions if Devin CLI is
+missing; it does **not** install Devin CLI or start Pocket. For complete Android
+setup, use the next installer.
 
-### Desde cero en Android/Termux, sin clonar
+### Android/Termux from scratch, without cloning
 
-1. Instala **Termux** desde [sus releases oficiales en GitHub](https://github.com/termux/termux-app/releases). Necesitas Android 7+ y un entorno ARM64 o x86_64; el binario de Devin CLI no soporta Android/Termux de 32 bits. Si usas Termux:Widget o Termux:API, instala también sus APK desde la misma fuente que Termux; no mezcles firmas de GitHub y F-Droid. Instalar los APK y autorizar tu cuenta de Devin son pasos manuales.
-2. Abre **Termux normal**, no una sesión de Ubuntu, y ejecuta:
+1. Install **Termux** from [official GitHub releases](https://github.com/termux/termux-app/releases).
+   Use Android 7+ and ARM64/x86_64. Optional Termux:Widget and Termux:API APKs must
+   come from the same source; do not mix GitHub and F-Droid signatures. Installing
+   APKs and authorizing your account are manual steps.
+2. In **normal Termux**, not Ubuntu/proot, run:
+
+   ```sh
+   pkg update -y && pkg install -y curl && \
+     curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash
+   ```
+
+   Updates Termux, installs `proot-distro`, creates Ubuntu (24.04 with the newer
+   proot-distro interface) or reuses it, updates Ubuntu, installs Node.js 22+ and
+   build tools, and installs the official Devin CLI if missing. It chooses the
+   highest stable npm version at least **seven days old**. Only npm E404 falls
+   back to building a `main` source archive. If the package exists but no version
+   is old enough, it stops: select `--source` or `--package` explicitly.
+
+   Source builds use the lockfile and supply-chain rules and need more time,
+   memory/storage and downloads. No `git clone`, Ubuntu deletion or automatic
+   Pocket start/restart. Existing launchers are preserved. If Pocket is running
+   in the selected Ubuntu, stop it when safe before retrying. The installer does
+   not request/store passwords or API keys; authorization happens later.
+3. Start from Termux and open `http://127.0.0.1:7777`:
+
+   ```sh
+   devin-pocket-ubuntu
+   devin-pocket-ubuntu doctor
+   devin-pocket-ubuntu logs
+   ```
+
+   The launcher enters Ubuntu with the required PATH. Tap **Inicia sesión en
+   Devin** / **Sign in to Devin**.
+
+Download the script to pass installer options:
 
 ```sh
-pkg update -y && pkg install -y curl && \
-  curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash
+curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh -o install-termux.sh
+bash install-termux.sh --help
+bash install-termux.sh --source main
+bash install-termux.sh --package devin-pocket@0.2.0
+bash install-termux.sh --package "$HOME/devin-pocket-0.2.0.tgz"
+bash install-termux.sh --source main --distro ubuntu --no-upgrade
 ```
 
-El script actualiza los paquetes de Termux, instala `proot-distro`, crea Ubuntu (24.04 en versiones actuales de proot-distro) o reutiliza el existente, actualiza sus paquetes, instala Node.js 22+ y sus herramientas y descarga el instalador oficial de Devin CLI si falta. Para Pocket elige la versión estable de npm más alta publicada hace al menos siete días. Si el paquete aún no existe en npm, descarga una copia comprimida de `main` y la compila con el lockfile y las reglas de seguridad del repositorio. **No usa `git clone`, no borra Ubuntu ni pide contraseñas o claves API.**
+| Option | Meaning |
+| --- | --- |
+| `--source REF` | Build a public branch, tag or commit of BOTOOM/devin-pocket. |
+| `--package SPEC` | Exact `devin-pocket@VERSION`, HTTPS tarball URL or existing local `.tgz`. |
+| `--distro NAME` | Ubuntu name to create/reuse; default `ubuntu`; must be Ubuntu. |
+| `--no-upgrade` | Skip general upgrades, still install prerequisites. |
+| `--help`, `-h` | Help without installing. |
 
-Para instalar desde una rama, usa la referencia de esa rama tanto para descargar el script como para compilar:
+`--source` and `--package` are mutually exclusive. For a branch-specific installer,
+download the script from that branch as well as passing it to `--source`.
+
+### From source or a local tarball
+
+Use a current Node.js 24 release for development/release tools; the packaged app
+supports Node.js 22+. Enable Corepack if available or install the pinned pnpm:
 
 ```sh
-pkg update -y && pkg install -y curl && \
-  curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/devin/1790558006-devin-pocket-mvp/install-termux.sh | \
-  bash -s -- --source devin/1790558006-devin-pocket-mvp
+git clone https://github.com/BOTOOM/devin-pocket.git
+cd devin-pocket
+npm i -g pnpm@12.6.0
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm pack
+npm install -g ./devin-pocket-*.tgz
+devin-pocket doctor
+devin-pocket start
 ```
 
-También puedes instalar una versión específica, un paquete `.tgz` descargado, o compilar un tag/commit sin clonar:
+Use npm for the tarball's global link: `pnpm add -g <tgz>` has been a silent no-op
+in some proot environments. An existing tarball works with
+`npm install -g /path/to/devin-pocket-VERSION.tgz`. From a built checkout,
+`DEVIN_POCKET_LOCAL=1 bash install.sh` installs the directory containing the
+script, **not** an arbitrary local tarball.
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash -s -- --package devin-pocket@0.1.5
-curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash -s -- --package "$HOME/devin-pocket-0.1.5.tgz"
-curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash -s -- --source main --no-upgrade
-```
-
-`--distro NOMBRE` permite elegir otro Ubuntu. `--no-upgrade` omite las actualizaciones generales, pero instala los requisitos necesarios. Si Pocket está corriendo dentro del Ubuntu elegido, el script se detiene antes de modificar sus paquetes: vuelve a intentarlo cuando puedas detener la app de forma segura. Se conservan los lanzadores existentes, y la app **no se inicia ni se reinicia automáticamente**.
-
-3. Al terminar, abre Pocket desde Termux:
-
-```sh
-devin-pocket-ubuntu
-devin-pocket-ubuntu doctor
-devin-pocket-ubuntu logs
-```
-
-El lanzador entra a Ubuntu y prepara el PATH; no necesitas recordar el comando de proot. Abre `http://127.0.0.1:7777` y pulsa **Inicia sesión en Devin**. Se crea también `~/.shortcuts/Devin Pocket` para Termux:Widget, si instalas ese complemento. Desactiva la optimización de batería de Termux; Android todavía puede finalizar procesos por falta de memoria. La instalación desde código fuente tarda y consume más recursos que instalar un paquete de npm, y requiere conexión para las descargas.
-
-## Uso
+## Quick start and first login
 
 ```sh
 devin-pocket start
-devin-pocket stop
-devin-pocket restart
-devin-pocket status
-devin-pocket logs
-devin-pocket doctor
-devin-pocket models   # diagnóstico del catálogo de modelos y precios
-devin-pocket open
+# Open http://127.0.0.1:7777 if the browser does not open.
 ```
 
-Abre `http://127.0.0.1:7777` si no se abre el navegador automáticamente.
+No command also means start. Normal start runs a background supervisor that
+retries crashes with backoff (not indefinitely). Tap **Inicia sesión en Devin** /
+**Sign in to Devin** in the PWA and authorize your account in the browser. If
+needed, run `devin auth login` on the server host. Select a workspace/session and
+send a prompt. Install the PWA through your browser when supported; the host must
+remain running.
 
-## Primer uso
+## CLI reference
 
-La primera vez, pulsa **Inicia sesión en Devin** en la PWA. Devin abrirá el navegador para autorizar la cuenta. Si necesitas hacerlo manualmente: `devin auth login`.
+| Command | Behavior |
+| --- | --- |
+| `start` (default) | Start supervisor and open browser. |
+| `stop` | Stop the process tracked by the pidfile. |
+| `restart` | Stop it, then start a new supervisor using supplied options. |
+| `status` | Report whether the tracked process is running. |
+| `logs` | Print the last 100 application log entries by default. |
+| `doctor` | Check runtime, CLI/auth/ACP, paths, ports and permissions. |
+| `models` | Refresh and print model/pricing diagnostics. |
+| `open` | Open `http://127.0.0.1:PORT`, even with a custom host. |
+| `version` | Print installed package version. |
+| `help` | Show usage. |
 
-## Termux: mantener vivo
+| Flag | Use/default |
+| --- | --- |
+| `--port N` | Server port: config or `7777`; also doctor/open. |
+| `--host H` | Listen address: config or `127.0.0.1`; also doctor. |
+| `--cwd DIR` | ACP working directory: current directory by default. |
+| `--agent CMD` | Agent command: overrides env/config; default `devin acp`. |
+| `--no-open` | Do not open browser on start. |
+| `--foreground` | Run start in foreground instead of daemonizing. |
+| `--dev` | Foreground development start, no automatic browser. |
+| `-f`, `--follow` | Follow application logs (`logs`). |
+| `-n N` | Log entry count (`logs`), default `100`. |
+| `-h`, `--help` | Show help. |
+| `-v`, `--version` | Print version. |
 
-El servidor usa `termux-wake-lock` cuando está disponible. Para un acceso directo instala Termux:Widget y crea un launcher que ejecute `devin-pocket start`; Termux:Boot puede iniciarlo al arrancar Android. Desactiva la optimización de batería para Termux y Termux:API para evitar que Android suspenda el proceso.
+Start options apply to `start`/`restart` where relevant. Restart creates a
+supervisor, not an earlier foreground mode, and does not remember earlier flags.
 
-## Diagnóstico
+```sh
+devin-pocket start --cwd "$HOME/project" --port 7778 --no-open
+devin-pocket logs -f -n 50
+devin-pocket stop
+```
 
-Ejecuta `devin-pocket doctor` para revisar Node, Devin, autenticación, ACP, puertos, disco y permisos. Usa `devin-pocket logs` para los registros. La pantalla **Diagnóstico** incluye el doctor, los últimos registros y la descarga de un reporte JSON.
+## Configuration and environment
 
-## Configuración
-
-El archivo opcional es `~/.config/devin-pocket/config.json`:
+Optional config: `$XDG_CONFIG_HOME/devin-pocket/config.json`, default
+`~/.config/devin-pocket/config.json`. Missing/invalid config falls back to defaults.
 
 ```json
 {
   "port": 7777,
   "host": "127.0.0.1",
   "agentCommand": "devin acp",
-  "workspaces": [{ "path": "/home/me/project", "name": "project" }],
+  "workspaces": [],
   "theme": "system",
   "showThoughts": false,
   "lang": "es"
 }
 ```
 
-El estado y los registros viven en `$XDG_STATE_HOME/devin-pocket` (por defecto `~/.local/state/devin-pocket`); la caché de modelos en `~/.cache/devin-pocket`.
+Workspace entries have `path`, `name` and optional numeric `lastUsedAt`. The
+schema accepts `theme`, `showThoughts` and `lang`, but UI preferences are managed
+in browser storage; do not rely on those config fields to set the UI.
 
-## Desarrollo
+| Variable | Purpose |
+| --- | --- |
+| `DEVIN_POCKET_AGENT` | Agent command: `--agent` takes precedence, then env, then config. |
+| `DEVIN_POCKET_VERBOSE=1` | Also write application logs to stderr. |
+| `XDG_CONFIG_HOME` | Config base; default `~/.config`. |
+| `XDG_STATE_HOME` | State base; default `~/.local/state`. |
+| `XDG_CACHE_HOME` | Cache base; default `~/.cache`. |
+| `DEVIN_POCKET_MODELS_FILE` | Development: catalog JSON fixture instead of CLI. |
+| `DEVIN_POCKET_LOCAL=1` | General installer: install its own source directory. |
+
+State is in the `devin-pocket` subdirectory: `server.pid`, `titles.json` (rename
+fallback), `devin-pocket.log`, `devin-acp.stderr.log`, `daemon.out.log`. Model cache:
+`$XDG_CACHE_HOME/devin-pocket/models.json`, default `~/.cache/devin-pocket/models.json`,
+fresh for 24 hours. `DEVIN_POCKET_SUPERVISOR` and `DEVIN_POCKET_DAEMON` are internal
+process markers, not user settings; Termux/proot also uses platform detection markers.
+
+## Termux tips
+
+- Wake lock is best effort via `termux-wake-lock`; install Termux:API and run
+  `pkg install termux-api` in Termux if needed.
+- The zero-clone installer creates `~/.shortcuts/Devin Pocket` for optional
+  Termux:Widget; existing shortcuts/launchers are not overwritten.
+- The general installer offers a direct shortcut only if the shortcuts directory
+  exists; in proot it prints instructions instead.
+- Disable battery optimization for Termux and Termux:API. Android can still kill
+  processes under memory pressure. Termux:Boot can run your launcher if separately
+  configured; the installer does not configure boot startup.
+
+## Security and remote access
+
+Default binding: **127.0.0.1:7777**. Devin login authenticates the agent,
+**not Pocket clients**. There is no built-in client authentication, pairing or TLS.
+`--host 0.0.0.0` exposes the app and agent capabilities to the network; origin
+checks are not authentication. Do not expose it to the public internet. If you
+deliberately need remote access, use an access-controlled tunnel/proxy. Non-local
+HTTP may also lose secure-context/PWA browser features. Review permissions and
+reports/logs before sharing: they can contain paths and project information.
+
+## Troubleshooting and FAQ
 
 ```sh
-pnpm install
+devin-pocket doctor
+devin-pocket logs -n 100
+devin-pocket models
+```
+
+**Diagnostics / Diagnóstico** includes checks, logs and a downloadable JSON
+report. Model diagnostics show command, source, errors and CLI output. Inspect
+reports for sensitive information before attaching them to issues.
+
+- **CLI missing/login blocked?** Install CLI on the host; try `devin auth login`.
+- **Port busy?** Stop the existing instance or start with `--port 7778`.
+- **Missing prices?** Check authentication and `models`; some models lack prices
+  and cached prices can be stale.
+- **Missing sessions?** Listings depend on ACP/workspace scope, not a local database.
+- **Fast/reasoning/images?** Depend on agent/model capabilities. Images are limited
+  to 1.5 MB each; encoded messages also face the server's 2 MiB WebSocket limit.
+- **No seven-day-old npm release?** Choose `--source main` or explicit
+  `--package devin-pocket@VERSION`; npm/npx direct installs do not apply that filter.
+- **Offline or a Devin replacement?** No: Pocket is a Devin CLI client.
+- **Windows?** Native Windows is not a documented supported installer target.
+
+## Roadmap and limitations
+
+Desktop/laptop remote-client workflows are planned. Currently this is a
+mobile-first UI served by the local host. Authenticated pairing/remote access
+and large-list/transcript virtualization remain work to do. Edited permission
+commands are currently displayed read-only; agent-dependent capabilities vary.
+
+## Development
+
+Use the pinned pnpm and a current Node.js 24 release.
+
+```sh
+pnpm install --frozen-lockfile
 pnpm run dev
+# Or server + fake agent without Devin login:
 pnpm run dev:fake
+pnpm run check
+pnpm run typecheck
 pnpm test
 pnpm run build
+pnpm run test:e2e
 ```
 
-El fake agent permite trabajar sin iniciar sesión: `DEVIN_POCKET_AGENT="npx tsx test/fake-agent.ts" FAKE_AGENT_AUTHED=1`. Para desarrolladores: la guía completa de arquitectura, convenciones y depuración está en `AGENTS.md`.
+`dev` runs Vite on 5173 plus the server. `src/server` owns HTTP/WS and ACP,
+`src/shared` the protocol/reducer, `src/web` the React PWA. Rebuild before using
+`bin/devin-pocket.mjs`, which loads `dist/server.mjs`.
+See [AGENTS.md](https://github.com/BOTOOM/devin-pocket/blob/main/AGENTS.md).
 
-### Instalar desde el código fuente
+## Contributing
 
-```sh
-git clone https://github.com/BOTOOM/devin-pocket.git && cd devin-pocket
-corepack enable && corepack prepare --activate   # o: npm i -g pnpm
-pnpm install && pnpm run build
-pnpm pack && npm install -g ./devin-pocket-*.tgz   # pnpm add -g no instala enlaces en algunos entornos proot
-devin-pocket doctor && devin-pocket start
-```
+Open [issues](https://github.com/BOTOOM/devin-pocket/issues) with reproduction
+steps and sanitized diagnostics; focused PRs are welcome. Keep both READMEs in
+sync, use conventional commits and run the checks above. `docs(readme)` triggers
+a patch release through semantic-release on main; never hand-edit versions/push tags.
 
-## Arquitectura
+## License and attribution
 
-Un proceso Node sirve HTTP y WebSocket, mantiene la PWA y administra un hijo ACP por stdio. `src/server` contiene el servidor y CLI, `src/shared` contiene el contrato y reducer compartidos, y `src/web` contiene React, estilos y componentes.
-
-## Estado y limitaciones
-
-- Los precios solo están disponibles cuando `devin models list` puede ejecutarse con una sesión autenticada.
-- `editableCommands` se muestra como solo lectura: el protocolo actual no reenvía el comando editado.
-- Se probó con el fake agent y con `devin acp` real sin iniciar sesión; no se autentica automáticamente.
-- Es una primera versión móvil: la lista de sesiones y el transcript no están virtualizados.
-
-## Licencia y atribución
-
-Devin Pocket se distribuye bajo **Apache License 2.0**. Consulta `LICENSE` y `NOTICE` para los términos completos y atribuciones. Porciones de la implementación fueron portadas de **devin-tui**, copyright Mark Fenner, bajo MIT.
-
----
-
-# Devin Pocket (English)
-
-Devin Pocket is a mobile web client for Devin CLI over ACP. One local Node.js process serves the PWA and drives a `devin acp` child, so daily use happens in the browser instead of a terminal. It supports Android/Termux, Linux, and macOS.
-
-Requirements are Node.js 22+, Devin CLI, and authentication. On Android, use Termux and proot Ubuntu/Debian when the CLI needs glibc. Install with pnpm or npm (`pnpm add -g devin-pocket` / `npm install -g devin-pocket`) or the install script above. Run `start`, `stop`, `restart`, `status`, `logs`, `doctor`, `models` (catalog/pricing diagnostics), and `open` as shown in the Spanish section.
-
-The config file is `~/.config/devin-pocket/config.json`; state and logs use `$XDG_STATE_HOME/devin-pocket`. Development uses `pnpm run dev`, `pnpm run dev:fake`, `pnpm test`, and `pnpm run build` (enable pnpm with `corepack enable` or `npm i -g pnpm`). From-source global install: `pnpm pack && npm install -g ./devin-pocket-*.tgz` (`pnpm add -g` of a tarball is a silent no-op on Termux proot) — see the Spanish "Instalar desde el código fuente" block. For developers: `AGENTS.md` documents the architecture, conventions, and debugging recipe. The architecture is one HTTP+WS server process with an ACP child, shared protocol/reducer code, and a React PWA.
-
-Known limitations: model prices require an authenticated `devin models list`; edited permission commands are currently read-only because the wire protocol does not forward edits; real ACP compatibility was checked without logging in. Devin Pocket is Apache-2.0; see `LICENSE` and `NOTICE`, including the MIT attribution for portions ported from devin-tui by Mark Fenner.
+Apache License 2.0. See [LICENSE](https://github.com/BOTOOM/devin-pocket/blob/main/LICENSE)
+and [NOTICE](https://github.com/BOTOOM/devin-pocket/blob/main/NOTICE). Portions were
+ported from **devin-tui**, copyright Mark Fenner, under MIT.
