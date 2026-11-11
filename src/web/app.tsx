@@ -48,7 +48,9 @@ export function App() {
             className={`flex min-h-0 min-w-0 flex-1 flex-col ${route.name === 'chat' ? 'lg:mx-auto lg:max-w-[860px]' : 'lg:mx-auto lg:max-w-[1100px]'}`}
           >
             {route.name === 'home' && (desktop ? <DesktopWelcome /> : <HomeScreen />)}
-            {route.name === 'chat' && <ChatScreen sessionId={route.sessionId} />}
+            {route.name === 'chat' && (
+              <ChatScreen key={route.sessionId} sessionId={route.sessionId} />
+            )}
             {route.name === 'settings' && <SettingsScreen />}
             {route.name === 'diagnostics' && <DiagnosticsScreen />}
           </div>
