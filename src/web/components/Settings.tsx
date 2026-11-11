@@ -163,7 +163,7 @@ export function SettingsScreen() {
         <h1 className="px-2 text-lg font-semibold">{t('settings.title')}</h1>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:[&>*]:min-w-0">
         <Card>
           <CardContent className="space-y-3 p-4">
             <div className="flex items-center justify-between gap-3">

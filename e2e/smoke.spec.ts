@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import './theme-screens';
+import './responsive-screens';
 
 test('fake agent home → session → prompt → permission → tool and usage', async ({ page }) => {
   await page.goto('/#/');
@@ -77,8 +78,8 @@ test('mention button loads files and picks one', async ({ page }) => {
   await expect(input).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: /Mencionar archivo|Mention file/i }).click();
   const row = page.getByRole('button', { name: /package\.json/ }).first();
-  await expect(row).toBeVisible({ timeout: 15_000 });
   await page.keyboard.type('pack');
+  await expect(row).toBeVisible({ timeout: 15_000 });
   await expect(row).toBeVisible();
   await row.click();
   await expect(page.getByRole('button', { name: /^@package\.json/ })).toBeVisible();

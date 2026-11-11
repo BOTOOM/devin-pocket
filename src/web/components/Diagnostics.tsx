@@ -92,7 +92,7 @@ export function DiagnosticsScreen() {
         </Button>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:[&>*]:min-w-0">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{t('diag.doctor')}</CardTitle>
