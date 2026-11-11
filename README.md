@@ -29,8 +29,6 @@ También puedes usar `npx devin-pocket` o instalar un tarball local con `DEVIN_P
 
 ### Desde cero en Android/Termux, sin clonar
 
-**Disponibilidad:** los comandos `curl` siguientes requieren que el instalador esté subido a la rama indicada de un repositorio público. Actualmente `BOTOOM/devin-pocket` es privado: sus URLs no funcionan sin autenticación. Para ofrecer instalación pública sin cambiar la visibilidad, se puede alojar este script en otro repo público y usar `--package` con npm o un `.tgz` público. `--source` también requiere acceso público al código. Con el repo privado puedes descargar el script y el `.tgz` desde tu sesión de GitHub y ejecutar `bash install-termux.sh --package "$HOME/devin-pocket-0.1.5.tgz"` en Termux, sin clonar nada.
-
 1. Instala **Termux** desde [sus releases oficiales en GitHub](https://github.com/termux/termux-app/releases). Necesitas Android 7+ y un entorno ARM64 o x86_64; el binario de Devin CLI no soporta Android/Termux de 32 bits. Si usas Termux:Widget o Termux:API, instala también sus APK desde la misma fuente que Termux; no mezcles firmas de GitHub y F-Droid. Instalar los APK y autorizar tu cuenta de Devin son pasos manuales.
 2. Abre **Termux normal**, no una sesión de Ubuntu, y ejecuta:
 
@@ -41,7 +39,7 @@ pkg update -y && pkg install -y curl && \
 
 El script actualiza los paquetes de Termux, instala `proot-distro`, crea Ubuntu (24.04 en versiones actuales de proot-distro) o reutiliza el existente, actualiza sus paquetes, instala Node.js 22+ y sus herramientas y descarga el instalador oficial de Devin CLI si falta. Para Pocket elige la versión estable de npm más alta publicada hace al menos siete días. Si el paquete aún no existe en npm, descarga una copia comprimida de `main` y la compila con el lockfile y las reglas de seguridad del repositorio. **No usa `git clone`, no borra Ubuntu ni pide contraseñas o claves API.**
 
-Mientras la app esté en una rama y aún no esté publicada, usa la referencia de esa rama tanto para descargar el script como para compilar:
+Para instalar desde una rama, usa la referencia de esa rama tanto para descargar el script como para compilar:
 
 ```sh
 pkg update -y && pkg install -y curl && \
