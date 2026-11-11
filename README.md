@@ -210,6 +210,21 @@ devin-pocket logs -f -n 50
 devin-pocket stop
 ```
 
+## Per-session working folder
+
+**New session** opens a folder picker before any ACP session or message is created.
+Choose a saved folder or browse, review its full path, then select **Start session**.
+**Cancel** creates nothing. The chosen folder belongs to that session; changing the
+choice for a later session does not move existing sessions. The chat header shows
+the session's folder (hover for the full path).
+
+Your browser remembers recent folders and preselects the last one you used. Without
+a previous choice, `devin-pocket start --cwd /absolute/path` sets the **suggested
+default**, not a global session folder; otherwise the server's launch directory is
+suggested. Folders must exist and be inside the server user's home directory or a
+workspace listed in `config.json`. Paths and allowed roots are resolved through
+symlinks before validation; a symlink cannot escape those allowed roots.
+
 ## Configuration and environment
 
 Optional config: `$XDG_CONFIG_HOME/devin-pocket/config.json`, default

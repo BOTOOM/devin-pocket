@@ -1,5 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import { startSession } from './session-helpers';
 
 for (const theme of ['dark', 'light'] as const) {
   test(`${theme} brand surfaces and theme switching`, async ({ page }, testInfo) => {
@@ -55,7 +56,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByRole('dialog')).toBeVisible();
     await shot('drawer');
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'New session', exact: true }).first().click();
+    await startSession(page);
     await expect(page.locator('textarea')).toBeVisible();
     await shot('empty');
     await page.locator('textarea').fill('Review the workspace');

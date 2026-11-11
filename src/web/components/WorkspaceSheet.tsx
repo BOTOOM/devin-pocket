@@ -32,6 +32,40 @@ export function WorkspaceSheet({
   onPick: (path: string) => void;
 }) {
   const t = useT();
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        panelSize="workspace"
+        className="safe-x safe-bottom max-h-[80dvh] overflow-y-auto px-4"
+      >
+        <SheetHeader className="px-0">
+          <SheetTitle>{t('home.workspaces')}</SheetTitle>
+          <SheetDescription className="sr-only">{t('home.workspaces')}</SheetDescription>
+        </SheetHeader>
+        <FolderPicker
+          open={open}
+          current={current}
+          onPick={(path) => {
+            onPick(path);
+            onOpenChange(false);
+          }}
+        />
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+export function FolderPicker({
+  open,
+  current,
+  onPick,
+}: {
+  open: boolean;
+  current?: string;
+  onPick: (path: string) => void;
+}) {
+  const t = useT();
   const workspaces = useStore((s) => s.workspaces);
   const prefs = useStore((s) => s.prefs);
   const [browse, setBrowse] = useState<string | null>(null);
@@ -54,136 +88,131 @@ export function WorkspaceSheet({
 
   useEffect(() => {
     if (browse === null || !open) return;
+    const controller = new AbortController();
     setResp(null);
     setErr(false);
-    fetch(`/api/workspaces/browse?path=${encodeURIComponent(browse)}`)
+    fetch(`/api/workspaces/browse?path=${encodeURIComponent(browse)}`, {
+      signal: controller.signal,
+    })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d: BrowseResp) => setResp(d))
-      .catch(() => setErr(true));
+      .catch(() => {
+        if (!controller.signal.aborted) setErr(true);
+      });
+    return () => controller.abort();
   }, [browse, open]);
 
   const crumbs = resp?.path.split('/').filter(Boolean) ?? [];
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        panelSize="workspace"
-        className="safe-x safe-bottom max-h-[80dvh] overflow-y-auto px-4"
-      >
-        <SheetHeader className="px-0">
-          <SheetTitle>{t('home.workspaces')}</SheetTitle>
-          <SheetDescription className="sr-only">{t('home.workspaces')}</SheetDescription>
-        </SheetHeader>
-
-        {browse === null ? (
-          <div className="space-y-1 pb-4">
-            {saved.length > 0 && (
-              <p className="px-1 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {t('ws.saved')}
-              </p>
-            )}
-            {saved.map((w) => (
-              <button
-                key={w.path}
-                type="button"
-                className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left hover:bg-accent ${current === w.path ? 'bg-accent' : ''}`}
-                onClick={() => {
-                  onPick(w.path);
-                  onOpenChange(false);
-                }}
-              >
-                <FolderOpen className="size-5 shrink-0 text-primary" />
-                <div className="min-w-0">
-                  <div className="truncate font-medium">{w.name || baseName(w.path)}</div>
-                  <div className="truncate text-xs text-muted-foreground">{w.path}</div>
-                </div>
-              </button>
-            ))}
+    <div>
+      {browse === null ? (
+        <div className="space-y-1 pb-4">
+          {saved.length > 0 && (
+            <p className="px-1 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t('ws.saved')}
+            </p>
+          )}
+          {saved.map((w) => (
             <button
+              key={w.path}
               type="button"
-              className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-primary hover:bg-accent"
-              onClick={() => setBrowse('')}
-            >
-              <Folder className="size-5 shrink-0" />
-              {t('ws.browseOther')}
-            </button>
-          </div>
-        ) : (
-          <div className="pb-4">
-            <div className="mb-1 flex items-center gap-1 overflow-x-auto text-sm">
-              {saved.length > 0 && (
-                <button
-                  type="button"
-                  className="mr-1 flex shrink-0 items-center gap-1 text-primary"
-                  onClick={() => setBrowse(null)}
-                >
-                  <ChevronLeft className="size-4" />
-                </button>
-              )}
-              <button type="button" className="shrink-0 text-primary" onClick={() => setBrowse('')}>
-                <Home className="size-4" />
-              </button>
-              {crumbs.map((c, i) => (
-                <span
-                  key={crumbs.slice(0, i + 1).join('/')}
-                  className="flex shrink-0 items-center gap-1"
-                >
-                  <span className="text-muted-foreground">/</span>
-                  <button
-                    type="button"
-                    className="text-primary"
-                    onClick={() => setBrowse('/' + crumbs.slice(0, i + 1).join('/'))}
-                  >
-                    {c}
-                  </button>
-                </span>
-              ))}
-            </div>
-            {resp && (
-              <p
-                className="mb-2 truncate text-xs text-muted-foreground"
-                style={{ direction: 'rtl', textAlign: 'left' }}
-              >
-                {resp.path}
-              </p>
-            )}
-            <Button
-              className="mb-3 w-full"
-              disabled={!resp?.path}
+              className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left hover:bg-accent ${current === w.path ? 'bg-accent' : ''}`}
               onClick={() => {
-                if (!resp?.path) return;
-                onPick(resp.path);
-                onOpenChange(false);
+                onPick(w.path);
+                setBrowse(null);
               }}
             >
-              {t('ws.useFolder')}
-              {resp?.path ? ` — ${baseName(resp.path) || '~'}` : ''}
-            </Button>
-            {resp === null && !err ? (
-              <div className="space-y-2">
-                {[0, 1, 2].map((i) => (
-                  <Skeleton key={i} className="h-10 w-full" />
-                ))}
+              <FolderOpen className="size-5 shrink-0 text-primary" />
+              <div className="min-w-0">
+                <div className="truncate font-medium">{w.name || baseName(w.path)}</div>
+                <div className="truncate text-xs text-muted-foreground">{w.path}</div>
               </div>
-            ) : err ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">{t('common.error')}</p>
-            ) : (
-              (resp?.entries ?? []).map((d) => (
-                <button
-                  key={d.path}
-                  type="button"
-                  className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left hover:bg-accent"
-                  onClick={() => setBrowse(d.path)}
-                >
-                  <Folder className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{d.name}</span>
-                </button>
-              ))
+            </button>
+          ))}
+          <button
+            type="button"
+            className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-primary hover:bg-accent"
+            onClick={() => setBrowse('')}
+          >
+            <Folder className="size-5 shrink-0" />
+            {t('ws.browseOther')}
+          </button>
+        </div>
+      ) : (
+        <div className="pb-4">
+          <div className="mb-1 flex items-center gap-1 overflow-x-auto text-sm">
+            {saved.length > 0 && (
+              <button
+                type="button"
+                className="mr-1 flex shrink-0 items-center gap-1 text-primary"
+                onClick={() => setBrowse(null)}
+              >
+                <ChevronLeft className="size-4" />
+              </button>
             )}
+            <button type="button" className="shrink-0 text-primary" onClick={() => setBrowse('')}>
+              <Home className="size-4" />
+            </button>
+            {crumbs.map((c, i) => (
+              <span
+                key={crumbs.slice(0, i + 1).join('/')}
+                className="flex shrink-0 items-center gap-1"
+              >
+                <span className="text-muted-foreground">/</span>
+                <button
+                  type="button"
+                  className="text-primary"
+                  onClick={() => setBrowse('/' + crumbs.slice(0, i + 1).join('/'))}
+                >
+                  {c}
+                </button>
+              </span>
+            ))}
           </div>
-        )}
-      </SheetContent>
-    </Sheet>
+          {resp && (
+            <p
+              className="mb-2 truncate text-xs text-muted-foreground"
+              style={{ direction: 'rtl', textAlign: 'left' }}
+            >
+              {resp.path}
+            </p>
+          )}
+          <Button
+            className="mb-3 w-full"
+            disabled={!resp?.path}
+            onClick={() => {
+              if (!resp?.path) return;
+              onPick(resp.path);
+              setBrowse(null);
+            }}
+          >
+            {t('ws.useFolder')}
+            {resp?.path ? ` — ${baseName(resp.path) || '~'}` : ''}
+          </Button>
+          {resp === null && !err ? (
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : err ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">{t('common.error')}</p>
+          ) : (
+            (resp?.entries ?? []).map((d) => (
+              <button
+                key={d.path}
+                type="button"
+                className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left hover:bg-accent"
+                onClick={() => setBrowse(d.path)}
+              >
+                <Folder className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{d.name}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }
