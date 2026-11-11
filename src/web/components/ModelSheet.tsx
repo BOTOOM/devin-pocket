@@ -4,6 +4,7 @@ import { pickModelOptions } from '@shared/reducer';
 import { Check, ImageOff, Search, Zap } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { RelativeCostBar } from '@/components/RelativeCostBar';
 import { currentValue, type FlatOption, selectOptions } from '@/components/StatusStrip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -185,6 +186,10 @@ export function ModelSheet({
           />
         </div>
 
+        {compare && !comparing && (
+          <RelativeCostBar models={flat} current={current} catalog={catalog} />
+        )}
+
         <div className="min-h-0 flex-1 overflow-y-auto pb-4">
           {flat.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">{t('model.empty')}</p>
@@ -256,6 +261,14 @@ export function ModelSheet({
 
         {comparing && (
           <ComparePanel
+            costBar={
+              <RelativeCostBar
+                models={flat}
+                current={current}
+                candidate={comparing.value}
+                catalog={catalog}
+              />
+            }
             from={currentRow}
             to={comparing}
             onConfirm={() => pick(comparing.value)}
@@ -318,11 +331,13 @@ function PriceCell({ from, to, toSummary }: { from?: number; to?: number; toSumm
 }
 
 function ComparePanel({
+  costBar,
   from,
   to,
   onConfirm,
   onCancel,
 }: {
+  costBar: ReactNode;
   from?: Row;
   to: Row;
   onConfirm: () => void;
@@ -333,6 +348,7 @@ function ComparePanel({
     from?.entry?.prices?.cached !== undefined || to.entry?.prices?.cached !== undefined;
   return (
     <div className="mb-1 rounded-xl border bg-card p-3">
+      <div className="mb-3">{costBar}</div>
       <div className="grid grid-cols-[auto_1fr_1fr] items-baseline gap-x-3 gap-y-1.5 text-sm">
         <span />
         <span className="text-xs font-medium uppercase text-muted-foreground">
@@ -409,7 +425,10 @@ function ComparePanel({
         <span>{to.entry?.maxContext ? fmtTokens(to.entry.maxContext) : '—'}</span>
       </div>
       <div className="mt-3 flex gap-2">
-        <Button className="flex-1" onClick={onConfirm}>
+        <Button
+          className="h-auto min-h-9 min-w-0 flex-1 whitespace-normal break-words"
+          onClick={onConfirm}
+        >
           {t('model.switchTo', { name: to.name })}
         </Button>
         <Button variant="outline" onClick={onCancel}>
@@ -431,10 +450,10 @@ function CompareTable({
 }) {
   const t = useT();
   return (
-    <table className="w-full text-sm">
+    <table className="w-full table-fixed text-sm">
       <thead>
         <tr className="text-left text-xs text-muted-foreground">
-          <th className="py-1 font-normal">{t('model.table.model')}</th>
+          <th className="w-[40%] py-1 font-normal">{t('model.table.model')}</th>
           <th className="py-1 text-right font-normal">{t('model.table.input')}</th>
           <th className="py-1 text-right font-normal">{t('model.table.output')}</th>
           <th className="py-1 text-right font-normal">{t('model.table.context')}</th>
@@ -447,7 +466,7 @@ function CompareTable({
             className={`border-t tabular-nums ${o.value === current ? 'bg-accent/50' : ''}`}
             onClick={() => onPick(o.value)}
           >
-            <td className="max-w-[40%] truncate py-2 pr-2 font-medium">{o.name}</td>
+            <td className="break-words py-2 pr-2 font-medium">{o.name}</td>
             <td className="py-2 text-right">
               <SidePrice entry={o.entry} field="input" empty="—" />
             </td>

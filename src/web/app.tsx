@@ -22,7 +22,7 @@ export function App() {
     <TooltipProvider delayDuration={400}>
       <div className="mx-auto flex h-dvh w-full max-w-3xl flex-col bg-background">
         {!connected && (
-          <div className="safe-top bg-warning/20 px-4 py-1.5 text-center text-xs font-medium text-warning-foreground dark:text-warning">
+          <div className="safe-top bg-warning/20 px-4 py-1.5 text-center text-xs font-medium text-warning">
             {t('conn.reconnecting')}
           </div>
         )}

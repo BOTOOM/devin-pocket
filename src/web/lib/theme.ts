@@ -12,10 +12,11 @@ function resolved(): 'light' | 'dark' {
 }
 
 function apply() {
-  document.documentElement.classList.toggle('dark', resolved() === 'dark');
-  document
-    .querySelector('meta[name="theme-color"]')
-    ?.setAttribute('content', resolved() === 'dark' ? '#191622' : '#ffffff');
+  const dark = resolved() === 'dark';
+  document.documentElement.classList.toggle('dark', dark);
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute('content', dark ? '#111412' : '#f6f7f2');
+  });
 }
 
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
