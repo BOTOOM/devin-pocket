@@ -9,9 +9,9 @@ import {
   RefreshCw,
   Search,
   Settings as SettingsIcon,
-  Sparkles,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { BrandMark } from '@/components/BrandMark';
 import { RenameDialog } from '@/components/RenameDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -107,6 +107,7 @@ export function HomeScreen() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="safe-top safe-x flex items-center gap-2 border-b px-4 py-3">
+        <BrandMark />
         <h1 className="flex-1 text-lg font-semibold tracking-tight">{t('app.name')}</h1>
         <ThemeToggle />
         <Button
@@ -180,7 +181,7 @@ export function HomeScreen() {
         ) : sessions.length === 0 ? (
           <div className="mx-2 mt-10 flex flex-col items-center gap-3 rounded-2xl border bg-card p-8 text-center">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Sparkles className="size-6" />
+              <BrandMark className="size-12" />
             </div>
             <h3 className="text-lg font-semibold">{t('home.start.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('home.start.body')}</p>

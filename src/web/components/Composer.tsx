@@ -437,7 +437,7 @@ export function Composer({
           onChange={(e) => onFiles(e.target.files)}
         />
         {/* Utility buttons sit inside the input box so the textarea keeps room. */}
-        <div className="flex min-h-11 min-w-0 flex-1 items-end rounded-xl border border-input shadow-xs transition-[color,box-shadow] has-[:disabled]:opacity-50 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 dark:bg-input/30">
+        <div className="flex min-h-11 min-w-0 flex-1 items-end rounded-xl border border-input shadow-xs transition-[color,box-shadow] has-[:disabled]:opacity-50 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 bg-card">
           <div className="flex items-center self-end pb-1 pl-1">
             <Button
               variant="ghost"

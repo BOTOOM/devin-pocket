@@ -1,5 +1,6 @@
 import type { AgentStatus } from '@shared/protocol';
-import { AlertCircle, Bot, Loader2, RotateCcw, Stethoscope } from 'lucide-react';
+import { AlertCircle, Loader2, RotateCcw, Stethoscope } from 'lucide-react';
+import { BrandMark } from '@/components/BrandMark';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -35,8 +36,8 @@ export function AgentGate({ status }: { status: AgentStatus }) {
       <Overlay>
         <Card className="w-full max-w-sm">
           <CardHeader className="items-center gap-3 pb-2 text-center">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-              <Bot className="size-8" />
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-muted">
+              <BrandMark className="size-14" />
             </div>
             <h1 className="text-xl font-semibold">{t('gate.login.title')}</h1>
           </CardHeader>

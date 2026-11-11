@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <title>Devin Pocket</title>
-  <rect width="512" height="512" rx="112" fill="#5b4bc4"/>
-  <path d="M150 150h212a36 36 0 0 1 36 36v110a36 36 0 0 1-36 36H242l-66 56v-56h-26a36 36 0 0 1-36-36V186a36 36 0 0 1 36-36z" fill="#fff"/>
-  <circle cx="206" cy="241" r="18" fill="#5b4bc4"/>
-  <circle cx="256" cy="241" r="18" fill="#5b4bc4"/>
-  <circle cx="306" cy="241" r="18" fill="#5b4bc4"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <title>Devin Pocket — hex phone</title>
+  <rect width="512" height="512" rx="100" fill="#111412"/>
+  <rect x="120" y="48" width="272" height="416" rx="44" stroke="#eef0ea" stroke-width="32"/>
+  <path d="M234 84H278M234 430H278" stroke="#eef0ea" stroke-width="16" stroke-linecap="round"/>
+  <path transform="translate(-10 0)" d="M208 130Q215 126 222 130L253 148Q260 152 260 160V179Q260 188 266 194L279 205Q286 210 294 206L311 196Q318 192 325 196L356 214Q363 218 363 226V262Q363 270 356 274L325 292Q318 296 311 292L280 274Q273 270 273 262V244Q273 234 265 228L252 217Q244 212 237 216L222 224Q215 228 208 224L177 206Q170 202 170 194V160Q170 152 177 148Z" fill="#c0e993"/>
+  <path d="M192 335L214 355L192 375M251 375H299" stroke="#eef0ea" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

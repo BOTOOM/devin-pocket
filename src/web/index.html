@@ -6,8 +6,8 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#191622" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f6f7f2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111412" media="(prefers-color-scheme: dark)" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -23,6 +23,9 @@
         const dark =
           t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
         if (dark) document.documentElement.classList.add('dark');
+        document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+          meta.setAttribute('content', dark ? '#111412' : '#f6f7f2');
+        });
       } catch (_e) {}
     </script>
   </head>

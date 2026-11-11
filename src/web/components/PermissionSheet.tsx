@@ -49,7 +49,7 @@ export function PermissionSheet({
       >
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <ShieldAlert className="size-5 text-warning-foreground dark:text-warning" />
+            <ShieldAlert className="size-5 text-warning" />
             {t('perm.title')}
           </SheetTitle>
           <SheetDescription className="text-left">{request.title}</SheetDescription>
@@ -99,12 +99,12 @@ export function PermissionSheet({
                   key={o.optionId}
                   variant={allow && !always ? 'default' : allow ? 'secondary' : 'outline'}
                   className={`h-auto min-h-12 w-full flex-col items-start gap-0 py-2.5 text-left ${
-                    !allow ? 'border-destructive/40 text-destructive hover:bg-destructive/10' : ''
+                    !allow ? 'border-destructive text-destructive hover:bg-destructive/10' : ''
                   }`}
                   onClick={() => respond(o.optionId)}
                 >
                   <span className="font-medium">{o.name}</span>
-                  {always && <span className="text-xs opacity-70">{t('perm.forSession')}</span>}
+                  {always && <span className="text-xs">{t('perm.forSession')}</span>}
                 </Button>
               );
             })}

@@ -58,9 +58,7 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
             onClick={() => setSheet('model')}
           >
             {modelName ?? modelValue ?? t('model.title')}
-            {speedValue === 'fast' && (
-              <span className="shrink-0 text-warning-foreground dark:text-warning"> ⚡</span>
-            )}
+            {speedValue === 'fast' && <span className="shrink-0 text-warning"> ⚡</span>}
           </Chip>
         )}
         {reasoning && reasonValue && (
@@ -100,7 +98,7 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
                   className={`h-auto flex-col items-start gap-0.5 rounded-lg border px-3 py-3 text-left data-[state=on]:bg-accent ${warn ? 'border-warning/60' : ''}`}
                 >
                   <span
-                    className={`flex w-full items-center justify-between font-medium ${warn ? 'text-warning-foreground dark:text-warning' : ''}`}
+                    className={`flex w-full items-center justify-between font-medium ${warn ? 'text-warning' : ''}`}
                   >
                     {m.name}
                     {state.currentMode === m.id && <Check className="size-4" />}
@@ -180,9 +178,7 @@ function Chip({
       title={label}
       onClick={onClick}
       className={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-medium ${
-        active
-          ? 'border-warning/60 bg-warning/15 text-warning-foreground dark:text-warning'
-          : 'bg-card'
+        active ? 'border-warning/60 bg-warning/15 text-warning' : 'bg-card'
       }`}
     >
       <span className="min-w-0 truncate">{children}</span>

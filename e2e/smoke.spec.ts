@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import './theme-screens';
 
 test('fake agent home → session → prompt → permission → tool and usage', async ({ page }) => {
   await page.goto('/#/');

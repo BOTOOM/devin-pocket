@@ -409,7 +409,10 @@ function ComparePanel({
         <span>{to.entry?.maxContext ? fmtTokens(to.entry.maxContext) : '—'}</span>
       </div>
       <div className="mt-3 flex gap-2">
-        <Button className="flex-1" onClick={onConfirm}>
+        <Button
+          className="h-auto min-h-9 min-w-0 flex-1 whitespace-normal break-words"
+          onClick={onConfirm}
+        >
           {t('model.switchTo', { name: to.name })}
         </Button>
         <Button variant="outline" onClick={onCancel}>
@@ -431,10 +434,10 @@ function CompareTable({
 }) {
   const t = useT();
   return (
-    <table className="w-full text-sm">
+    <table className="w-full table-fixed text-sm">
       <thead>
         <tr className="text-left text-xs text-muted-foreground">
-          <th className="py-1 font-normal">{t('model.table.model')}</th>
+          <th className="w-[40%] py-1 font-normal">{t('model.table.model')}</th>
           <th className="py-1 text-right font-normal">{t('model.table.input')}</th>
           <th className="py-1 text-right font-normal">{t('model.table.output')}</th>
           <th className="py-1 text-right font-normal">{t('model.table.context')}</th>
@@ -447,7 +450,7 @@ function CompareTable({
             className={`border-t tabular-nums ${o.value === current ? 'bg-accent/50' : ''}`}
             onClick={() => onPick(o.value)}
           >
-            <td className="max-w-[40%] truncate py-2 pr-2 font-medium">{o.name}</td>
+            <td className="break-words py-2 pr-2 font-medium">{o.name}</td>
             <td className="py-2 text-right">
               <SidePrice entry={o.entry} field="input" empty="—" />
             </td>

@@ -152,7 +152,7 @@ const Item = memo(function Item({
             item.level === 'error'
               ? 'text-destructive'
               : item.level === 'warn'
-                ? 'text-warning-foreground dark:text-warning'
+                ? 'text-warning'
                 : 'text-muted-foreground'
           }`}
         >
