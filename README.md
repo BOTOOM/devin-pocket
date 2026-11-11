@@ -2,6 +2,8 @@
 
 [English](https://github.com/BOTOOM/devin-pocket/blob/main/README.md) · [Español](https://github.com/BOTOOM/devin-pocket/blob/main/README.es.md)
 
+[Website](https://devin-pocket.edwardiaz.dev) · [Install guides](https://devin-pocket.edwardiaz.dev/#install) · [npm](https://www.npmjs.com/package/devin-pocket)
+
 A mobile-first browser UI for Devin CLI over ACP, on Android/Termux, Linux and macOS.
 
 [![npm version](https://img.shields.io/npm/v/devin-pocket)](https://www.npmjs.com/package/devin-pocket)
@@ -59,6 +61,9 @@ global bin directory is on PATH. npm global installs need a writable prefix.
 
 ### General installer
 
+Platform guides: [Linux](https://devin-pocket.edwardiaz.dev/docs/linux) ·
+[macOS](https://devin-pocket.edwardiaz.dev/docs/macos).
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install.sh | bash
 ```
@@ -70,6 +75,9 @@ missing; it does **not** install Devin CLI or start Pocket. For complete Android
 setup, use the next installer.
 
 ### Android/Termux from scratch, without cloning
+
+See the [Android/Termux installation guide](https://devin-pocket.edwardiaz.dev/docs/android-termux)
+for the complete walkthrough.
 
 1. Install **Termux** from [official GitHub releases](https://github.com/termux/termux-app/releases).
    Use Android 7+ and ARM64/x86_64. Optional Termux:Widget and Termux:API APKs must
