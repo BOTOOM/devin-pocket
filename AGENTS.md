@@ -195,8 +195,14 @@ notifications `_cognition.ai/turn_stats` and `_cognition.ai/output`.
 - Workflow/elicitation/resource-link ACP shapes are unverified.
 - Fake agent `deleteSession` only removes app-created sessions; the fixed demo
   sessions (`fake-session-*`) always remain.
-- Release: `v*` tags trigger `.github/workflows/release.yml` → `pnpm publish
-  --provenance --access public` — needs the `NPM_TOKEN` repo secret. PR #1 is a draft.
+
+## Releases
+
+- Conventional commits on `main` drive semantic-release versions and npm publishing
+  via `.github/workflows/release.yml` after verification. `docs(readme)` also ships a
+  patch. Never hand-edit the version or push release tags.
+- `package.json` is the runtime version source. Releases update it and `CHANGELOG.md`,
+  publish publicly with provenance, and require the `NPM_TOKEN` repo secret.
 
 ## Debugging recipe
 
