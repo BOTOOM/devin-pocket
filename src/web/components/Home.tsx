@@ -251,7 +251,13 @@ export function SessionList({ currentSessionId }: { currentSessionId?: string })
           onOpenChange={(o) => !o && setRename(null)}
         />
       )}
-      <DeleteDialog s={del} onClose={() => setDel(null)} />
+      <DeleteDialog
+        s={del}
+        onClose={() => setDel(null)}
+        onDeleted={(sessionId) => {
+          if (sessionId === currentSessionId) navigate('home');
+        }}
+      />
     </div>
   );
 }
@@ -350,7 +356,15 @@ function SessionRow({
   );
 }
 
-function DeleteDialog({ s, onClose }: { s: SessionSummary | null; onClose: () => void }) {
+function DeleteDialog({
+  s,
+  onClose,
+  onDeleted,
+}: {
+  s: SessionSummary | null;
+  onClose: () => void;
+  onDeleted: (sessionId: string) => void;
+}) {
   const t = useT();
   return (
     <Dialog open={!!s} onOpenChange={(o) => !o && onClose()}>
@@ -371,7 +385,9 @@ function DeleteDialog({ s, onClose }: { s: SessionSummary | null; onClose: () =>
                   type: 'session.delete',
                   sessionId: s.sessionId,
                   cwd: s.cwd,
-                }).catch(() => {});
+                })
+                  .then(() => onDeleted(s.sessionId))
+                  .catch(() => {});
               onClose();
             }}
           >
