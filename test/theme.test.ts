@@ -33,7 +33,7 @@ describe('brand theme contrast', () => {
       for (const fg of [
         'foreground',
         'muted-foreground',
-        'primary',
+        'link',
         'success',
         'warning',
         'info',
@@ -50,6 +50,8 @@ describe('brand theme contrast', () => {
       ['diff-add-fg', 'diff-add-bg'],
       ['diff-del-fg', 'diff-del-bg'],
       ['code-foreground', 'code'],
+      ['ring', 'background'],
+      ['ring', 'primary'],
     ] as const) {
       it(`${theme}: ${fg} on ${bg} meets AA`, () =>
         expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5));
