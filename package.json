@@ -1,8 +1,12 @@
 {
   "name": "devin-pocket",
   "version": "0.2.0",
-  "description": "Mobile-first web client for Devin CLI over ACP. One command, runs on your phone (Termux), open it in the browser.",
+  "description": "Mobile-first browser UI for Devin CLI over Agent Client Protocol (ACP): sessions, streaming and tools on Android/Termux, Linux and macOS.",
   "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "packageManager": "pnpm@12.6.0",
   "type": "module",
   "bin": {
@@ -50,16 +54,29 @@
   },
   "keywords": [
     "devin",
+    "devin-cli",
+    "devin-ai",
+    "cognition",
     "acp",
     "agent-client-protocol",
+    "ai-agent",
+    "coding-agent",
+    "ai-coding-assistant",
     "termux",
     "android",
     "mobile",
-    "pwa"
+    "pwa",
+    "web-ui",
+    "self-hosted",
+    "cli",
+    "browser",
+    "developer-tools"
   ],
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
     "@playwright/test": "1.63.0",
+    "@semantic-release/changelog": "7.0.0",
+    "@semantic-release/git": "11.0.1",
     "@tailwindcss/vite": "4.3.3",
     "@types/dompurify": "3.0.5",
     "@types/node": "24.19.0",
@@ -70,12 +87,14 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "concurrently": "10.0.5",
+    "conventional-changelog-conventionalcommits": "9.3.1",
     "dompurify": "3.4.16",
     "lucide-react": "1.48.0",
     "marked": "18.0.14",
     "radix-ui": "1.6.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "semantic-release": "25.0.9",
     "tailwind-merge": "3.7.0",
     "tailwindcss": "4.3.3",
     "tsdown": "0.23.0",
@@ -85,7 +104,7 @@
     "vite": "8.3.1",
     "vitest": "5.0.2"
   },
-  "author": "Edwar D\u00edaz (BOTOOM)",
+  "author": "Edwar Díaz (BOTOOM)",
   "homepage": "https://github.com/BOTOOM/devin-pocket",
   "bugs": {
     "url": "https://github.com/BOTOOM/devin-pocket/issues"
