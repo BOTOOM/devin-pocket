@@ -201,6 +201,8 @@ notifications `_cognition.ai/turn_stats` and `_cognition.ai/output`.
 - Conventional commits on `main` drive semantic-release versions and npm publishing
   via `.github/workflows/release.yml` after verification. `docs(readme)` also ships a
   patch. Never hand-edit the version or push release tags.
+- CI commits use `ci:` / `ci(release):` and never release; CI/build/test types and
+  ci/actions/workflows/release scopes are excluded, even for breaking changes.
 - `package.json` is the runtime version source. Releases update it and `CHANGELOG.md`,
   publish publicly with provenance, and require the `NPM_TOKEN` repo secret.
 
