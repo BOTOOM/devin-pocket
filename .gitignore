@@ -1,0 +1,9 @@
+node_modules
+dist
+.snapshots
+playwright-report
+test-results
+*.log
+.DS_Store
+
+*.tgz

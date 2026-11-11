@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Devin Pocket</title>
+  <rect width="512" height="512" rx="112" fill="#5b4bc4"/>
+  <path d="M150 150h212a36 36 0 0 1 36 36v110a36 36 0 0 1-36 36H242l-66 56v-56h-26a36 36 0 0 1-36-36V186a36 36 0 0 1 36-36z" fill="#fff"/>
+  <circle cx="206" cy="241" r="18" fill="#5b4bc4"/>
+  <circle cx="256" cy="241" r="18" fill="#5b4bc4"/>
+  <circle cx="306" cy="241" r="18" fill="#5b4bc4"/>
+</svg>
