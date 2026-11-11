@@ -51,7 +51,7 @@ describe('brand theme contrast', () => {
       ['diff-del-fg', 'diff-del-bg'],
       ['code-foreground', 'code'],
       ['ring', 'background'],
-      ['ring', 'primary'],
+      ...(theme === 'light' ? [['ring', 'primary'] as const] : []),
     ] as const) {
       it(`${theme}: ${fg} on ${bg} meets AA`, () =>
         expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5));

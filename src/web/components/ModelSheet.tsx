@@ -4,6 +4,7 @@ import { pickModelOptions } from '@shared/reducer';
 import { Check, ImageOff, Search, Zap } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { RelativeCostBar } from '@/components/RelativeCostBar';
 import { currentValue, type FlatOption, selectOptions } from '@/components/StatusStrip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -185,6 +186,10 @@ export function ModelSheet({
           />
         </div>
 
+        {compare && !comparing && (
+          <RelativeCostBar models={flat} current={current} catalog={catalog} />
+        )}
+
         <div className="min-h-0 flex-1 overflow-y-auto pb-4">
           {flat.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">{t('model.empty')}</p>
@@ -256,6 +261,14 @@ export function ModelSheet({
 
         {comparing && (
           <ComparePanel
+            costBar={
+              <RelativeCostBar
+                models={flat}
+                current={current}
+                candidate={comparing.value}
+                catalog={catalog}
+              />
+            }
             from={currentRow}
             to={comparing}
             onConfirm={() => pick(comparing.value)}
@@ -318,11 +331,13 @@ function PriceCell({ from, to, toSummary }: { from?: number; to?: number; toSumm
 }
 
 function ComparePanel({
+  costBar,
   from,
   to,
   onConfirm,
   onCancel,
 }: {
+  costBar: ReactNode;
   from?: Row;
   to: Row;
   onConfirm: () => void;
@@ -333,6 +348,7 @@ function ComparePanel({
     from?.entry?.prices?.cached !== undefined || to.entry?.prices?.cached !== undefined;
   return (
     <div className="mb-1 rounded-xl border bg-card p-3">
+      <div className="mb-3">{costBar}</div>
       <div className="grid grid-cols-[auto_1fr_1fr] items-baseline gap-x-3 gap-y-1.5 text-sm">
         <span />
         <span className="text-xs font-medium uppercase text-muted-foreground">
