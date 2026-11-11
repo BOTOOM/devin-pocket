@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { SessionUpdate } from '@agentclientprotocol/sdk';
@@ -162,6 +162,17 @@ describe('devin-pocket server', () => {
     const ack = await c.waitFor((m) => m.type === 'ack' && m.id === 'new-1');
     expect(ack.type === 'ack' && ack.ok).toBe(true);
     await c.waitFor((m) => m.type === 'session.snapshot');
+    c.ws.close();
+  });
+
+  it('session.new rejects an invalid folder before invoking ACP', async () => {
+    const c = wsClient(h.port);
+    await c.waitFor((m) => m.type === 'hello');
+    const before = h.sessions.openStates().length;
+    c.send({ type: 'session.new', cwd: 'relative/path' }, 'invalid-folder');
+    const ack = await c.waitFor((m) => m.type === 'ack' && m.id === 'invalid-folder');
+    expect(ack).toMatchObject({ ok: false, error: 'invalid_cwd' });
+    expect(h.sessions.openStates()).toHaveLength(before);
     c.ws.close();
   });
 
@@ -532,7 +543,7 @@ describe('devin-pocket server', () => {
   });
 
   it('app-created sessions survive restart via the global session/list', async () => {
-    const otherCwd = mkdtempSync(path.join(os.tmpdir(), 'devin-pocket-cwd-'));
+    const otherCwd = mkdtempSync(path.join(os.homedir(), '.devin-pocket-cwd-'));
     const s = await h.sessions.create(otherCwd);
     await h.sessions.rename(s.sessionId, 'Persisted session');
     // simulated restart: a fresh manager with no workspaces — only the
@@ -544,6 +555,7 @@ describe('devin-pocket server', () => {
     expect(found).toBeTruthy();
     expect(found?.title).toBe('Persisted session');
     expect(found?.cwd).toBe(otherCwd);
+    rmSync(otherCwd, { recursive: true, force: true });
   });
 
   it('catalog.refresh returns debug info (fixture source)', async () => {

@@ -24,6 +24,7 @@ import type { AgentProcess } from './acp/agent.js';
 import { normalizeUpdate } from './acp/normalize.js';
 import type { Logger } from './log.js';
 import { titlesFile } from './paths.js';
+import { validateCwd } from './workspace.js';
 
 type Send = (msg: ServerMessage) => void;
 
@@ -287,6 +288,7 @@ export class SessionManager {
   }
 
   async create(cwd: string): Promise<SessionState> {
+    cwd = validateCwd(cwd, this.workspaces);
     const res = await this.agent.newSession(cwd);
     const _s = this.ensure(res.sessionId, cwd);
     this.agent.trackOpen(res.sessionId, cwd);
