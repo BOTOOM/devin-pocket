@@ -320,6 +320,8 @@ reproducir y diagnóstico sin datos sensibles; los PR enfocados son bienvenidos.
 Mantén ambos README sincronizados, usa conventional commits y ejecuta los checks
 anteriores. `docs(readme)` genera un patch con semantic-release en main; nunca
 edites versiones manualmente ni subas tags de release.
+Los commits de CI usan `ci:` / `ci(release):` y nunca publican; se excluyen los tipos
+ci/build/test y scopes ci/actions/workflows/release, incluso con breaking changes.
 
 ## Licencia y atribución
 

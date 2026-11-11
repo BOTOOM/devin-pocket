@@ -319,6 +319,8 @@ Open [issues](https://github.com/BOTOOM/devin-pocket/issues) with reproduction
 steps and sanitized diagnostics; focused PRs are welcome. Keep both READMEs in
 sync, use conventional commits and run the checks above. `docs(readme)` triggers
 a patch release through semantic-release on main; never hand-edit versions/push tags.
+CI commits use `ci:` / `ci(release):` and never release; CI/build/test types and
+ci/actions/workflows/release scopes are excluded, including breaking changes.
 
 ## License and attribution
 
