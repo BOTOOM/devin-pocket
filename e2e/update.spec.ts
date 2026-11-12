@@ -41,7 +41,7 @@ for (const theme of ['light', 'dark'] as const) {
       route.fulfill({
         json: {
           ok: true,
-          update: { current: '0.5.0', latest, updateAvailable: true },
+          update: { current: '0.5.0', latest, updateAvailable: true, installManager: 'npm' },
         },
       }),
     );
@@ -66,6 +66,32 @@ for (const theme of ['light', 'dark'] as const) {
     latest = '99.1.0';
     await page.reload();
     await expect(notice).toContainText('99.1.0');
+  });
+}
+
+for (const lang of ['es', 'en'] as const) {
+  test(`unknown installations show manual update instructions in ${lang}`, async ({ page }) => {
+    await page.addInitScript((lang) => localStorage.setItem('dp.lang', lang), lang);
+    await page.route('**/api/health', (route) =>
+      route.fulfill({
+        json: {
+          update: {
+            current: '0.5.0',
+            latest: '99.0.0',
+            updateAvailable: true,
+            installManager: null,
+          },
+        },
+      }),
+    );
+    await page.goto('/#/settings');
+    const notice = page.getByRole('complementary', {
+      name: lang === 'es' ? 'Actualización disponible' : 'Update available',
+    });
+    await expect(notice).toContainText(
+      lang === 'es' ? 'método de instalación original' : 'original installation method',
+    );
+    await expect(notice).not.toContainText('devin-pocket update');
   });
 }
 

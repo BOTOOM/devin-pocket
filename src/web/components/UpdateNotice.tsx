@@ -35,8 +35,14 @@ export function UpdateNotice() {
       aria-label={t('update.title')}
     >
       <p className="min-w-0 flex-1 break-words">
-        {t('update.notice', { version: update.latest })}{' '}
-        <code className="break-all font-mono">devin-pocket update</code>
+        {update.installManager ? (
+          <>
+            {t('update.notice', { version: update.latest })}{' '}
+            <code className="break-all font-mono">devin-pocket update</code>
+          </>
+        ) : (
+          t('update.manual', { version: update.latest })
+        )}
       </p>
       <Button
         variant="ghost"

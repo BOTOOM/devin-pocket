@@ -5,6 +5,8 @@ export type Lang = 'es' | 'en';
 const es = {
   'update.title': 'Actualización disponible',
   'update.notice': 'Nueva versión {version} disponible · ejecuta',
+  'update.manual':
+    'Nueva versión {version} disponible · actualiza con el método de instalación original (código fuente, npx u otro).',
   'app.name': 'Devin Pocket',
   'common.cancel': 'Cancelar',
   'common.close': 'Cerrar',
@@ -217,6 +219,8 @@ const es = {
 const en: Record<keyof typeof es, string> = {
   'update.title': 'Update available',
   'update.notice': 'New version {version} available · run',
+  'update.manual':
+    'New version {version} available · update using your original installation method (source, npx or other).',
   'app.name': 'Devin Pocket',
   'common.cancel': 'Cancel',
   'common.close': 'Close',

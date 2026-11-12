@@ -583,6 +583,7 @@ describe('devin-pocket server', () => {
       current: expect.any(String),
       latest: expect.any(String),
       updateAvailable: false,
+      installManager: null,
     });
     const doctor = (await fetch(`http://127.0.0.1:${h.port}/api/doctor`).then((r) => r.json())) as {
       checks: unknown[];

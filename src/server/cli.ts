@@ -2,7 +2,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { AgentStatus, BillingInfo } from '../shared/protocol.js';
 import { AgentProcess } from './acp/agent.js';
 import { type Args, parseArgs, serializeArgs } from './args.js';
@@ -21,7 +20,7 @@ import {
 } from './paths.js';
 import { SessionManager } from './sessions.js';
 import { savedStartArgs } from './startup.js';
-import { installPackage, runUpdate, startUpdateChecks } from './update.js';
+import { installPackage, runningPackageDir, runUpdate, startUpdateChecks } from './update.js';
 
 function box(lines: string[]): void {
   const w = Math.max(...lines.map((l) => l.length)) + 4;
@@ -263,12 +262,7 @@ const host = args.host ?? fileConfig.host;
 
 switch (args.cmd) {
   case 'update': {
-    let packageDir = path.dirname(fileURLToPath(import.meta.url));
-    while (!fs.existsSync(path.join(packageDir, 'package.json'))) {
-      const parent = path.dirname(packageDir);
-      if (parent === packageDir) throw new Error('Cannot locate running package');
-      packageDir = parent;
-    }
+    const packageDir = runningPackageDir();
     let startArgs = ['start'];
     process.exitCode = await runUpdate(args, {
       packageDir,

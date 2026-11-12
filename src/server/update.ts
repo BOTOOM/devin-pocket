@@ -2,10 +2,12 @@ import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { fileURLToPath } from 'node:url';
 import type { UpdateInfo } from '../shared/protocol.js';
 import { cacheDir, VERSION } from './paths.js';
 
 const DAY = 24 * 3600 * 1000;
+let installManager: UpdateInfo['installManager'] = null;
 const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][\da-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][\da-zA-Z-]*))*))?(?:\+[\da-zA-Z-]+(?:\.[\da-zA-Z-]+)*)?$/;
 
@@ -60,7 +62,33 @@ export async function registryVersion(version = 'latest'): Promise<string> {
 }
 
 export function updateInfo(latest = VERSION): UpdateInfo {
-  return { current: VERSION, latest, updateAvailable: compareVersions(VERSION, latest) < 0 };
+  return {
+    current: VERSION,
+    latest,
+    updateAvailable: compareVersions(VERSION, latest) < 0,
+    installManager,
+  };
+}
+
+export function runningPackageDir(): string {
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  while (!fs.existsSync(path.join(dir, 'package.json'))) {
+    const parent = path.dirname(dir);
+    if (parent === dir) throw new Error('Cannot locate running package');
+    dir = parent;
+  }
+  return dir;
+}
+
+export async function refreshInstallManager(
+  packageDir: string,
+  detect = detectManager,
+): Promise<void> {
+  try {
+    installManager = await detect(packageDir);
+  } catch {
+    installManager = null;
+  }
 }
 
 export function updateChecksDisabled(): boolean {
@@ -105,6 +133,7 @@ export async function checkForUpdate(log: { warn: (message: string) => void }): 
 
 export function startUpdateChecks(log: { warn: (message: string) => void }): void {
   if (updateChecksDisabled()) return;
+  void refreshInstallManager(runningPackageDir());
   void checkForUpdate(log);
   setInterval(() => void checkForUpdate(log), DAY).unref();
 }

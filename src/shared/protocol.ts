@@ -25,6 +25,7 @@ export interface UpdateInfo {
   current: string;
   latest: string;
   updateAvailable: boolean;
+  installManager?: 'npm' | 'pnpm' | null;
 }
 
 export type {

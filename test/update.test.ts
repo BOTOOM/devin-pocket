@@ -11,11 +11,28 @@ import {
   checkForUpdate,
   compareVersions,
   detectManager,
+  refreshInstallManager,
   registryVersion,
   runUpdate,
+  updateInfo,
 } from '../src/server/update.js';
 
 afterEach(() => vi.unstubAllEnvs());
+
+it('exposes unknown installations safely before manager detection completes', () => {
+  expect(updateInfo()).toMatchObject({ installManager: null });
+});
+
+it('reports detected global managers, unknown roots and detection failures', async () => {
+  for (const manager of ['npm', 'pnpm', null] as const) {
+    await refreshInstallManager('/package', async () => manager);
+    expect(cachedUpdate().installManager).toBe(manager);
+  }
+  await refreshInstallManager('/package', async () => {
+    throw new Error('unavailable');
+  });
+  expect(cachedUpdate().installManager).toBe(null);
+});
 
 it('reads the installed package version from source as well as the built layout', () => {
   const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
