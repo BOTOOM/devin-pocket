@@ -247,13 +247,15 @@ describe('Termux bootstrap installer', () => {
     const f = fixture();
     expect(f.run(['--distro', 'my-ubuntu', '--package', 'devin-pocket@0.1.5']).status).toBe(0);
     for (const name of ['devin-pocket', 'devin-pocket-ubuntu']) {
+      const before = f.commands().length;
       const result = spawnSync('/bin/bash', [path.join(f.prefix, 'bin', name), ...args], {
         env: { ...f.env, MOCK_LOG_ONLY: '1' },
         encoding: 'utf8',
       });
       expect(result.status).toBe(0);
-      expect(f.commands()).toContain('proot-distro|login|my-ubuntu|--|/bin/bash|-lc|');
-      expect(f.commands()).toContain(`devin-pocket|${args.length ? `${args.join('|')}|` : ''}\n`);
+      const commands = f.commands().slice(before);
+      expect(commands).toContain('proot-distro|login|my-ubuntu|--|/bin/bash|-lc|');
+      expect(commands).toContain(`devin-pocket|${args.length ? `${args.join('|')}|` : ''}\n`);
     }
   });
 
