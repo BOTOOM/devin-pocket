@@ -1,28 +1,31 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
+
+async function createSession(page: Page) {
+  await page
+    .getByRole('button', { name: /^(Nueva sesión|New session)$/i })
+    .first()
+    .click();
+  const start = page.getByRole('button', { name: /^(Iniciar sesión|Start session)$/ });
+  if (await start.isVisible()) await start.click();
+  await expect(page.locator('textarea')).toBeVisible();
+  return page.url();
+}
 
 test('desktop session changes do not leak composer drafts', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/#/');
-  await page.goto('/#/s/fake-session-middle');
-  await expect(page.locator('textarea')).toBeVisible();
-  await page.goto('/#/s/fake-session-empty');
-  await expect(page.locator('textarea')).toBeVisible();
-  await page.goto('/#/s/fake-session-middle');
+  const first = await createSession(page);
+  const second = await createSession(page);
+  await page.goto(first);
   await page.locator('textarea').fill('PRIVATE_DRAFT_FOR_FIRST_SESSION');
-  await page.goto('/#/s/fake-session-empty');
+  await page.goto(second);
   await expect(page.locator('textarea')).toHaveValue('');
 });
 
 test('desktop deleting the active session returns home', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/#/');
-  await page
-    .getByRole('button', { name: /Nueva sesión|New session/i })
-    .first()
-    .click();
-  const start = page.getByRole('button', { name: /^(Iniciar sesión|Start session)$/ });
-  if (await start.isVisible()) await start.click();
-  await expect(page.locator('textarea')).toBeVisible();
+  await createSession(page);
   const row = page
     .getByTestId('session-sidebar')
     .locator('button[aria-current="page"]')
@@ -34,11 +37,7 @@ test('desktop deleting the active session returns home', async ({ page }) => {
     .getByRole('button', { name: /Eliminar|Delete/i })
     .click();
   await expect(page).toHaveURL(/#\/$/);
-  await page
-    .getByTestId('session-sidebar')
-    .getByText('Fix the flaky test', { exact: true })
-    .click();
-  await expect(page.locator('textarea')).toBeVisible();
+  await createSession(page);
 });
 
 test('desktop new session buttons share an in-flight guard', async ({ page }) => {
