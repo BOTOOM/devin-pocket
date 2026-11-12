@@ -1,3 +1,20 @@
+## [0.4.0](https://github.com/BOTOOM/devin-pocket/compare/v0.3.0...v0.4.0) (2026-11-12)
+
+### Features
+
+* **ui:** adapt the client for tablets and desktop ([7f805dd](https://github.com/BOTOOM/devin-pocket/commit/7f805ddfaa1a01a6c599a4d76ce6324b28dd7cd0))
+
+### Bug Fixes
+
+* **sessions:** deduplicate creation requests by working folder ([50e9440](https://github.com/BOTOOM/devin-pocket/commit/50e9440a77c8fbfe3a092bedeb92d401263a995d))
+* **ui:** isolate chat drafts when switching sessions ([97e7663](https://github.com/BOTOOM/devin-pocket/commit/97e7663dfd4599abfca02f9fa24b88fd0a521afb))
+* **ui:** return home after deleting the active sidebar session ([e047418](https://github.com/BOTOOM/devin-pocket/commit/e047418a0b28de15326489d26c950255a240c27a))
+* **ui:** share the in-flight session creation request ([cb77f0e](https://github.com/BOTOOM/devin-pocket/commit/cb77f0eee4df40d4d0b468d6a71a08291d6d121e))
+
+### Maintenance
+
+* normalize npm repository URL ([0984853](https://github.com/BOTOOM/devin-pocket/commit/098485389ca1d60430432c06847624a5c6a7ddf1))
+
 ## [0.3.0](https://github.com/BOTOOM/devin-pocket/compare/v0.2.1...v0.3.0) (2026-11-11)
 
 ### Features
