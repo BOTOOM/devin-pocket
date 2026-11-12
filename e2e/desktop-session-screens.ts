@@ -64,9 +64,21 @@ test('desktop new session buttons share an in-flight guard', async ({ page }) =>
   await page.goto('/#/');
   const buttons = page.getByRole('button', {
     name: /^(Nueva sesión|New session|Creando.*|Creating.*)$/i,
+    includeHidden: true,
   });
   await expect(buttons).toHaveCount(2);
   await buttons.first().click();
+  const start = page.getByRole('button', { name: /^(Iniciar sesión|Start session)$/ });
+  if (await start.isVisible()) {
+    await start.click();
+    await buttons.nth(1).evaluate((button: HTMLButtonElement) => button.click());
+    await page.getByRole('button', { name: /^(Iniciar sesión|Start session)$/ }).click();
+    await expect(
+      page.getByRole('button', { name: /^(Creando|Creating)/i, includeHidden: true }),
+    ).toHaveCount(2);
+    expect(creations).toBe(1);
+    return;
+  }
   await buttons.nth(1).evaluate((button: HTMLButtonElement) => button.click());
   await expect(buttons.first()).toBeDisabled();
   await expect(buttons.nth(1)).toBeDisabled();
