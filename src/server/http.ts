@@ -23,6 +23,7 @@ import { type Logger, logFiles, readLogs, redact } from './log.js';
 import { agentStderrFile, type Config, platformInfo, stateDir, VERSION } from './paths.js';
 import { listPorts } from './ports.js';
 import type { SessionManager } from './sessions.js';
+import { validateCwd } from './workspace.js';
 
 /** Envelope shape gate before dispatch — unknown cmd.type falls to default ack. */
 const Envelope = z.object({
@@ -369,11 +370,19 @@ export class PocketServer {
         if (!cwdAllowed(cwd, this.deps.config.workspaces)) {
           return this.json(res, { error: 'cwd not allowed' }, 403);
         }
-        return this.json(res, await search(cwd, q, limit));
+        return this.json(
+          res,
+          await search(validateCwd(cwd, this.deps.config.workspaces), q, limit),
+        );
       }
       if (url.pathname === '/api/workspaces/browse') {
         const p = url.searchParams.get('path') ?? '';
-        return this.json(res, { entries: browse(p), path: browsePath(p), home: homeDir() });
+        const workspaces = this.deps.config.workspaces;
+        return this.json(res, {
+          entries: browse(p, workspaces),
+          path: browsePath(p, workspaces),
+          home: homeDir(),
+        });
       }
       if (url.pathname === '/api/catalog') {
         return this.json(res, getCatalog());

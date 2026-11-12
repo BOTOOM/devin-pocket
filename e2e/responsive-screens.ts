@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { startSession } from './session-helpers';
 
 for (const [width, height] of [
   [390, 844],
@@ -53,7 +54,7 @@ for (const [width, height] of [
     await page.locator('[data-chip="workspace"]').click();
     await panel(640);
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'New session', exact: true }).first().click();
+    await startSession(page);
     await expect(page.locator('textarea')).toBeVisible();
     if (width >= 1024) {
       await expect(sidebar.locator('[aria-current="page"]')).toHaveCount(1);

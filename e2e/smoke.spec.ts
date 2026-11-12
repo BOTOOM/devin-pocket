@@ -1,15 +1,14 @@
 import { expect, test } from '@playwright/test';
+import { startSession } from './session-helpers';
 import './theme-screens';
 import './responsive-screens';
 import './desktop-session-screens';
+import './session-folder-screens';
 
 test('fake agent home → session → prompt → permission → tool and usage', async ({ page }) => {
   await page.goto('/#/');
   await expect(page.getByText('Devin Pocket')).toBeVisible();
-  await page
-    .getByRole('button', { name: /Nueva sesión|New session/i })
-    .first()
-    .click();
+  await startSession(page);
   await expect(page.locator('textarea')).toBeVisible();
   await page.locator('textarea').fill('Lista los archivos de src');
   await page.keyboard.press('Enter');
@@ -29,10 +28,7 @@ test('fake agent home → session → prompt → permission → tool and usage',
 test('compact controls stay on one row with long settings on a narrow phone', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/#/');
-  await page
-    .getByRole('button', { name: /Nueva sesión|New session/i })
-    .first()
-    .click();
+  await startSession(page);
   await page.locator('[data-chip="mode"]').click();
   await page.getByText('Bypass Permissions', { exact: true }).last().click();
   await expect(page.locator('[data-chip="mode"]')).toContainText('Bypass Permissions');
@@ -54,10 +50,7 @@ test('compact controls stay on one row with long settings on a narrow phone', as
 
 test('visible commands button opens palette without changing the draft', async ({ page }) => {
   await page.goto('/#/');
-  await page
-    .getByRole('button', { name: /Nueva sesión|New session/i })
-    .first()
-    .click();
+  await startSession(page);
   const input = page.locator('textarea').first();
   await input.fill('Borrador');
   const attach = page.getByRole('button', { name: /Adjuntar imagen|Attach image/i });
@@ -115,10 +108,7 @@ test('settings shows the plan & quota card when the agent pushes billing info', 
 
 test('queued message edits in place keeping its position', async ({ page }) => {
   await page.goto('/#/');
-  await page
-    .getByRole('button', { name: /Nueva sesión|New session/i })
-    .first()
-    .click();
+  await startSession(page);
   const input = page.locator('textarea');
   await input.fill('QUEUE_HOLD');
   await page.keyboard.press('Enter');
@@ -172,6 +162,10 @@ test('new session shows busy state, blocks double-clicks and reports errors', as
   await page.goto('/#/');
   const newBtn = page.getByRole('button', { name: /Nueva sesión|New session/i }).first();
   await newBtn.click();
+  const startBtn = page
+    .getByRole('dialog')
+    .getByRole('button', { name: /^(Iniciar sesión|Start session)$/ });
+  await startBtn.click();
   const busy = page.getByRole('button', { name: /Creando|Creating/i });
   await expect(busy).toBeVisible();
   await expect(busy).toBeDisabled();
@@ -180,9 +174,9 @@ test('new session shows busy state, blocks double-clicks and reports errors', as
   await expect(
     page.getByText(/No se pudo crear la sesión|Could not create the session/i),
   ).toBeVisible();
-  await expect(newBtn).toBeEnabled();
+  await expect(startBtn).toBeEnabled();
   pendingAck = null;
-  await newBtn.click();
+  await startBtn.click();
   await expect.poll(() => newCount).toBe(2);
   await expect.poll(() => pendingAck).not.toBeNull();
   deliver?.(pendingAck ?? '');
@@ -195,10 +189,7 @@ test('ACP Markdown renders on mobile without losing file references or code', as
 }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto('/#/');
-  await page
-    .getByRole('button', { name: /Nueva sesión|New session/i })
-    .first()
-    .click();
+  await startSession(page);
   await page.locator('textarea').fill('MARKDOWN_FIXTURE');
   await page.keyboard.press('Enter');
   const response = page
@@ -223,10 +214,7 @@ test('ACP Markdown renders on mobile without losing file references or code', as
 
 test('queue can interrupt an active turn on mobile', async ({ page }) => {
   await page.goto('/#/');
-  await page
-    .getByRole('button', { name: /Nueva sesión|New session/i })
-    .first()
-    .click();
+  await startSession(page);
   await page.locator('textarea').fill('QUEUE_HOLD');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: /Añadir a la cola|Add to queue/i })).toBeVisible();
@@ -256,10 +244,7 @@ test('long history renders the last page and expands on load earlier', async ({ 
 
 test('side question works alongside an active turn', async ({ page }) => {
   await page.goto('/#/');
-  await page
-    .getByRole('button', { name: /Nueva sesión|New session/i })
-    .first()
-    .click();
+  await startSession(page);
   await expect(page.getByRole('button', { name: /Pregunta aparte|Side question/i })).toBeVisible();
   await page.locator('textarea').first().fill('QUEUE_HOLD');
   await page.keyboard.press('Enter');

@@ -92,7 +92,13 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
           onClick={() => setRenameOpen(true)}
         >
           <div className="truncate font-semibold">{title}</div>
-          <div className="truncate text-xs text-muted-foreground">{baseName(cwd) || cwd}</div>
+          <div
+            data-testid="session-folder"
+            title={cwd}
+            className="truncate text-xs text-muted-foreground"
+          >
+            {baseName(cwd) || cwd}
+          </div>
         </button>
         {btwOk && (
           <Button

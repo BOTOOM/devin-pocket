@@ -33,6 +33,12 @@ const es = {
   'home.newSession': 'Nueva sesión',
   'home.newSession.creating': 'Creando…',
   'home.newSession.error': 'No se pudo crear la sesión',
+  'sessionFolder.description':
+    'Elige la carpeta de trabajo antes de iniciar la sesión. Cancelar no crea ninguna sesión.',
+  'sessionFolder.selected': 'Carpeta seleccionada',
+  'sessionFolder.start': 'Iniciar sesión',
+  'sessionFolder.invalid':
+    'Elige una carpeta existente con una ruta absoluta dentro de tu directorio personal o de una carpeta de trabajo configurada. Los enlaces simbólicos deben permanecer dentro de esas ubicaciones.',
   'home.sessions': 'Sesiones',
   'home.empty': 'Todavía no hay sesiones. Crea una para empezar.',
   'home.openBadge': 'Abierta',
@@ -234,6 +240,12 @@ const en: Record<keyof typeof es, string> = {
   'home.newSession': 'New session',
   'home.newSession.creating': 'Creating…',
   'home.newSession.error': 'Could not create the session',
+  'sessionFolder.description':
+    'Choose the working folder before starting the session. Cancel creates no session.',
+  'sessionFolder.selected': 'Selected folder',
+  'sessionFolder.start': 'Start session',
+  'sessionFolder.invalid':
+    'Choose an existing folder with an absolute path inside your home directory or a configured workspace. Symlinks must stay within those locations.',
   'home.sessions': 'Sessions',
   'home.empty': 'No sessions yet. Create one to get started.',
   'home.openBadge': 'Open',

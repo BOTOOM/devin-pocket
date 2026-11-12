@@ -3,6 +3,7 @@ import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { FsEntry, Workspace } from '../shared/protocol.js';
+import { validateCwd } from './workspace.js';
 
 const SKIP = new Set(['node_modules', '.git', 'dist', 'target', '.venv', '__pycache__']);
 const MAX_DEPTH = 6;
@@ -13,13 +14,12 @@ const WALK_CACHE_MAX = 32;
 
 /** cwd must be inside home or a configured workspace. */
 export function cwdAllowed(cwd: string, workspaces: Workspace[]): boolean {
-  const home = os.homedir();
-  const abs = path.resolve(cwd);
-  if (abs === home || abs.startsWith(home + path.sep)) return true;
-  return workspaces.some((w) => {
-    const wp = path.resolve(w.path);
-    return abs === wp || abs.startsWith(wp + path.sep);
-  });
+  try {
+    validateCwd(cwd, workspaces);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Root .gitignore globs → regex (simple: basename or path prefix matches). */
@@ -132,22 +132,28 @@ export function homeDir(): string {
   return os.homedir();
 }
 
-/** Resolve the browse dir param: empty/relative → home. */
-export function browsePath(dir: string): string {
-  const abs = dir ? path.resolve(dir) : os.homedir();
-  const home = os.homedir();
-  return abs === home || abs.startsWith(home + path.sep) ? abs : home;
+/** Invalid or disallowed browse roots fall back to home. */
+export function browsePath(dir: string, workspaces: Workspace[] = []): string {
+  try {
+    return validateCwd(dir || os.homedir(), workspaces);
+  } catch {
+    return fs.realpathSync(os.homedir());
+  }
 }
 
 /** List immediate subdirectories of `path`, for the workspace picker. */
-export function browse(dir: string): FsEntry[] {
-  const abs = browsePath(dir);
-  const home = os.homedir();
-  if (!(abs === home || abs.startsWith(home + path.sep))) return [];
+export function browse(dir: string, workspaces: Workspace[] = []): FsEntry[] {
+  const abs = browsePath(dir, workspaces);
   try {
     return fs
       .readdirSync(abs, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && !e.name.startsWith('.') && !SKIP.has(e.name))
+      .filter(
+        (e) =>
+          e.isDirectory() &&
+          !e.name.startsWith('.') &&
+          !SKIP.has(e.name) &&
+          cwdAllowed(path.join(abs, e.name), workspaces),
+      )
       .map((e) => ({ name: e.name, path: path.join(abs, e.name), kind: 'dir' as const }))
       .sort((a, b) => a.name.localeCompare(b.name));
   } catch {

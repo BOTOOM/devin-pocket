@@ -1,7 +1,6 @@
 import type { SessionSummary } from '@shared/protocol';
 import {
   FolderOpen,
-  Loader2,
   Lock,
   LockOpen,
   MoreVertical,
@@ -12,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { BrandMark } from '@/components/BrandMark';
+import { NewSessionSheet } from '@/components/NewSessionSheet';
 import { RenameDialog } from '@/components/RenameDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -32,52 +32,40 @@ import {
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { WorkspaceSheet } from '@/components/WorkspaceSheet';
 import { useT } from '@/i18n';
 import { baseName, dayGroup, relTime } from '@/lib/format';
 import { navigate } from '@/lib/router';
 import { send } from '@/lib/ws';
-import { setPrefs, useStore } from '@/store';
+import { useStore } from '@/store';
 
 export function HomeScreen() {
   return <SessionList />;
 }
 
 function useNewSession() {
-  const t = useT();
   const prefs = useStore((s) => s.prefs);
-  const workspaces = useStore((s) => s.workspaces);
   const serverCwd = useStore((s) => s.settings?.cwd);
-  const cwd = prefs.workspace ?? workspaces[0]?.path ?? serverCwd ?? '';
-  const [creating, setCreating] = useState(false);
-  const newSession = async () => {
-    if (creating || !cwd) return;
-    setCreating(true);
-    try {
-      const res = (await send({ type: 'session.new', cwd })) as { sessionId?: string } | undefined;
-      if (res?.sessionId) navigate({ name: 'chat', sessionId: res.sessionId });
-    } catch (e) {
-      void import('sonner').then(({ toast }) =>
-        toast.error(t('home.newSession.error'), { description: (e as Error).message }),
-      );
-    } finally {
-      setCreating(false);
-    }
+  const cwd = prefs.workspace ?? serverCwd ?? '';
+  const [open, setOpen] = useState(false);
+  return {
+    cwd,
+    newSession: () => setOpen(true),
+    panel: <NewSessionSheet open={open} onOpenChange={setOpen} />,
   };
-  return { cwd, creating, newSession };
 }
 
 export function DesktopWelcome() {
   const t = useT();
-  const { cwd, creating, newSession } = useNewSession();
+  const { newSession, panel } = useNewSession();
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
       <BrandMark className="size-16" />
       <h1 className="text-xl font-semibold">{t('home.selectSession')}</h1>
-      <Button disabled={!cwd || creating} aria-busy={creating} onClick={newSession}>
-        {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-        {creating ? t('home.newSession.creating') : t('home.newSession')}
+      <Button onClick={newSession}>
+        <Plus className="size-4" />
+        {t('home.newSession')}
       </Button>
+      {panel}
     </div>
   );
 }
@@ -86,10 +74,8 @@ export function SessionList({ currentSessionId }: { currentSessionId?: string })
   const t = useT();
   const sessions = useStore((s) => s.sessions);
   const hydrated = useStore((s) => s.hydrated);
-  const prefs = useStore((s) => s.prefs);
   const openMap = useStore((s) => s.open);
-  const { cwd, creating, newSession } = useNewSession();
-  const [wsOpen, setWsOpen] = useState(false);
+  const { cwd, newSession, panel } = useNewSession();
   const [rename, setRename] = useState<SessionSummary | null>(null);
   const [del, setDel] = useState<SessionSummary | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -106,17 +92,6 @@ export function SessionList({ currentSessionId }: { currentSessionId?: string })
     );
     return () => clearTimeout(debounce.current);
   }, [query, hydrated]);
-
-  // Workspace pick only affects "Nueva sesión" — the list itself is global.
-  const pickFolder = (p: string) => {
-    if (!p) return;
-    if (!prefs.workspaces.some((w) => w.path === p)) {
-      setPrefs({
-        workspaces: [...prefs.workspaces, { path: p, name: baseName(p), lastUsedAt: Date.now() }],
-      });
-    }
-    setPrefs({ workspace: p });
-  };
 
   const groups: Record<'today' | 'yesterday' | 'older', SessionSummary[]> = {
     today: [],
@@ -146,20 +121,15 @@ export function SessionList({ currentSessionId }: { currentSessionId?: string })
           variant="outline"
           data-chip="workspace"
           className="h-10 max-w-[55%] justify-start gap-2 truncate"
-          onClick={() => setWsOpen(true)}
+          onClick={newSession}
         >
           <FolderOpen className="size-4 shrink-0" />
           <span className="truncate">{cwd ? baseName(cwd) : t('home.chooseFolder')}</span>
         </Button>
         <div className="flex-1" />
-        <Button
-          className="h-10 gap-2"
-          disabled={!cwd || creating}
-          aria-busy={creating}
-          onClick={newSession}
-        >
-          {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-          {creating ? t('home.newSession.creating') : t('home.newSession')}
+        <Button className="h-10 gap-2" onClick={newSession}>
+          <Plus className="size-4" />
+          {t('home.newSession')}
         </Button>
       </div>
 
@@ -206,14 +176,9 @@ export function SessionList({ currentSessionId }: { currentSessionId?: string })
             </div>
             <h3 className="text-lg font-semibold">{t('home.start.title')}</h3>
             <p className="text-sm text-muted-foreground">{t('home.start.body')}</p>
-            <Button
-              className="mt-1 gap-2"
-              disabled={!cwd || creating}
-              aria-busy={creating}
-              onClick={newSession}
-            >
-              {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              {creating ? t('home.newSession.creating') : t('home.newSession')}
+            <Button className="mt-1 gap-2" onClick={newSession}>
+              <Plus className="size-4" />
+              {t('home.newSession')}
             </Button>
           </div>
         ) : (
@@ -242,7 +207,7 @@ export function SessionList({ currentSessionId }: { currentSessionId?: string })
         )}
       </div>
 
-      <WorkspaceSheet open={wsOpen} onOpenChange={setWsOpen} current={cwd} onPick={pickFolder} />
+      {panel}
       {rename && (
         <RenameDialog
           sessionId={rename.sessionId}
