@@ -1,12 +1,14 @@
 import { expect, type Page, test } from '@playwright/test';
 
 async function createSession(page: Page) {
+  const previous = page.url();
   await page
     .getByRole('button', { name: /^(Nueva sesión|New session)$/i })
     .first()
     .click();
   const start = page.getByRole('button', { name: /^(Iniciar sesión|Start session)$/ });
   if (await start.isVisible()) await start.click();
+  await expect(page).not.toHaveURL(previous);
   await expect(page.locator('textarea')).toBeVisible();
   return page.url();
 }
