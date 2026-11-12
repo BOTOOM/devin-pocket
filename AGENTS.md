@@ -122,6 +122,10 @@ devin-pocket stop | restart | status | logs [-f] [-n N] | doctor | models | open
 
 ## Termux / proot notes
 
+- `install-termux.sh` creates host-side `devin-pocket` (primary) and
+  `devin-pocket-ubuntu` (compatibility alias), forwarding all arguments into the
+  selected `--distro`. Existing launchers/widget shortcuts are preserved. An
+  unrelated host `devin-pocket` is never overwritten; use the alias on collision.
 - Devin CLI runs inside Ubuntu/Debian proot (`proot-distro`); the app detects Termux
   and calls `termux-wake-lock` (needs Termux:API). Termux:Boot/Termux:Widget can
   auto-start `devin-pocket`.

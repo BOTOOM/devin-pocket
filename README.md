@@ -105,12 +105,16 @@ for the complete walkthrough.
 3. Start from Termux and open `http://127.0.0.1:7777`:
 
    ```sh
-   devin-pocket-ubuntu
-   devin-pocket-ubuntu doctor
-   devin-pocket-ubuntu logs
+   devin-pocket
+   devin-pocket doctor
+   devin-pocket logs
    ```
 
-   The launcher enters Ubuntu with the required PATH. Tap **Inicia sesión en
+   The host-side launcher enters the selected Ubuntu with the required PATH and
+   forwards all arguments. `devin-pocket-ubuntu` remains an alias with the same
+   behavior. If an unrelated `devin-pocket` command already exists, the installer
+   keeps it and prints a notice: use `devin-pocket-ubuntu` instead. Existing
+   launchers and the Termux:Widget shortcut are preserved. Tap **Inicia sesión en
    Devin** / **Sign in to Devin**.
 
 Download the script to pass installer options:

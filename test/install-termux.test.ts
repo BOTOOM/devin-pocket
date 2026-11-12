@@ -1,5 +1,14 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -13,7 +22,7 @@ afterEach(() => {
 });
 
 function fixture(options: { legacy?: boolean; existing?: boolean; missingDevin?: boolean } = {}) {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'pocket-installer-'));
+  const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'pocket-installer-')));
   temporaryDirs.push(root);
   const prefix = path.join(root, 'termux');
   const home = path.join(root, 'host-home');
@@ -48,7 +57,7 @@ while [[ "$1" != -- ]]; do shift; done
 shift
 shift 3
 cat > "$MOCK_ROOT/guest-input.sh"
-sed 's@  \\. /etc/os-release@  ID=ubuntu@' "$MOCK_ROOT/guest-input.sh" > "$MOCK_ROOT/guest-script.sh"
+sed -e 's@  \\. /etc/os-release@  ID=ubuntu@' -e 's@  \\[\\[ -r /etc/os-release \\]\\].*@  :@' "$MOCK_ROOT/guest-input.sh" > "$MOCK_ROOT/guest-script.sh"
 export HOME="$MOCK_GUEST_HOME"
 export PATH="$HOME/.local/bin:/usr/bin:/bin"
 exec /bin/bash "$MOCK_ROOT/guest-script.sh" "$@"`,
@@ -215,6 +224,9 @@ describe('Termux bootstrap installer', () => {
     expect(commands).not.toContain('devin-pocket|start');
     expect(commands).not.toContain('auth|login');
     expect(existsSync(path.join(f.prefix, 'bin', 'devin-pocket-ubuntu'))).toBe(true);
+    expect(readFileSync(path.join(f.prefix, 'bin', 'devin-pocket'), 'utf8')).toBe(
+      readFileSync(path.join(f.prefix, 'bin', 'devin-pocket-ubuntu'), 'utf8'),
+    );
     expect(existsSync(path.join(f.home, '.shortcuts', 'Devin Pocket'))).toBe(true);
     expect(result.stdout).toContain('No se inicia ni se reinicia');
   });
@@ -224,6 +236,69 @@ describe('Termux bootstrap installer', () => {
     expect(f.run(['--package', 'devin-pocket@0.1.5']).status).toBe(0);
     expect(f.commands()).toContain('proot-distro|install|--override-alias|ubuntu|ubuntu|');
     expect(f.commands()).not.toContain('ubuntu:24.04');
+  });
+
+  it.each([
+    [],
+    ['update', '--check'],
+    ['doctor'],
+    ['logs', '-n', '10'],
+    ['start', '--cwd', '/a folder'],
+  ])('forwards host command arguments into a custom distro: %j', (...args) => {
+    const f = fixture();
+    expect(f.run(['--distro', 'my-ubuntu', '--package', 'devin-pocket@0.1.5']).status).toBe(0);
+    for (const name of ['devin-pocket', 'devin-pocket-ubuntu']) {
+      const before = f.commands().length;
+      const result = spawnSync('/bin/bash', [path.join(f.prefix, 'bin', name), ...args], {
+        env: { ...f.env, MOCK_LOG_ONLY: '1' },
+        encoding: 'utf8',
+      });
+      expect(result.status).toBe(0);
+      const commands = f.commands().slice(before);
+      expect(commands).toContain('proot-distro|login|my-ubuntu|--|/bin/bash|-lc|');
+      expect(commands).toContain(`devin-pocket|${args.length ? `${args.join('|')}|` : ''}\n`);
+    }
+  });
+
+  it.each(['file', 'symlink', 'dangling symlink', 'directory'])(
+    'preserves an unrelated host command (%s) and explains the fallback',
+    (kind) => {
+      const f = fixture();
+      const command = path.join(f.prefix, 'bin', 'devin-pocket');
+      const original = '#!/bin/bash\n# not our wrapper\nprintf custom\n';
+      const target = path.join(f.root, 'other-command');
+      if (kind === 'file') writeFileSync(command, original);
+      else if (kind === 'directory') mkdirSync(command);
+      else {
+        if (kind === 'symlink') writeFileSync(target, original);
+        symlinkSync(target, command);
+      }
+      const result = f.run(['--package', 'devin-pocket@0.1.5']);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('no es uno de nuestros lanzadores');
+      expect(result.stdout).toContain('devin-pocket-ubuntu sigue funcionando');
+      expect(result.stdout).toContain('Para abrir la app desde Termux: devin-pocket-ubuntu');
+      if (kind === 'file' || kind === 'symlink') {
+        expect(readFileSync(command, 'utf8')).toBe(original);
+      }
+      expect(existsSync(path.join(f.prefix, 'bin', 'devin-pocket-ubuntu'))).toBe(true);
+    },
+  );
+
+  it('recognizes its marked command and preserves existing wrappers and widget on rerun', () => {
+    const f = fixture();
+    expect(f.run(['--package', 'devin-pocket@0.1.5']).status).toBe(0);
+    const command = path.join(f.prefix, 'bin', 'devin-pocket');
+    const original = readFileSync(command, 'utf8');
+    expect(original.split('\n')).toContain('# devin-pocket Termux/proot launcher');
+    const widget = path.join(f.home, '.shortcuts', 'Devin Pocket');
+    writeFileSync(widget, 'custom widget');
+    const result = f.run(['--package', 'devin-pocket@0.1.5']);
+    expect(result.status).toBe(0);
+    expect(result.stdout).not.toContain('no es uno de nuestros lanzadores');
+    expect(result.stdout).toContain('Para abrir la app desde Termux: devin-pocket\n');
+    expect(readFileSync(command, 'utf8')).toBe(original);
+    expect(readFileSync(widget, 'utf8')).toBe('custom widget');
   });
 
   it.each([true, false])('reuses existing Ubuntu (legacy=%s) and preserves launchers', (legacy) => {

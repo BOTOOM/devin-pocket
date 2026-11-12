@@ -105,12 +105,16 @@ para ver el procedimiento completo.
 3. Inicia desde Termux y abre `http://127.0.0.1:7777`:
 
    ```sh
-   devin-pocket-ubuntu
-   devin-pocket-ubuntu doctor
-   devin-pocket-ubuntu logs
+   devin-pocket
+   devin-pocket doctor
+   devin-pocket logs
    ```
 
-   El lanzador entra a Ubuntu con el PATH necesario. Pulsa **Inicia sesión en
+   El lanzador de Termux entra al Ubuntu elegido con el PATH necesario y reenvía
+   todos los argumentos. `devin-pocket-ubuntu` sigue como alias con el mismo
+   comportamiento. Si ya existe otro comando `devin-pocket`, el instalador lo
+   conserva y muestra un aviso: usa `devin-pocket-ubuntu` en ese caso. Conserva los
+   lanzadores y el acceso directo de Termux:Widget existentes. Pulsa **Inicia sesión en
    Devin** / **Sign in to Devin**.
 
 Descarga el script para pasar opciones:

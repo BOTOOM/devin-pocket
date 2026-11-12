@@ -121,6 +121,7 @@ write_launcher() {
     set -o noclobber
     {
       printf '#!%s/bin/bash\n' "$PREFIX"
+      printf '# devin-pocket Termux/proot launcher\n'
       printf 'set -euo pipefail\n'
       printf 'case "${1:-start}" in start|restart) termux-wake-lock 2>/dev/null || true ;; esac\n'
       printf 'exec %q login %q -- /bin/bash -lc ' "$proot" "$distro"
@@ -132,7 +133,7 @@ write_launcher() {
 }
 
 main() {
-  local mode=auto spec='' distro=ubuntu upgrade=1 local_package='' proot install_help runtime
+  local mode=auto spec='' distro=ubuntu upgrade=1 local_package='' proot install_help runtime launch_command=devin-pocket
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --help|-h) usage; return ;;
@@ -189,12 +190,19 @@ main() {
   } | "${login[@]}" -- /bin/bash -ls -- "$mode" "$spec" "$upgrade"
 
   write_launcher "$PREFIX/bin/devin-pocket-ubuntu" "$distro" "$proot"
+  if [[ -e "$PREFIX/bin/devin-pocket" || -L "$PREFIX/bin/devin-pocket" ]] \
+    && ! grep -Fxq '# devin-pocket Termux/proot launcher' "$PREFIX/bin/devin-pocket" 2>/dev/null; then
+    say "Conservando $PREFIX/bin/devin-pocket: no es uno de nuestros lanzadores. devin-pocket-ubuntu sigue funcionando."
+    launch_command=devin-pocket-ubuntu
+  else
+    write_launcher "$PREFIX/bin/devin-pocket" "$distro" "$proot"
+  fi
   mkdir -p "$HOME/.shortcuts"
   write_launcher "$HOME/.shortcuts/Devin Pocket" "$distro" "$proot"
   say ''
-  say 'Listo. Para abrir la app desde Termux: devin-pocket-ubuntu'
+  say "Listo. Para abrir la app desde Termux: $launch_command"
   say 'En el navegador: http://127.0.0.1:7777'
-  say 'Para ver el diagnóstico: devin-pocket-ubuntu doctor'
+  say "Para ver el diagnóstico: $launch_command doctor"
   say 'Pulsa «Inicia sesión en Devin» en la app; el instalador no pide ni guarda contraseñas.'
   say 'Termux:Widget es opcional para el acceso directo. Instálalo desde la misma fuente que Termux.'
   say 'Desactiva la optimización de batería para Termux. No se inicia ni se reinicia la app automáticamente.'
