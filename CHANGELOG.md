@@ -1,3 +1,14 @@
+## [0.5.0](https://github.com/BOTOOM/devin-pocket/compare/v0.4.0...v0.5.0) (2026-11-12)
+
+### Features
+
+* **sessions:** choose a working folder before creating a session ([ec0ac21](https://github.com/BOTOOM/devin-pocket/commit/ec0ac215993ecc62c48d8e3800118cadbe2e1e11))
+
+### Bug Fixes
+
+* **server:** validate session folders with realpath containment ([6877967](https://github.com/BOTOOM/devin-pocket/commit/687796752a240338f7aaf3d9d14ce393a5a6155a))
+* **ui:** browse from the selected session folder ([39fc1d5](https://github.com/BOTOOM/devin-pocket/commit/39fc1d50f4bb88ca7caf87777b5f90bcf5f993e8))
+
 ## [0.4.0](https://github.com/BOTOOM/devin-pocket/compare/v0.3.0...v0.4.0) (2026-11-12)
 
 ### Features
