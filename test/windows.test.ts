@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,6 +24,38 @@ describe('browser commands', () => {
 });
 
 describe('Windows executable resolution', () => {
+  // Windows does not enforce POSIX execute permission bits.
+  it.skipIf(process.platform === 'win32')(
+    'skips non-executable POSIX files earlier on PATH',
+    () => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pocket-executable-'));
+      const first = path.join(root, 'first');
+      const second = path.join(root, 'second');
+      try {
+        fs.mkdirSync(first);
+        fs.mkdirSync(second);
+        const blocked = path.join(first, 'devin');
+        const executable = path.join(second, 'devin');
+        fs.writeFileSync(blocked, '#!/bin/sh\nprintf blocked', { mode: 0o644 });
+        fs.writeFileSync(executable, '#!/bin/sh\nprintf valid', { mode: 0o755 });
+        expect((spawnSync(blocked).error as NodeJS.ErrnoException)?.code).toBe('EACCES');
+        const options = {
+          platform: 'linux' as const,
+          env: { PATH: `${first}:${second}` },
+          home: root,
+        };
+        const resolved = findExecutable('devin', options);
+        expect(resolved).toBe(executable);
+        expect(spawnSync(resolved ?? '', { encoding: 'utf8' }).stdout).toBe('valid');
+        expect(findExecutable(blocked, options)).toBeNull();
+        expect(findExecutable(executable, options)).toBe(executable);
+        expect(findExecutable('missing', options)).toBeNull();
+        expect(findExecutable('devin', { ...options, env: { PATH: first } })).toBeNull();
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
   const options = (files: string[], env = { Path: 'C:\\first;"C:\\Program Files\\Devin"' }) => ({
     platform: 'win32' as const,
     env,
@@ -68,6 +100,7 @@ describe('Windows executable resolution', () => {
       env: { PATH: '/bin:/usr/bin' },
       home: '/home/me',
       isFile: (f: string) => f === '/home/me/.local/bin/devin',
+      isExecutable: () => true,
     };
     expect(resolveBin('devin', o)).toBe('/home/me/.local/bin/devin');
     expect(

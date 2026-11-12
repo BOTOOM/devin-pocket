@@ -7,11 +7,21 @@ export interface ResolverOptions {
   env?: NodeJS.ProcessEnv;
   home?: string;
   isFile?: (file: string) => boolean;
+  isExecutable?: (file: string) => boolean;
 }
 
 function isFile(file: string): boolean {
   try {
     return fs.statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isExecutable(file: string): boolean {
+  try {
+    fs.accessSync(file, fs.constants.X_OK);
+    return true;
   } catch {
     return false;
   }
@@ -30,7 +40,8 @@ export function findExecutable(bin: string, options: ResolverOptions = {}): stri
   const bases = explicit ? [bin] : dirs.map((dir) => p.join(dir.replace(/^"|"$/g, ''), bin));
   if (!win) {
     if (!explicit) bases.push(p.join(options.home ?? os.homedir(), '.local', 'bin', bin));
-    return bases.find(exists) ?? null;
+    const executable = options.isExecutable ?? isExecutable;
+    return bases.find((file) => exists(file) && executable(file)) ?? null;
   }
   const extensions = (envValue('PATHEXT') ?? '.COM;.EXE;.BAT;.CMD')
     .split(';')
