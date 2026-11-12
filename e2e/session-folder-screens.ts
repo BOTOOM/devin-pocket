@@ -1,4 +1,3 @@
-import { mkdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
@@ -40,7 +39,7 @@ for (const [width, height, theme] of [
   [768, 1024, 'dark'],
   [1440, 900, 'dark'],
 ] as const) {
-  test(`per-session folder at ${width}px ${theme}`, async ({ page }) => {
+  test(`per-session folder at ${width}px ${theme}`, async ({ page }, testInfo) => {
     const repo = process.cwd();
     const folder = path.join(repo, 'src');
     let newCount = 0;
@@ -105,9 +104,8 @@ for (const [width, height, theme] of [
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
-    await mkdir(path.join(os.homedir(), 'artifacts/session-folder'), { recursive: true });
     await page.screenshot({
-      path: path.join(os.homedir(), `artifacts/session-folder/panel-${width}-${theme}.png`),
+      path: testInfo.outputPath(`panel-${width}-${theme}.png`),
       animations: 'disabled',
     });
     await panel.getByRole('button', { name: 'Start session', exact: true }).focus();
