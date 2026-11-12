@@ -9,6 +9,9 @@ export interface Args {
   foreground: boolean;
   follow: boolean;
   lines: number;
+  check?: boolean;
+  version?: string;
+  yes?: boolean;
 }
 
 export function parseArgs(argv: string[]): Args {
@@ -29,6 +32,12 @@ export function parseArgs(argv: string[]): Args {
     switch (t) {
       case '--port':
         a.port = Number(rest[++i]);
+        break;
+      case '--check':
+        a.check = true;
+        break;
+      case '--yes':
+        a.yes = true;
         break;
       case '--host':
         a.host = rest[++i];
@@ -63,7 +72,11 @@ export function parseArgs(argv: string[]): Args {
         break;
       case '-v':
       case '--version':
-        a.cmd = 'version';
+        if (a.cmd === 'update' && t === '--version') {
+          const version = rest[++i];
+          if (!version || version.startsWith('-')) throw new Error('--version requires a version');
+          a.version = version;
+        } else a.cmd = 'version';
         break;
       default:
         break;
@@ -77,6 +90,14 @@ export function parseArgs(argv: string[]): Args {
  * supervised-child command lines so `restart` (or any cmd) always yields `start`.
  */
 export function serializeArgs(a: Args): string[] {
+  if (a.cmd === 'update') {
+    return [
+      'update',
+      ...(a.check ? ['--check'] : []),
+      ...(a.version ? ['--version', a.version] : []),
+      ...(a.yes ? ['--yes'] : []),
+    ];
+  }
   const out = ['start'];
   if (a.port !== undefined) out.push('--port', String(a.port));
   if (a.host !== undefined) out.push('--host', a.host);

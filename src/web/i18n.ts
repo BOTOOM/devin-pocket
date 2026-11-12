@@ -3,6 +3,8 @@ import { useSyncExternalStore } from 'react';
 export type Lang = 'es' | 'en';
 
 const es = {
+  'update.title': 'Actualización disponible',
+  'update.notice': 'Nueva versión {version} disponible · ejecuta',
   'app.name': 'Devin Pocket',
   'common.cancel': 'Cancelar',
   'common.close': 'Cerrar',
@@ -210,6 +212,8 @@ const es = {
 };
 
 const en: Record<keyof typeof es, string> = {
+  'update.title': 'Update available',
+  'update.notice': 'New version {version} available · run',
   'app.name': 'Devin Pocket',
   'common.cancel': 'Cancel',
   'common.close': 'Close',

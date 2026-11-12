@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { selectOptions } from '@/components/StatusStrip';
+import { UpdateNotice } from '@/components/UpdateNotice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -93,6 +94,7 @@ export function DiagnosticsScreen() {
       </header>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:[&>*]:min-w-0">
+        <UpdateNotice />
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{t('diag.doctor')}</CardTitle>

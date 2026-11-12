@@ -118,6 +118,7 @@ pnpm pack && npm install -g ./devin-pocket-*.tgz
 # runtime:
 devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD] [--no-open]
 devin-pocket stop | restart | status | logs [-f] [-n N] | doctor | models | open
+devin-pocket update [--check] [--version X] [--yes]
 ```
 
 ## Termux / proot notes

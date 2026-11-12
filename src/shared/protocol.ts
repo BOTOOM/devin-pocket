@@ -21,6 +21,12 @@ import type {
   ToolKind,
 } from '@agentclientprotocol/sdk';
 
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  updateAvailable: boolean;
+}
+
 export type {
   ContentBlock,
   PermissionOption,

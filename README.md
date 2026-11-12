@@ -308,6 +308,33 @@ reports for sensitive information before attaching them to issues.
 - **Offline or a Devin replacement?** No: Pocket is a Devin CLI client.
 - **Windows?** Native Windows is not a documented supported installer target.
 
+## Updating
+
+```sh
+devin-pocket update --check
+devin-pocket update
+devin-pocket update --version 0.5.0 --yes
+```
+
+`--check` only reports the installed/latest versions (exit 0 even when an update is
+available). Updating detects npm/pnpm global installations and asks for confirmation;
+`--yes` skips the prompt. It stops a running Pocket daemon, installs the target version,
+then starts it with its recorded launch options, or defaults for older installations.
+If installation fails it still attempts to restart the previous version. It never
+updates Devin CLI; use that CLI's own installer. Current or newer versions are left alone.
+
+Source checkouts, npx and unknown installations are not modified: rerun your original
+installer or rebuild/reinstall the source package. On automated Termux installs, run
+`devin-pocket-ubuntu update --check` / `devin-pocket-ubuntu update` from normal Termux.
+Alternatively, stop Pocket safely and rerun `install-termux.sh`; its seven-day release
+filter still applies, unlike the update command's npm `latest` target.
+
+The server checks for Pocket releases at startup and every 24 hours, caching results in
+`~/.cache/devin-pocket/update.json` (or `$XDG_CACHE_HOME/devin-pocket/update.json`).
+Settings and Diagnostics show a dismissible notice. Failures are logged without blocking
+the app; `DEVIN_POCKET_NO_UPDATE_CHECK=1` disables background checks. Registry requests
+honor `npm_config_registry` / `NPM_CONFIG_REGISTRY` and time out after five seconds.
+
 ## Roadmap and limitations
 
 Desktop/laptop remote-client workflows are planned. Currently this is a

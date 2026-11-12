@@ -48,6 +48,12 @@ describe('parseArgs', () => {
 });
 
 describe('serializeArgs', () => {
+  it('roundtrips update options without treating the target as --version output', () => {
+    const args = parseArgs(['update', '--check', '--version', '1.2.3', '--yes']);
+    expect(args).toMatchObject({ cmd: 'update', check: true, version: '1.2.3', yes: true });
+    expect(parseArgs(serializeArgs(args))).toEqual(args);
+    expect(() => parseArgs(['update', '--version'])).toThrow('requires a version');
+  });
   it('roundtrips parse → serialize → parse', () => {
     const a = parseArgs([
       'start',
