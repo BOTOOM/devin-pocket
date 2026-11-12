@@ -19,6 +19,8 @@ import {
   VERSION,
 } from './paths.js';
 import { SessionManager } from './sessions.js';
+import { savedStartArgs } from './startup.js';
+import { installPackage, runningPackageDir, runUpdate, startUpdateChecks } from './update.js';
 
 function box(lines: string[]): void {
   const w = Math.max(...lines.map((l) => l.length)) + 4;
@@ -72,6 +74,7 @@ function readPid(): number | null {
 /** Spawn the detached supervisor (this process exits; supervisor owns the pidfile). */
 function daemonize(args: Args): number {
   ensureDirs();
+  recordStartArgs(args);
   const logFile = path.join(stateDir(), 'daemon.out.log');
   const out = fs.openSync(logFile, 'a');
   const env: NodeJS.ProcessEnv = { ...process.env, DEVIN_POCKET_SUPERVISOR: '1' };
@@ -86,6 +89,14 @@ function daemonize(args: Args): number {
   child.unref();
   fs.writeFileSync(pidFile(), String(child.pid));
   return child.pid ?? 0;
+}
+
+function recordStartArgs(args: Args): void {
+  fs.writeFileSync(
+    path.join(stateDir(), 'start-args.json'),
+    JSON.stringify(savedStartArgs(args, fileConfig)),
+    { mode: 0o600 },
+  );
 }
 
 /**
@@ -163,6 +174,7 @@ async function runServer(args: Args): Promise<ServerHandle> {
     agentCommand: args.agent ?? process.env.DEVIN_POCKET_AGENT ?? config.agentCommand,
   };
   const log = new Logger();
+  startUpdateChecks(log);
   const stderr = new StderrSink();
 
   // agent.status listeners: SessionManager + (once up) the WS broadcast
@@ -249,6 +261,54 @@ const port = args.port ?? fileConfig.port;
 const host = args.host ?? fileConfig.host;
 
 switch (args.cmd) {
+  case 'update': {
+    const packageDir = runningPackageDir();
+    let startArgs = ['start'];
+    process.exitCode = await runUpdate(args, {
+      packageDir,
+      stop: async () => {
+        const pid = readPid();
+        if (!pid) return false;
+        try {
+          const recorded: unknown = JSON.parse(
+            fs.readFileSync(path.join(stateDir(), 'start-args.json'), 'utf8'),
+          );
+          if (
+            Array.isArray(recorded) &&
+            recorded[0] === 'start' &&
+            recorded.every((v) => typeof v === 'string')
+          )
+            startArgs = recorded;
+        } catch {}
+        process.kill(pid, 'SIGTERM');
+        const until = Date.now() + 8000;
+        while (Date.now() < until) {
+          try {
+            process.kill(pid, 0);
+          } catch {
+            return true;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        throw new Error('Server did not stop; no packages were changed.');
+      },
+      restart: async (installed) => {
+        const original = parseArgs(startArgs);
+        if (original.foreground || original.dev) {
+          process.stdout.write(
+            `Pocket was running in foreground/dev mode. Restart it manually with its original command: devin-pocket ${startArgs.join(' ')}\n`,
+          );
+          return;
+        }
+        const code = installed
+          ? await installPackage('devin-pocket', startArgs)
+          : await installPackage(process.execPath, [process.argv[1] ?? '', ...startArgs]);
+        if (code !== 0)
+          throw new Error('Could not restart Pocket. Run devin-pocket start manually.');
+      },
+    });
+    break;
+  }
   case 'start': {
     if (process.env.DEVIN_POCKET_SUPERVISOR === '1') {
       fs.writeFileSync(pidFile(), String(process.pid));
@@ -270,7 +330,10 @@ switch (args.cmd) {
       if (args.open && !supervised) openBrowser(url);
       if (!supervised) wakeLock();
       await runServer(args);
-      if (!supervised) fs.writeFileSync(pidFile(), String(process.pid));
+      if (!supervised) {
+        recordStartArgs(args);
+        fs.writeFileSync(pidFile(), String(process.pid));
+      }
     } else {
       const pid = readPid();
       if (pid) {
@@ -406,6 +469,7 @@ switch (args.cmd) {
 Uso / Usage:
   devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD] [--no-open] [--dev] [--foreground]
   devin-pocket stop | restart | status | logs [-f] [-n N] | doctor | models | open | version | help
+  devin-pocket update [--check] [--version X] [--yes]
 
 Sin comando = start · No command = start
 `,

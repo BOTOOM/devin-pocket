@@ -7,6 +7,7 @@ import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclie
 import type { DoctorCheck, DoctorReport } from '../shared/protocol.js';
 import { resolveBin, splitCommand } from './acp/agent.js';
 import { configFile, isProot, isTermux, loadConfig, stateDir, VERSION } from './paths.js';
+import { cachedUpdate } from './update.js';
 
 function which(cmd: string): string | null {
   for (const d of (process.env.PATH ?? '').split(path.delimiter)) {
@@ -111,6 +112,15 @@ export async function doctorReport(opts: {
   serverPid?: number;
 }): Promise<DoctorReport> {
   const checks: DoctorCheck[] = [];
+  const update = cachedUpdate();
+  checks.push({
+    id: 'pocket-update',
+    update,
+    label: 'Devin Pocket version',
+    status: update.updateAvailable ? 'warn' : 'ok',
+    detail: `current ${update.current} · latest known ${update.latest}`,
+    fix: update.updateAvailable ? 'Run: devin-pocket update' : undefined,
+  });
   const nodeMajor = Number(process.versions.node.split('.')[0]);
   checks.push({
     id: 'node',

@@ -297,6 +297,33 @@ del CLI. Revisa información sensible antes de adjuntar reportes a issues.
 - **¿Sin conexión o reemplaza Devin?** No: Pocket es un cliente para Devin CLI.
 - **¿Windows?** Windows nativo no es un destino de instalación documentado como compatible.
 
+## Actualización
+
+```sh
+devin-pocket update --check
+devin-pocket update
+devin-pocket update --version 0.5.0 --yes
+```
+
+`--check` solo muestra las versiones instalada y disponible (sale con código 0 aunque
+haya una actualización). El comando detecta instalaciones globales npm/pnpm y pide
+confirmación; `--yes` omite la pregunta. Detiene el daemon de Pocket, instala la versión
+y lo inicia con las opciones de arranque registradas, o las predeterminadas en
+instalaciones antiguas. Si falla la instalación, intenta reiniciar la versión anterior.
+No modifica versiones iguales o posteriores ni actualiza Devin CLI: usa su propio instalador.
+
+No modifica instalaciones desde código, npx o desconocidas: repite el instalador original
+o compila y reinstala el paquete. Con la instalación automática de Termux puedes ejecutar
+`devin-pocket-ubuntu update --check` / `devin-pocket-ubuntu update` desde Termux normal.
+También puedes detener Pocket cuando sea seguro y repetir `install-termux.sh`; ese script
+mantiene el filtro de siete días, mientras que `update` usa la versión `latest` de npm.
+
+El servidor consulta nuevas versiones al iniciar y cada 24 horas, con caché en
+`~/.cache/devin-pocket/update.json` (o `$XDG_CACHE_HOME/devin-pocket/update.json`).
+Ajustes y Diagnóstico muestran un aviso descartable. Los fallos se registran sin bloquear
+la app; `DEVIN_POCKET_NO_UPDATE_CHECK=1` desactiva las consultas en segundo plano.
+Se respeta `npm_config_registry` / `NPM_CONFIG_REGISTRY`; cada consulta vence a los cinco segundos.
+
 ## Hoja de ruta y limitaciones
 
 Se planean flujos de cliente remoto para desktop/laptop. Hoy es una interfaz

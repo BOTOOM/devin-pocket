@@ -23,6 +23,7 @@ import { type Logger, logFiles, readLogs, redact } from './log.js';
 import { agentStderrFile, type Config, platformInfo, stateDir, VERSION } from './paths.js';
 import { listPorts } from './ports.js';
 import type { SessionManager } from './sessions.js';
+import { cachedUpdate } from './update.js';
 import { validateCwd } from './workspace.js';
 
 /** Envelope shape gate before dispatch — unknown cmd.type falls to default ack. */
@@ -348,7 +349,12 @@ export class PocketServer {
     }
     try {
       if (url.pathname === '/api/health') {
-        return this.json(res, { ok: true, version: VERSION, agent: this.deps.agent.status });
+        return this.json(res, {
+          ok: true,
+          version: VERSION,
+          agent: this.deps.agent.status,
+          update: cachedUpdate(),
+        });
       }
       if (url.pathname === '/api/doctor') {
         const r = await doctorReport({

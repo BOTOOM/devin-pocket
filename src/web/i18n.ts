@@ -3,6 +3,10 @@ import { useSyncExternalStore } from 'react';
 export type Lang = 'es' | 'en';
 
 const es = {
+  'update.title': 'Actualización disponible',
+  'update.notice': 'Nueva versión {version} disponible · ejecuta',
+  'update.manual':
+    'Nueva versión {version} disponible · actualiza con el método de instalación original (código fuente, npx u otro).',
   'app.name': 'Devin Pocket',
   'common.cancel': 'Cancelar',
   'common.close': 'Cerrar',
@@ -196,6 +200,9 @@ const es = {
   'home.start.body': 'Devin trabaja dentro de una carpeta de tu teléfono.',
   'logs.empty': 'Sin registros todavía',
   'doctor.fix.node': 'Termux: pkg install nodejs-lts · o instala Node ≥22',
+  'doctor.label.pocket-update': 'Versión de Devin Pocket',
+  'doctor.detail.pocket-update': 'actual {current} · última conocida {latest}',
+  'doctor.fix.pocket-update': 'Ejecuta: devin-pocket update',
   'doctor.fix.devin-bin': 'Instala Devin CLI: curl -fsSL https://cli.devin.ai/install.sh | bash',
   'doctor.fix.devin-auth': 'Ejecuta: devin auth login',
   'doctor.fix.port': 'Usa otro puerto',
@@ -210,6 +217,10 @@ const es = {
 };
 
 const en: Record<keyof typeof es, string> = {
+  'update.title': 'Update available',
+  'update.notice': 'New version {version} available · run',
+  'update.manual':
+    'New version {version} available · update using your original installation method (source, npx or other).',
   'app.name': 'Devin Pocket',
   'common.cancel': 'Cancel',
   'common.close': 'Close',
@@ -403,6 +414,9 @@ const en: Record<keyof typeof es, string> = {
   'home.start.body': 'Devin works inside a folder on your phone.',
   'logs.empty': 'No logs yet',
   'doctor.fix.node': 'Termux: pkg install nodejs-lts · or install Node ≥22',
+  'doctor.label.pocket-update': 'Devin Pocket version',
+  'doctor.detail.pocket-update': 'current {current} · latest known {latest}',
+  'doctor.fix.pocket-update': 'Run: devin-pocket update',
   'doctor.fix.devin-bin': 'Install Devin CLI: curl -fsSL https://cli.devin.ai/install.sh | bash',
   'doctor.fix.devin-auth': 'Run: devin auth login',
   'doctor.fix.port': 'Use another port',

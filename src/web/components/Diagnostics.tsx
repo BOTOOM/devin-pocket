@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { selectOptions } from '@/components/StatusStrip';
+import { UpdateNotice } from '@/components/UpdateNotice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -93,6 +94,7 @@ export function DiagnosticsScreen() {
       </header>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:[&>*]:min-w-0">
+        <UpdateNotice />
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">{t('diag.doctor')}</CardTitle>
@@ -107,8 +109,19 @@ export function DiagnosticsScreen() {
                 <div key={c.id} className="flex items-start gap-2.5 rounded-lg px-1 py-1.5">
                   <CheckIcon status={c.status} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{c.label}</div>
-                    {c.detail && <div className="text-xs text-muted-foreground">{c.detail}</div>}
+                    <div className="text-sm font-medium">
+                      {c.id === 'pocket-update' ? t('doctor.label.pocket-update') : c.label}
+                    </div>
+                    {c.detail && (
+                      <div className="text-xs text-muted-foreground">
+                        {c.id === 'pocket-update' && c.update
+                          ? t('doctor.detail.pocket-update', {
+                              current: c.update.current,
+                              latest: c.update.latest,
+                            })
+                          : c.detail}
+                      </div>
+                    )}
                     {c.fix && (
                       <div className="mt-0.5 flex items-center gap-1 text-xs text-primary">
                         <span>{fixText(t, c)}</span>

@@ -576,8 +576,15 @@ describe('devin-pocket server', () => {
   it('/api/health + /api/doctor + /api/fs', async () => {
     const health = (await fetch(`http://127.0.0.1:${h.port}/api/health`).then((r) => r.json())) as {
       ok: boolean;
+      update: { current: string; latest: string; updateAvailable: boolean };
     };
     expect(health.ok).toBe(true);
+    expect(health.update).toEqual({
+      current: expect.any(String),
+      latest: expect.any(String),
+      updateAvailable: false,
+      installManager: null,
+    });
     const doctor = (await fetch(`http://127.0.0.1:${h.port}/api/doctor`).then((r) => r.json())) as {
       checks: unknown[];
     };

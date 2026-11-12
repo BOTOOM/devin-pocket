@@ -21,6 +21,13 @@ import type {
   ToolKind,
 } from '@agentclientprotocol/sdk';
 
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  updateAvailable: boolean;
+  installManager?: 'npm' | 'pnpm' | null;
+}
+
 export type {
   ContentBlock,
   PermissionOption,
@@ -473,6 +480,7 @@ export interface DoctorCheck {
   status: 'ok' | 'warn' | 'fail' | 'skip';
   detail?: string;
   fix?: string;
+  update?: UpdateInfo;
 }
 
 /** GET /api/doctor */
