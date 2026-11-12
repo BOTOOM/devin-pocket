@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AgentStatus, BillingInfo } from '../shared/protocol.js';
@@ -18,6 +18,7 @@ import {
   stateDir,
   VERSION,
 } from './paths.js';
+import { openUrlCommand, stopDaemon } from './platform.js';
 import { SessionManager } from './sessions.js';
 
 function box(lines: string[]): void {
@@ -29,19 +30,10 @@ function box(lines: string[]): void {
 }
 
 function openBrowser(url: string): void {
-  const cmds: [string, string[]][] = isTermux()
-    ? [['termux-open-url', [url]]]
-    : process.platform === 'darwin'
-      ? [['open', [url]]]
-      : [['xdg-open', [url]]];
-  for (const [c, args] of cmds) {
-    const r = spawnSync(
-      'sh',
-      ['-c', `command -v ${c} >/dev/null && ${c} ${args.map((a) => `'${a}'`).join(' ')}`],
-      { stdio: 'ignore' },
-    );
-    if (r.status === 0) return;
-  }
+  const [command, args] = openUrlCommand(process.platform, url, isTermux());
+  spawn(command, args, { detached: true, stdio: 'ignore', windowsHide: true })
+    .on('error', () => {})
+    .unref();
 }
 
 function wakeLock(): void {
@@ -62,6 +54,7 @@ function isLoopback(host: string): boolean {
 function readPid(): number | null {
   try {
     const pid = Number(fs.readFileSync(pidFile(), 'utf8').trim());
+    if (!Number.isSafeInteger(pid) || pid <= 0) return null;
     process.kill(pid, 0);
     return pid;
   } catch {
@@ -80,6 +73,7 @@ function daemonize(args: Args): number {
   const argv = [process.argv[1] ?? '', ...serializeArgs(args)];
   const child = spawn(process.execPath, argv, {
     detached: true,
+    windowsHide: true,
     stdio: ['ignore', out, out],
     env,
   });
@@ -120,7 +114,11 @@ async function supervise(): Promise<void> {
   while (!quitting) {
     const startedAt = Date.now();
     const code = await new Promise<number>((resolve) => {
-      child = spawn(process.execPath, argv, { stdio: ['ignore', out, out], env });
+      child = spawn(process.execPath, argv, {
+        stdio: ['ignore', out, out],
+        env,
+        windowsHide: true,
+      });
       child.on('error', () => resolve(127));
       child.on('exit', (c) => resolve(c ?? 1));
     });
@@ -298,7 +296,7 @@ switch (args.cmd) {
       process.stdout.write('No está corriendo / Not running\n');
       break;
     }
-    process.kill(pid, 'SIGTERM');
+    stopDaemon(pid);
     try {
       fs.unlinkSync(pidFile());
     } catch {
@@ -310,7 +308,7 @@ switch (args.cmd) {
   case 'restart': {
     const pid = readPid();
     if (pid) {
-      process.kill(pid, 'SIGTERM');
+      stopDaemon(pid);
       await new Promise((r) => setTimeout(r, 800));
     }
     const pid2 = daemonize(args);

@@ -4,8 +4,6 @@
  * src/acp/connection.ts (MIT, Mark Fenner).
  */
 import { type ChildProcessWithoutNullStreams, execFile, spawn } from 'node:child_process';
-import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import {
@@ -27,22 +25,12 @@ import {
   type SessionNotification,
 } from '@agentclientprotocol/sdk';
 import type { AgentInfo, AgentStatus, BillingInfo, TurnStat } from '../../shared/protocol.js';
+import { requireNativeExecutable, resolveBin } from '../commands.js';
 import { type Logger, redact, type StderrSink } from '../log.js';
 import { VERSION } from '../paths.js';
 import { parseBillingInfo } from './billing.js';
 
 export { resolveBin, splitCommand };
-
-/** Use `bin` if it's on PATH; otherwise fall back to ~/.local/bin/<bin>. */
-function resolveBin(bin: string): string {
-  if (bin.includes('/')) return bin;
-  const onPath = (process.env.PATH ?? '')
-    .split(path.delimiter)
-    .some((d) => d && fs.existsSync(path.join(d, bin)));
-  if (onPath) return bin;
-  const fallback = path.join(os.homedir(), '.local', 'bin', bin);
-  return fs.existsSync(fallback) ? fallback : bin;
-}
 
 /** Split a command string like `npx tsx test/fake-agent.ts` respecting quotes. */
 function splitCommand(cmd: string): string[] {
@@ -59,7 +47,11 @@ function splitCommand(cmd: string): string[] {
 /** Can we probe auth externally? Only the real `devin` CLI exposes `auth status`. */
 export function canProbeAuth(binCmd: string): boolean {
   const bin = splitCommand(binCmd)[0];
-  return bin !== undefined && path.basename(bin) === 'devin';
+  const basename =
+    process.platform === 'win32'
+      ? path.win32.basename(bin ?? '').toLowerCase()
+      : path.basename(bin ?? '');
+  return basename === 'devin' || (process.platform === 'win32' && basename === 'devin.exe');
 }
 
 /** Probe: `devin auth status` exit 0 → logged in. Only meaningful for the real CLI. */
@@ -68,14 +60,19 @@ export function probeAuth(binCmd: string, timeoutMs = 10_000): Promise<boolean> 
   if (!bin || !canProbeAuth(binCmd)) return Promise.resolve(false); // unverifiable
   const devin = resolveBin(bin);
   const args = ['auth', 'status'];
-  return new Promise((resolve) => {
-    const child = execFile(devin, args, { timeout: timeoutMs }, (err, stdout, stderr) => {
-      if (err) return resolve(false);
-      const out = `${stdout}${stderr}`;
-      resolve(!/not logged in|unauthenticated/i.test(out));
-    });
+  return new Promise<boolean>((resolve) => {
+    const child = execFile(
+      requireNativeExecutable(devin),
+      args,
+      { timeout: timeoutMs, windowsHide: true },
+      (err, stdout, stderr) => {
+        if (err) return resolve(false);
+        const out = `${stdout}${stderr}`;
+        resolve(!/not logged in|unauthenticated/i.test(out));
+      },
+    );
     child.on('error', () => resolve(false));
-  });
+  }).catch(() => false);
 }
 
 /** `_cognition.ai/turn_stats` params → TurnStat (ported from devin-tui spend.ts). */
@@ -227,10 +224,11 @@ export class AgentProcess {
     const bin = resolveBin(rawBin);
     this.opts.log.info(`spawn: ${bin} ${args.join(' ')} (cwd=${this.opts.cwd})`);
     try {
-      this.child = spawn(bin, args, {
+      this.child = spawn(requireNativeExecutable(bin), args, {
         cwd: this.opts.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: process.env,
+        windowsHide: true,
       });
     } catch (e) {
       this.setStatus({ phase: 'error', message: (e as Error).message, code: 'spawn_failed' });

@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { CatalogDebug, CatalogEntry, CatalogState } from '../shared/protocol.js';
 import { resolveBin } from './acp/agent.js';
+import { requireNativeExecutable } from './commands.js';
 import type { Logger } from './log.js';
 import { modelsCacheFile } from './paths.js';
 
@@ -189,11 +190,11 @@ interface CliResult {
 
 function runModelsList(): Promise<CliResult> {
   const started = Date.now();
-  return new Promise((resolve) => {
+  return new Promise<CliResult>((resolve) => {
     const child = execFile(
-      resolveBin('devin'),
+      requireNativeExecutable(resolveBin('devin')),
       ['models', 'list', '--format', 'json'],
-      { timeout: TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024 },
+      { timeout: TIMEOUT_MS, maxBuffer: 32 * 1024 * 1024, windowsHide: true },
       (err, stdout, stderr) =>
         resolve({
           stdout: String(stdout),
@@ -215,7 +216,12 @@ function runModelsList(): Promise<CliResult> {
         durationMs: Date.now() - started,
       }),
     );
-  });
+  }).catch((e: Error) => ({
+    stdout: '',
+    stderr: e.message,
+    exitCode: null,
+    durationMs: Date.now() - started,
+  }));
 }
 
 function readText(file: string): string | null {

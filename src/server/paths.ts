@@ -42,30 +42,43 @@ export type Config = z.infer<typeof configSchema>;
 
 export const DEFAULT_CONFIG: Config = configSchema.parse({});
 
-const home = os.homedir();
+export function appDirectories(
+  platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+  home = os.homedir(),
+): { config: string; state: string; cache: string } {
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  const roaming = env.APPDATA || p.join(home, 'AppData', 'Roaming');
+  const local = env.LOCALAPPDATA || p.join(home, 'AppData', 'Local');
+  const xdg = (key: string) => ((env[key] ?? '').trim() ? env[key] : undefined);
+  return {
+    config: p.join(
+      xdg('XDG_CONFIG_HOME') ?? (platform === 'win32' ? roaming : p.join(home, '.config')),
+      APP_NAME,
+    ),
+    state: xdg('XDG_STATE_HOME')
+      ? p.join(xdg('XDG_STATE_HOME') as string, APP_NAME)
+      : platform === 'win32'
+        ? p.join(local, APP_NAME, 'state')
+        : p.join(home, '.local', 'state', APP_NAME),
+    cache: xdg('XDG_CACHE_HOME')
+      ? p.join(xdg('XDG_CACHE_HOME') as string, APP_NAME)
+      : platform === 'win32'
+        ? p.join(local, APP_NAME, 'cache')
+        : p.join(home, '.cache', APP_NAME),
+  };
+}
 
 export function stateDir(): string {
-  return (
-    (process.env.XDG_STATE_HOME ?? '').trim() !== ''
-      ? path.join(process.env.XDG_STATE_HOME as string, APP_NAME)
-      : path.join(home, '.local', 'state', APP_NAME)
-  ) as string;
+  return appDirectories().state;
 }
 
 export function configFile(): string {
-  const base =
-    (process.env.XDG_CONFIG_HOME ?? '').trim() !== ''
-      ? (process.env.XDG_CONFIG_HOME as string)
-      : path.join(home, '.config');
-  return path.join(base, APP_NAME, 'config.json');
+  return path.join(appDirectories().config, 'config.json');
 }
 
 export function cacheDir(): string {
-  const base =
-    (process.env.XDG_CACHE_HOME ?? '').trim() !== ''
-      ? (process.env.XDG_CACHE_HOME as string)
-      : path.join(home, '.cache');
-  return path.join(base, APP_NAME);
+  return appDirectories().cache;
 }
 
 export function modelsCacheFile(): string {
@@ -108,6 +121,7 @@ export function loadConfig(file = configFile()): { config: Config; error?: strin
 // ---------------------------------------------------------------------------
 
 export function isTermux(): boolean {
+  if (process.platform === 'win32') return false;
   return Boolean(process.env.TERMUX_VERSION) || fs.existsSync('/data/data/com.termux');
 }
 

@@ -262,6 +262,49 @@ fallback), `devin-pocket.log`, `devin-acp.stderr.log`, `daemon.out.log`. Model c
 fresh for 24 hours. `DEVIN_POCKET_SUPERVISOR` and `DEVIN_POCKET_DAEMON` are internal
 process markers, not user settings; Termux/proot also uses platform detection markers.
 
+## Windows (experimental)
+
+Native Windows hosting is **experimental**, not yet verified on real hardware.
+Use PowerShell in Windows Terminal with Node.js 22+ and the official
+[Devin CLI for Windows](https://docs.devin.ai/work-with-devin/devin-cli).
+
+```powershell
+irm https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install.ps1 | iex
+```
+
+The installer does not install Node automatically. If missing, it prints
+`winget install OpenJS.NodeJS.LTS`. It requires `devin.exe` on PATH; install Devin
+with `irm https://static.devin.ai/cli/setup.ps1 | iex`, then reopen PowerShell.
+To explicitly let Pocket's installer run the Devin installer, download
+`install.ps1` and run `./install.ps1 -InstallDevin`. Use `-Version 0.5.0` to select
+a Pocket version instead of `latest`.
+
+Manual Pocket installation and launch:
+
+```powershell
+npm.cmd install -g devin-pocket@latest
+devin-pocket start
+devin-pocket doctor
+devin-pocket logs
+devin-pocket stop
+```
+
+Open `http://127.0.0.1:7777` and sign in through the app. If PowerShell execution
+policy blocks npm's `.ps1` shim, use `devin-pocket.cmd` instead. Do not weaken
+execution policy globally. Keep loopback binding: there is no built-in browser
+client authentication or TLS.
+
+- Config: `%APPDATA%\devin-pocket\config.json`.
+- State/logs/pidfile: `%LOCALAPPDATA%\devin-pocket\state`.
+- Model cache: `%LOCALAPPDATA%\devin-pocket\cache`.
+- `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `XDG_CACHE_HOME` override those locations.
+- Agent discovery uses PATH/PATHEXT, preferring native executables. `.cmd`/`.bat`
+  **agent** launchers are rejected; use `devin.exe` or a quoted native executable
+  path in `--agent`. No undocumented Devin install directories are guessed.
+- Stop/restart uses `taskkill /T /F` for the daemon tree; shutdown is forceful,
+  not a graceful signal-driven shutdown. Save work before stopping.
+- No Termux-like Windows widget is provided. WSL is not officially supported.
+
 ## Termux tips
 
 - Wake lock is best effort via `termux-wake-lock`; install Termux:API and run
@@ -306,7 +349,7 @@ reports for sensitive information before attaching them to issues.
 - **No seven-day-old npm release?** Choose `--source main` or explicit
   `--package devin-pocket@VERSION`; npm/npx direct installs do not apply that filter.
 - **Offline or a Devin replacement?** No: Pocket is a Devin CLI client.
-- **Windows?** Native Windows is not a documented supported installer target.
+- **Windows?** Native hosting is experimental; see the Windows section above.
 
 ## Roadmap and limitations
 

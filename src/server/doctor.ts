@@ -1,19 +1,15 @@
 import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
-import path from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk';
 import type { DoctorCheck, DoctorReport } from '../shared/protocol.js';
-import { resolveBin, splitCommand } from './acp/agent.js';
+import { canProbeAuth, resolveBin, splitCommand } from './acp/agent.js';
+import { findExecutable, requireNativeExecutable } from './commands.js';
 import { configFile, isProot, isTermux, loadConfig, stateDir, VERSION } from './paths.js';
 
 function which(cmd: string): string | null {
-  for (const d of (process.env.PATH ?? '').split(path.delimiter)) {
-    const p = path.join(d, cmd);
-    if (d && fs.existsSync(p)) return p;
-  }
-  return null;
+  return findExecutable(cmd);
 }
 
 function run(
@@ -21,12 +17,17 @@ function run(
   args: string[],
   timeoutMs = 8000,
 ): Promise<{ code: number; out: string }> {
-  return new Promise((resolve) => {
-    const child = execFile(cmd, args, { timeout: timeoutMs }, (err, stdout, stderr) => {
-      resolve({ code: err ? -1 : 0, out: `${stdout}${stderr}`.trim() });
-    });
+  return new Promise<{ code: number; out: string }>((resolve) => {
+    const child = execFile(
+      requireNativeExecutable(cmd),
+      args,
+      { timeout: timeoutMs, windowsHide: true },
+      (err, stdout, stderr) => {
+        resolve({ code: err ? -1 : 0, out: `${stdout}${stderr}`.trim() });
+      },
+    );
     child.on('error', (e) => resolve({ code: -1, out: e.message }));
-  });
+  }).catch((e: Error) => ({ code: -1, out: e.message }));
 }
 
 function portFree(port: number, host: string): Promise<boolean> {
@@ -46,7 +47,11 @@ function acpProbe(command: string, timeoutMs = 15_000): Promise<string | null> {
     const bin = resolveBin(rawBin);
     let child: ReturnType<typeof spawn>;
     try {
-      child = spawn(bin, args, { stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
+      child = spawn(requireNativeExecutable(bin), args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: process.env,
+        windowsHide: true,
+      });
     } catch (e) {
       return resolve((e as Error).message);
     }
@@ -127,11 +132,19 @@ export async function doctorReport(opts: {
     id: 'devin-bin',
     label: 'Devin CLI binary',
     status: devinFound ? 'ok' : 'fail',
-    detail: devinFound ? String(devinPath) : `not found on PATH or ~/.local/bin`,
-    fix: devinFound ? undefined : 'Install: curl -fsSL https://cli.devin.ai/install.sh | bash',
+    detail: devinFound
+      ? String(devinPath)
+      : process.platform === 'win32'
+        ? 'not found on PATH'
+        : 'not found on PATH or ~/.local/bin',
+    fix: devinFound
+      ? undefined
+      : process.platform === 'win32'
+        ? 'PowerShell: irm https://static.devin.ai/cli/setup.ps1 | iex'
+        : 'Install: curl -fsSL https://cli.devin.ai/install.sh | bash',
   });
 
-  if (devinFound && bin === 'devin') {
+  if (devinFound && canProbeAuth(opts.agentCommand)) {
     const v = await run(devinPath as string, ['--version'], 8000);
     checks.push({
       id: 'devin-version',
