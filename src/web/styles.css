@@ -259,3 +259,11 @@
     transition-duration: 0.01ms;
   }
 }
+
+@media (min-width: 768px) {
+  button:not([role='switch']), [role='menuitem'] {
+    min-height: 40px;
+    min-width: 40px;
+  }
+  [data-slot='sheet-header'] { flex-shrink: 0; }
+}

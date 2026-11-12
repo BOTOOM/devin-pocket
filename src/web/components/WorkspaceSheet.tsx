@@ -66,7 +66,11 @@ export function WorkspaceSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="safe-x safe-bottom max-h-[80dvh] overflow-y-auto px-4">
+      <SheetContent
+        side="bottom"
+        panelSize="workspace"
+        className="safe-x safe-bottom max-h-[80dvh] overflow-y-auto px-4"
+      >
         <SheetHeader className="px-0">
           <SheetTitle>{t('home.workspaces')}</SheetTitle>
           <SheetDescription className="sr-only">{t('home.workspaces')}</SheetDescription>

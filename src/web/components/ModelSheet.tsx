@@ -2,7 +2,7 @@ import { matchEntry } from '@shared/catalog-match';
 import type { CatalogEntry, SessionConfigOption } from '@shared/protocol';
 import { pickModelOptions } from '@shared/reducer';
 import { Check, ImageOff, Search, Zap } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { RelativeCostBar } from '@/components/RelativeCostBar';
 import { currentValue, type FlatOption, selectOptions } from '@/components/StatusStrip';
@@ -127,7 +127,11 @@ export function ModelSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="safe-x safe-bottom flex max-h-[85dvh] flex-col px-4">
+      <SheetContent
+        side="bottom"
+        panelSize="wide"
+        className="safe-x safe-bottom flex max-h-[85dvh] flex-col px-4 md:overflow-hidden"
+      >
         <SheetHeader>
           <div className="flex items-center justify-between gap-2">
             <SheetTitle>{t('model.title')}</SheetTitle>
@@ -190,91 +194,94 @@ export function ModelSheet({
           <RelativeCostBar models={flat} current={current} catalog={catalog} />
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto pb-4">
-          {flat.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">{t('model.empty')}</p>
-          ) : compare ? (
-            <CompareTable
-              rows={filtered}
-              current={current}
-              onPick={(v) => {
-                const row = flat.find((o) => o.value === v);
-                if (row) select(row);
-              }}
+        <div className="contents md:block md:min-h-0 md:flex-1 md:overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-4 md:overflow-visible">
+            {flat.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">{t('model.empty')}</p>
+            ) : compare ? (
+              <CompareTable
+                rows={filtered}
+                current={current}
+                onPick={(v) => {
+                  const row = flat.find((o) => o.value === v);
+                  if (row) select(row);
+                }}
+              />
+            ) : (
+              groups.map(([family, rows]) => (
+                <div key={family || '_'}>
+                  {family && (
+                    <h4 className="px-1 pt-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {family}
+                    </h4>
+                  )}
+                  {rows.map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      className="flex min-h-14 w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-accent"
+                      onClick={() => select(o)}
+                    >
+                      <span
+                        className="mt-1.5 size-2.5 shrink-0 rounded-full"
+                        style={{
+                          background:
+                            TIER_COLOR[o.entry?.costTier?.toLowerCase() ?? ''] ??
+                            'var(--muted-foreground)',
+                        }}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate font-medium">{o.name}</span>
+                          {isFast(o) && <Zap className="size-3.5 shrink-0 text-warning" />}
+                          {o.supportsImages === false && (
+                            <span title={t('model.noImages')}>
+                              <ImageOff className="size-3.5 shrink-0 text-muted-foreground" />
+                            </span>
+                          )}
+                          {o.entry?.isNew && <Badge variant="secondary">{t('model.new')}</Badge>}
+                          {o.entry?.isBeta && <Badge variant="outline">{t('model.beta')}</Badge>}
+                          {/fusion/i.test(o.entry?.familyLabel ?? o.name) && (
+                            <Badge variant="outline">Fusion</Badge>
+                          )}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {o.entry?.costSummary ??
+                            (o.entry?.prices
+                              ? t('model.price', {
+                                  in: o.entry.prices.input,
+                                  out: o.entry.prices.output,
+                                })
+                              : t('model.noPrice'))}
+                          {o.entry?.maxContext ? ` · ${fmtTokens(o.entry.maxContext)}` : ''}
+                        </span>
+                      </span>
+                      {o.value === current && <Check className="mt-1 size-4 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+
+          {comparing && (
+            <ComparePanel
+              key={comparing.value}
+              costBar={
+                <RelativeCostBar
+                  models={flat}
+                  current={current}
+                  candidate={comparing.value}
+                  catalog={catalog}
+                />
+              }
+              from={currentRow}
+              to={comparing}
+              onConfirm={() => pick(comparing.value)}
+              onCancel={() => setComparing(null)}
             />
-          ) : (
-            groups.map(([family, rows]) => (
-              <div key={family || '_'}>
-                {family && (
-                  <h4 className="px-1 pt-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {family}
-                  </h4>
-                )}
-                {rows.map((o) => (
-                  <button
-                    key={o.value}
-                    type="button"
-                    className="flex min-h-14 w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-accent"
-                    onClick={() => select(o)}
-                  >
-                    <span
-                      className="mt-1.5 size-2.5 shrink-0 rounded-full"
-                      style={{
-                        background:
-                          TIER_COLOR[o.entry?.costTier?.toLowerCase() ?? ''] ??
-                          'var(--muted-foreground)',
-                      }}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="truncate font-medium">{o.name}</span>
-                        {isFast(o) && <Zap className="size-3.5 shrink-0 text-warning" />}
-                        {o.supportsImages === false && (
-                          <span title={t('model.noImages')}>
-                            <ImageOff className="size-3.5 shrink-0 text-muted-foreground" />
-                          </span>
-                        )}
-                        {o.entry?.isNew && <Badge variant="secondary">{t('model.new')}</Badge>}
-                        {o.entry?.isBeta && <Badge variant="outline">{t('model.beta')}</Badge>}
-                        {/fusion/i.test(o.entry?.familyLabel ?? o.name) && (
-                          <Badge variant="outline">Fusion</Badge>
-                        )}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {o.entry?.costSummary ??
-                          (o.entry?.prices
-                            ? t('model.price', {
-                                in: o.entry.prices.input,
-                                out: o.entry.prices.output,
-                              })
-                            : t('model.noPrice'))}
-                        {o.entry?.maxContext ? ` · ${fmtTokens(o.entry.maxContext)}` : ''}
-                      </span>
-                    </span>
-                    {o.value === current && <Check className="mt-1 size-4 shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            ))
           )}
         </div>
-
-        {comparing && (
-          <ComparePanel
-            costBar={
-              <RelativeCostBar
-                models={flat}
-                current={current}
-                candidate={comparing.value}
-                catalog={catalog}
-              />
-            }
-            from={currentRow}
-            to={comparing}
-            onConfirm={() => pick(comparing.value)}
-            onCancel={() => setComparing(null)}
-          />
-        )}
       </SheetContent>
     </Sheet>
   );
@@ -346,8 +353,14 @@ function ComparePanel({
   const t = useT();
   const showCached =
     from?.entry?.prices?.cached !== undefined || to.entry?.prices?.cached !== undefined;
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (matchMedia('(min-width: 768px)').matches) {
+      panel.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, []);
   return (
-    <div className="mb-1 rounded-xl border bg-card p-3">
+    <div ref={panel} className="mb-1 rounded-xl border bg-card p-3">
       <div className="mb-3">{costBar}</div>
       <div className="grid grid-cols-[auto_1fr_1fr] items-baseline gap-x-3 gap-y-1.5 text-sm">
         <span />
@@ -463,7 +476,7 @@ function CompareTable({
         {rows.map((o) => (
           <tr
             key={o.value}
-            className={`border-t tabular-nums ${o.value === current ? 'bg-accent/50' : ''}`}
+            className={`border-t tabular-nums md:h-10 ${o.value === current ? 'bg-accent/50' : ''}`}
             onClick={() => onPick(o.value)}
           >
             <td className="break-words py-2 pr-2 font-medium">{o.name}</td>

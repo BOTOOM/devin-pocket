@@ -11,6 +11,7 @@ let attempt = 0;
 let closed = false;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 const pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+const sessionCreations = new Map<string, Promise<unknown>>();
 
 function url(): string {
   return `${location.origin.replace(/^http/, 'ws')}/ws`;
@@ -79,8 +80,12 @@ export function isConnected(): boolean {
 }
 
 export function send(cmd: ClientCommand): Promise<unknown> {
+  if (cmd.type === 'session.new') {
+    const existing = sessionCreations.get(cmd.cwd);
+    if (existing) return existing;
+  }
   const env: ClientEnvelope = { id: `c${++seq}`, cmd };
-  return new Promise((resolve, reject) => {
+  const request = new Promise((resolve, reject) => {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       reject(new Error('not connected'));
       return;
@@ -91,4 +96,12 @@ export function send(cmd: ClientCommand): Promise<unknown> {
       if (pending.delete(env.id)) reject(new Error('ack timeout'));
     }, 30000);
   });
+  if (cmd.type === 'session.new') {
+    sessionCreations.set(cmd.cwd, request);
+    const clear = () => {
+      sessionCreations.delete(cmd.cwd);
+    };
+    void request.then(clear, clear);
+  }
+  return request;
 }

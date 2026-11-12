@@ -81,7 +81,7 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
           </SheetHeader>
           <ToggleGroup
             type="single"
-            className="flex-col items-stretch gap-1"
+            className="flex-col items-stretch gap-1 md:w-full"
             value={state.currentMode}
             onValueChange={async (v) => {
               if (!v) return;

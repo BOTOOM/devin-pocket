@@ -40,18 +40,59 @@ import { send } from '@/lib/ws';
 import { setPrefs, useStore } from '@/store';
 
 export function HomeScreen() {
+  return <SessionList />;
+}
+
+function useNewSession() {
+  const t = useT();
+  const prefs = useStore((s) => s.prefs);
+  const workspaces = useStore((s) => s.workspaces);
+  const serverCwd = useStore((s) => s.settings?.cwd);
+  const cwd = prefs.workspace ?? workspaces[0]?.path ?? serverCwd ?? '';
+  const [creating, setCreating] = useState(false);
+  const newSession = async () => {
+    if (creating || !cwd) return;
+    setCreating(true);
+    try {
+      const res = (await send({ type: 'session.new', cwd })) as { sessionId?: string } | undefined;
+      if (res?.sessionId) navigate({ name: 'chat', sessionId: res.sessionId });
+    } catch (e) {
+      void import('sonner').then(({ toast }) =>
+        toast.error(t('home.newSession.error'), { description: (e as Error).message }),
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
+  return { cwd, creating, newSession };
+}
+
+export function DesktopWelcome() {
+  const t = useT();
+  const { cwd, creating, newSession } = useNewSession();
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+      <BrandMark className="size-16" />
+      <h1 className="text-xl font-semibold">{t('home.selectSession')}</h1>
+      <Button disabled={!cwd || creating} aria-busy={creating} onClick={newSession}>
+        {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+        {creating ? t('home.newSession.creating') : t('home.newSession')}
+      </Button>
+    </div>
+  );
+}
+
+export function SessionList({ currentSessionId }: { currentSessionId?: string }) {
   const t = useT();
   const sessions = useStore((s) => s.sessions);
   const hydrated = useStore((s) => s.hydrated);
-  const workspaces = useStore((s) => s.workspaces);
   const prefs = useStore((s) => s.prefs);
   const openMap = useStore((s) => s.open);
-  const serverCwd = useStore((s) => s.settings?.cwd);
+  const { cwd, creating, newSession } = useNewSession();
   const [wsOpen, setWsOpen] = useState(false);
   const [rename, setRename] = useState<SessionSummary | null>(null);
   const [del, setDel] = useState<SessionSummary | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState('');
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -67,8 +108,6 @@ export function HomeScreen() {
   }, [query, hydrated]);
 
   // Workspace pick only affects "Nueva sesión" — the list itself is global.
-  const cwd = prefs.workspace ?? workspaces[0]?.path ?? serverCwd ?? '';
-
   const pickFolder = (p: string) => {
     if (!p) return;
     if (!prefs.workspaces.some((w) => w.path === p)) {
@@ -77,24 +116,6 @@ export function HomeScreen() {
       });
     }
     setPrefs({ workspace: p });
-  };
-
-  const newSession = async () => {
-    if (creating) return;
-    setCreating(true);
-    try {
-      const res = (await send({ type: 'session.new', cwd })) as { sessionId?: string } | undefined;
-      if (res?.sessionId) {
-        navigate({ name: 'chat', sessionId: res.sessionId });
-        return;
-      }
-      setCreating(false);
-    } catch (e) {
-      setCreating(false);
-      void import('sonner').then(({ toast }) =>
-        toast.error(t('home.newSession.error'), { description: (e as Error).message }),
-      );
-    }
   };
 
   const groups: Record<'today' | 'yesterday' | 'older', SessionSummary[]> = {
@@ -210,6 +231,7 @@ export function HomeScreen() {
                       key={s.sessionId}
                       s={s}
                       open={openMap.has(s.sessionId)}
+                      active={s.sessionId === currentSessionId}
                       onRename={() => setRename(s)}
                       onDelete={() => setDel(s)}
                     />
@@ -229,7 +251,13 @@ export function HomeScreen() {
           onOpenChange={(o) => !o && setRename(null)}
         />
       )}
-      <DeleteDialog s={del} onClose={() => setDel(null)} />
+      <DeleteDialog
+        s={del}
+        onClose={() => setDel(null)}
+        onDeleted={(sessionId) => {
+          if (sessionId === currentSessionId) navigate('home');
+        }}
+      />
     </div>
   );
 }
@@ -237,11 +265,13 @@ export function HomeScreen() {
 function SessionRow({
   s,
   open,
+  active,
   onRename,
   onDelete,
 }: {
   s: SessionSummary;
   open: boolean;
+  active: boolean;
   onRename: () => void;
   onDelete: () => void;
 }) {
@@ -250,9 +280,12 @@ function SessionRow({
   const canForceClose = useStore((s) => s.agentInfo?.caps.forceClose === true);
   const title = s.title || t('session.untitled');
   return (
-    <div className="flex min-h-14 w-full items-center rounded-lg hover:bg-accent/60">
+    <div
+      className={`flex min-h-14 w-full items-center rounded-lg hover:bg-accent/60 ${active ? 'bg-accent' : ''}`}
+    >
       <button
         type="button"
+        aria-current={active ? 'page' : undefined}
         className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-ring"
         onClick={() => navigate({ name: 'chat', sessionId: s.sessionId })}
       >
@@ -323,7 +356,15 @@ function SessionRow({
   );
 }
 
-function DeleteDialog({ s, onClose }: { s: SessionSummary | null; onClose: () => void }) {
+function DeleteDialog({
+  s,
+  onClose,
+  onDeleted,
+}: {
+  s: SessionSummary | null;
+  onClose: () => void;
+  onDeleted: (sessionId: string) => void;
+}) {
   const t = useT();
   return (
     <Dialog open={!!s} onOpenChange={(o) => !o && onClose()}>
@@ -344,7 +385,9 @@ function DeleteDialog({ s, onClose }: { s: SessionSummary | null; onClose: () =>
                   type: 'session.delete',
                   sessionId: s.sessionId,
                   cwd: s.cwd,
-                }).catch(() => {});
+                })
+                  .then(() => onDeleted(s.sessionId))
+                  .catch(() => {});
               onClose();
             }}
           >
