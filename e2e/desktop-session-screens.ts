@@ -16,9 +16,18 @@ test('desktop session changes do not leak composer drafts', async ({ page }) => 
   await page.goto('/#/');
   const first = await createSession(page);
   const second = await createSession(page);
-  await page.goto(first);
+  const rows = page.getByTestId('session-sidebar').locator('button[aria-current]');
+  await rows.first().waitFor();
+  const secondButton = await rows.first().elementHandle();
+  const sessionButtons = page
+    .getByTestId('session-sidebar')
+    .locator('button')
+    .filter({ has: page.locator('span.font-medium') });
+  await sessionButtons.nth(1).click();
+  await expect(page).toHaveURL(first);
   await page.locator('textarea').fill('PRIVATE_DRAFT_FOR_FIRST_SESSION');
-  await page.goto(second);
+  await secondButton?.click();
+  await expect(page).toHaveURL(second);
   await expect(page.locator('textarea')).toHaveValue('');
 });
 
