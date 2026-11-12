@@ -1,6 +1,6 @@
 {
   "name": "devin-pocket",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Mobile-first browser UI for Devin CLI over Agent Client Protocol (ACP): sessions, streaming and tools on Android/Termux, Linux and macOS.",
   "license": "Apache-2.0",
   "publishConfig": {

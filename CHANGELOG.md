@@ -1,3 +1,24 @@
+## [0.6.0](https://github.com/BOTOOM/devin-pocket/compare/v0.5.0...v0.6.0) (2026-11-12)
+
+### Features
+
+* **cli:** add update command and new-version notice ([d681aba](https://github.com/BOTOOM/devin-pocket/commit/d681aba882923b234763ddd9eb4b7946071d7991))
+* **installer:** add devin-pocket command on Termux host ([c7c210b](https://github.com/BOTOOM/devin-pocket/commit/c7c210b55def485283db7357e0c235fa9970cc94))
+* **windows:** experimental native Windows support ([6f74fac](https://github.com/BOTOOM/devin-pocket/commit/6f74fac6558ea1a6415faf0b1684a249a513ea2f))
+
+### Bug Fixes
+
+* **cli:** avoid daemonizing foreground servers after updates ([a242e40](https://github.com/BOTOOM/devin-pocket/commit/a242e40a794e03b5f4d2053082650e2969028cf6))
+* **cli:** persist an absolute startup working directory ([d36876e](https://github.com/BOTOOM/devin-pocket/commit/d36876e17d338282889a2861e978f47d4832889a))
+* **cli:** skip non-executable POSIX command candidates ([066f72b](https://github.com/BOTOOM/devin-pocket/commit/066f72be577bfe4e8af1493836a1d8f0ffbbb576))
+* **i18n:** translate Pocket update diagnostics in Spanish ([c075011](https://github.com/BOTOOM/devin-pocket/commit/c075011dfd9821f58a36a6bff1f33cdb96498b0d))
+* **paths:** canonicalize macOS workspace test roots ([af70a34](https://github.com/BOTOOM/devin-pocket/commit/af70a34f7b7af0c277fe6c0569cf184612571cd2))
+* **termux:** make installer fixtures portable to macOS ([38a2cc3](https://github.com/BOTOOM/devin-pocket/commit/38a2cc3e7d13fbfcfc1e7ff4755b649550b68c53))
+* **web:** show manual updates for unknown installations ([2b94aaf](https://github.com/BOTOOM/devin-pocket/commit/2b94aafcf3b9aab698c64718c16a9b078b8c5518))
+* **windows:** handle native folder paths in the client ([69e367c](https://github.com/BOTOOM/devin-pocket/commit/69e367c927c5500cee282ccba0c8b66fae7f6e08))
+* **windows:** load packaged server through a file URL ([a772798](https://github.com/BOTOOM/devin-pocket/commit/a7727981afef64b39c74c44bfcf5b66498bbd336))
+* **windows:** preserve LF line endings in native checkouts ([1b5f22b](https://github.com/BOTOOM/devin-pocket/commit/1b5f22b4e7f7bd8952fa4621a7cbd5ef8e38ae03))
+
 ## [0.5.0](https://github.com/BOTOOM/devin-pocket/compare/v0.4.0...v0.5.0) (2026-11-12)
 
 ### Features
