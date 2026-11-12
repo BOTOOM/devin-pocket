@@ -6,7 +6,7 @@ import { browse, browsePath, cwdAllowed } from '../src/server/fs-search.js';
 import { validateCwd } from '../src/server/workspace.js';
 
 describe('working folder validation', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pocket-workspace-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pocket-workspace-')));
   const home = path.join(root, 'home');
   const outside = path.join(root, 'outside');
   const project = path.join(home, 'project');
