@@ -204,7 +204,8 @@ notifications `_cognition.ai/turn_stats` and `_cognition.ai/output`.
 - CI commits use `ci:` / `ci(release):` and never release; CI/build/test types and
   ci/actions/workflows/release scopes are excluded, even for breaking changes.
 - `package.json` is the runtime version source. Releases update it and `CHANGELOG.md`,
-  publish publicly with provenance, and require the `NPM_TOKEN` repo secret.
+  publish publicly with provenance via npm Trusted Publishing (OIDC from
+  `release.yml`); no `NPM_TOKEN` secret is used.
 
 ## Debugging recipe
 
