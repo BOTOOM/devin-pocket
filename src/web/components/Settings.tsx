@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { WorkspaceSheet } from '@/components/WorkspaceSheet';
 import { setLang, useT } from '@/i18n';
+import { baseName } from '@/lib/format';
 import { navigate } from '@/lib/router';
 import { setTheme, useTheme } from '@/lib/theme';
 import { setPrefs, useStore } from '@/store';
@@ -338,7 +339,7 @@ export function SettingsScreen() {
           setPrefs({
             workspaces: [
               ...prefs.workspaces.filter((w) => w.path !== p),
-              { path: p, name: p.split('/').filter(Boolean).pop() ?? p },
+              { path: p, name: baseName(p) },
             ],
           })
         }

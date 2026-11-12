@@ -3,14 +3,15 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const installer = path.join(import.meta.dirname, '..', 'install.ps1').replaceAll("'", "''");
+const shell = process.platform === 'win32' ? 'powershell.exe' : 'pwsh';
 const available =
-  spawnSync('pwsh', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.Major']).status === 0;
+  spawnSync(shell, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.Major']).status === 0;
 
 // PowerShell is provided by Windows CI; these tests never run the real installers.
 describe.skipIf(!available)('PowerShell installer', () => {
   function run(version: string, node = 'v24.0.0', npmExit = 0, devin = true) {
     return spawnSync(
-      'pwsh',
+      shell,
       [
         '-NoLogo',
         '-NoProfile',

@@ -1,5 +1,7 @@
 import { getLang } from '@/i18n';
 
+export { baseName } from '@shared/path-display';
+
 export function relTime(iso?: string): string {
   if (!iso) return '';
   const d = new Date(iso).getTime();
@@ -27,11 +29,6 @@ export function fmtMoney(amount: number, currency = 'USD'): string {
     currency,
     minimumFractionDigits: amount < 1 ? 3 : 2,
   }).format(amount);
-}
-
-export function baseName(p: string): string {
-  const parts = p.replace(/\/+$/, '').split('/');
-  return parts[parts.length - 1] || p;
 }
 
 export function dayGroup(iso?: string): 'today' | 'yesterday' | 'older' {
