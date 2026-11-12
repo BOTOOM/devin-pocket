@@ -55,7 +55,7 @@ async function walk(root: string, ignores: RegExp[], out: FsEntry[]): Promise<vo
     for (const e of ents) {
       if (budget <= 0) return;
       if (e.name.startsWith('.') && e.name !== '.github') continue;
-      const rel = path.relative(root, path.join(dir, e.name));
+      const rel = path.relative(root, path.join(dir, e.name)).split(path.sep).join('/');
       if (SKIP.has(e.name) || ignores.some((r) => r.test(rel))) continue;
       if (e.isDirectory()) {
         out.push({ name: e.name, path: rel, kind: 'dir' });

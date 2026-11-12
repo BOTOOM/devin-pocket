@@ -173,7 +173,8 @@ if [[ "$1" == pack ]]; then printf 'mock package' > "$3/devin-pocket-0.1.5.tgz";
   };
 }
 
-describe('Termux bootstrap installer', () => {
+// Exercises Termux's POSIX shell/package manager, not the Windows installer.
+describe.skipIf(process.platform === 'win32')('Termux bootstrap installer', () => {
   it('has valid shell syntax and help works outside Termux', () => {
     expect(spawnSync('bash', ['-n', installer]).status).toBe(0);
     const f = fixture();

@@ -1,3 +1,4 @@
+import { pathBreadcrumbs } from '@shared/path-display';
 import type { FsEntry } from '@shared/protocol';
 import { ChevronLeft, Folder, FolderOpen, Home } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -102,7 +103,7 @@ export function FolderPicker({
     return () => controller.abort();
   }, [browse, open]);
 
-  const crumbs = resp?.path.split('/').filter(Boolean) ?? [];
+  const crumbs = resp ? pathBreadcrumbs(resp.path) : [];
 
   return (
     <div>
@@ -154,18 +155,15 @@ export function FolderPicker({
             <button type="button" className="shrink-0 text-primary" onClick={() => setBrowse('')}>
               <Home className="size-4" />
             </button>
-            {crumbs.map((c, i) => (
-              <span
-                key={crumbs.slice(0, i + 1).join('/')}
-                className="flex shrink-0 items-center gap-1"
-              >
+            {crumbs.map((crumb) => (
+              <span key={crumb.path} className="flex shrink-0 items-center gap-1">
                 <span className="text-muted-foreground">/</span>
                 <button
                   type="button"
                   className="text-primary"
-                  onClick={() => setBrowse('/' + crumbs.slice(0, i + 1).join('/'))}
+                  onClick={() => setBrowse(crumb.path)}
                 >
-                  {c}
+                  {crumb.label}
                 </button>
               </span>
             ))}

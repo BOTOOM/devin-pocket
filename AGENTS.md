@@ -136,6 +136,25 @@ devin-pocket update [--check] [--version X] [--yes]
 - The box `devin` binary may exist but be **not logged in** — `devin-pocket models`
   will show `stderr: Not logged in` (that output working is the point).
 
+## Windows (experimental)
+
+- Native Windows hosting is experimental, not verified on real hardware. Use
+  PowerShell / Windows Terminal: `irm https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install.ps1 | iex`.
+  Manual install: `npm.cmd install -g devin-pocket@latest`; launch `devin-pocket`
+  (or `devin-pocket.cmd` if PowerShell blocks npm's script shim).
+- Node 22+ required; installer only prints the winget hint. Devin's official
+  PowerShell installer runs only with explicit `-InstallDevin` consent.
+- PATH/PATHEXT resolution prefers native executables; batch agent launchers are
+  rejected without a shell. Quote executable paths containing spaces in `--agent`.
+  No undocumented default Devin installation directory is assumed.
+- Config is `%APPDATA%\devin-pocket\config.json`; state/logs/pidfile and model
+  cache are `%LOCALAPPDATA%\devin-pocket\state` and `\cache`. XDG overrides win.
+- Browser opening uses rundll32 without a shell; hidden detached supervisor.
+  Stop/restart kills the entire daemon tree via `taskkill /T /F` (forceful).
+  SIGTERM/SIGINT handlers are used on POSIX; Windows stop does not rely on them.
+- No Windows Termux-like widget. WSL is not officially supported. Preserve the
+  loopback/no-client-auth warning. Windows CI runs Node 24 and parses install.ps1.
+
 ## ACP facts we rely on
 
 Client→agent methods (via `@agentclientprotocol/sdk` `ClientSideConnection`):

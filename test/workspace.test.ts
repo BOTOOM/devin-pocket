@@ -6,7 +6,7 @@ import { browse, browsePath, cwdAllowed } from '../src/server/fs-search.js';
 import { validateCwd } from '../src/server/workspace.js';
 
 describe('working folder validation', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pocket-workspace-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pocket-workspace-')));
   const home = path.join(root, 'home');
   const outside = path.join(root, 'outside');
   const project = path.join(home, 'project');
@@ -14,8 +14,16 @@ describe('working folder validation', () => {
     fs.mkdirSync(project, { recursive: true });
     fs.mkdirSync(outside);
     fs.writeFileSync(path.join(home, 'file.txt'), 'text');
-    fs.symlinkSync(outside, path.join(home, 'escape'), 'dir');
-    fs.symlinkSync(project, path.join(home, 'alias'), 'dir');
+    fs.symlinkSync(
+      outside,
+      path.join(home, 'escape'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    fs.symlinkSync(
+      project,
+      path.join(home, 'alias'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
     vi.spyOn(os, 'homedir').mockReturnValue(home);
   });
   afterAll(() => {

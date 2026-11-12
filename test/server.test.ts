@@ -21,7 +21,7 @@ process.env.FAKE_AGENT_AUTHED = '1';
 process.env.FAKE_AGENT_FAST = '1';
 process.env.DEVIN_POCKET_MODELS_FILE = path.join(tmp, 'models.json');
 
-const AGENT_CMD = `npx tsx ${path.join(import.meta.dirname, 'fake-agent.ts')}`;
+const AGENT_CMD = `"${process.execPath}" --import tsx "${path.join(import.meta.dirname, 'fake-agent.ts')}"`;
 
 writeFileSync(
   process.env.DEVIN_POCKET_MODELS_FILE as string,
@@ -76,7 +76,7 @@ async function boot(): Promise<Harness> {
       port: 0,
       host: '127.0.0.1',
       agentCommand: AGENT_CMD,
-      workspaces: [],
+      workspaces: [{ path: process.cwd(), name: 'repo' }],
     },
     dev: true,
   });
