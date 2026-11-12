@@ -299,6 +299,13 @@ switch (args.cmd) {
         throw new Error('Server did not stop; no packages were changed.');
       },
       restart: async (installed) => {
+        const original = parseArgs(startArgs);
+        if (original.foreground || original.dev) {
+          process.stdout.write(
+            `Pocket was running in foreground/dev mode. Restart it manually with its original command: devin-pocket ${startArgs.join(' ')}\n`,
+          );
+          return;
+        }
         const code = installed
           ? await installPackage('devin-pocket', startArgs)
           : await installPackage(process.execPath, [process.argv[1] ?? '', ...startArgs]);

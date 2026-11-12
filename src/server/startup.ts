@@ -8,11 +8,14 @@ export function savedStartArgs(
   cwd = process.cwd(),
   env = process.env,
 ): string[] {
-  return serializeArgs({
-    ...args,
-    port: args.port ?? config.port,
-    host: args.host ?? config.host,
-    cwd: path.resolve(cwd, args.cwd ?? '.'),
-    agent: args.agent ?? env.DEVIN_POCKET_AGENT ?? config.agentCommand,
-  });
+  return [
+    ...serializeArgs({
+      ...args,
+      port: args.port ?? config.port,
+      host: args.host ?? config.host,
+      cwd: path.resolve(cwd, args.cwd ?? '.'),
+      agent: args.agent ?? env.DEVIN_POCKET_AGENT ?? config.agentCommand,
+    }),
+    ...(args.dev ? ['--dev'] : args.foreground ? ['--foreground'] : []),
+  ];
 }

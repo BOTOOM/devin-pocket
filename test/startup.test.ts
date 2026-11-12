@@ -5,6 +5,13 @@ import { DEFAULT_CONFIG } from '../src/server/paths.js';
 import { savedStartArgs } from '../src/server/startup.js';
 
 describe('saved startup options', () => {
+  for (const mode of ['--foreground', '--dev']) {
+    it(`retains ${mode} so an update does not daemonize it`, () => {
+      const saved = parseArgs(savedStartArgs(parseArgs(['start', mode]), DEFAULT_CONFIG));
+      expect(saved.foreground).toBe(true);
+      expect(saved.dev).toBe(mode === '--dev');
+    });
+  }
   it('anchors relative cwd to the startup directory, not the update directory', () => {
     const original = path.resolve('original');
     const saved = parseArgs(
