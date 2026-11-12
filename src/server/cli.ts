@@ -20,6 +20,7 @@ import {
   VERSION,
 } from './paths.js';
 import { SessionManager } from './sessions.js';
+import { savedStartArgs } from './startup.js';
 import { installPackage, runUpdate, startUpdateChecks } from './update.js';
 
 function box(lines: string[]): void {
@@ -94,15 +95,7 @@ function daemonize(args: Args): number {
 function recordStartArgs(args: Args): void {
   fs.writeFileSync(
     path.join(stateDir(), 'start-args.json'),
-    JSON.stringify(
-      serializeArgs({
-        ...args,
-        port: args.port ?? fileConfig.port,
-        host: args.host ?? fileConfig.host,
-        cwd: args.cwd ?? process.cwd(),
-        agent: args.agent ?? process.env.DEVIN_POCKET_AGENT ?? fileConfig.agentCommand,
-      }),
-    ),
+    JSON.stringify(savedStartArgs(args, fileConfig)),
     { mode: 0o600 },
   );
 }
