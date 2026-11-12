@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -21,7 +22,7 @@ afterEach(() => {
 });
 
 function fixture(options: { legacy?: boolean; existing?: boolean; missingDevin?: boolean } = {}) {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'pocket-installer-'));
+  const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'pocket-installer-')));
   temporaryDirs.push(root);
   const prefix = path.join(root, 'termux');
   const home = path.join(root, 'host-home');
@@ -56,7 +57,7 @@ while [[ "$1" != -- ]]; do shift; done
 shift
 shift 3
 cat > "$MOCK_ROOT/guest-input.sh"
-sed 's@  \\. /etc/os-release@  ID=ubuntu@' "$MOCK_ROOT/guest-input.sh" > "$MOCK_ROOT/guest-script.sh"
+sed -e 's@  \\. /etc/os-release@  ID=ubuntu@' -e 's@  \\[\\[ -r /etc/os-release \\]\\].*@  :@' "$MOCK_ROOT/guest-input.sh" > "$MOCK_ROOT/guest-script.sh"
 export HOME="$MOCK_GUEST_HOME"
 export PATH="$HOME/.local/bin:/usr/bin:/bin"
 exec /bin/bash "$MOCK_ROOT/guest-script.sh" "$@"`,
