@@ -3,6 +3,37 @@ import os from 'node:os';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
+test('browse starts at a selected external workspace root', async ({ page }) => {
+  const root = '/srv/configured-project';
+  await page.addInitScript((root) => {
+    localStorage.setItem('dp.lang', 'en');
+    localStorage.setItem(
+      'dp.prefs',
+      JSON.stringify({ workspace: root, workspaces: [{ path: root }] }),
+    );
+  }, root);
+  await page.route('/api/workspaces/browse?*', async (route) => {
+    const selected = new URL(route.request().url()).searchParams.get('path');
+    const current = selected || os.homedir();
+    await route.fulfill({
+      json: {
+        home: os.homedir(),
+        path: current,
+        entries: current === root ? [{ name: 'child', path: `${root}/child`, kind: 'dir' }] : [],
+      },
+    });
+  });
+  await page.goto('/#/');
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click();
+  const panel = page.getByRole('dialog');
+  const browse = page.waitForRequest((r) => r.url().includes('/api/workspaces/browse?'));
+  await panel.getByRole('button', { name: 'Browse for another folder', exact: true }).click();
+  expect(new URL((await browse).url()).searchParams.get('path')).toBe(root);
+  await panel.getByRole('button', { name: 'child', exact: true }).click();
+  await panel.getByRole('button', { name: /Use this folder/ }).click();
+  await expect(panel.getByTestId('selected-folder')).toHaveText(`${root}/child`);
+});
+
 for (const [width, height, theme] of [
   [390, 844, 'dark'],
   [390, 844, 'light'],
@@ -61,10 +92,9 @@ for (const [width, height, theme] of [
     expect(newCount).toBe(0);
     await page.getByRole('button', { name: 'New session', exact: true }).first().click();
     await panel.getByRole('button', { name: 'Browse for another folder', exact: true }).click();
-    // Browse from home to the repository, then choose an actual child directory.
-    for (const part of path.relative(os.homedir(), repo).split(path.sep)) {
-      await panel.getByRole('button', { name: part, exact: true }).last().click();
-    }
+    await expect(panel.getByRole('button', { name: /Use this folder/ })).toContainText(
+      path.basename(repo),
+    );
     await panel.getByRole('button', { name: 'src', exact: true }).last().click();
     await panel.getByRole('button', { name: /Use this folder/ }).click();
     await expect(panel.getByTestId('selected-folder')).toHaveText(folder);

@@ -81,7 +81,7 @@ export function FolderPicker({
   useEffect(() => {
     if (!open) return;
     // No saved folders → go straight to the browser; otherwise show the list.
-    setBrowse(saved.length === 0 ? '' : null);
+    setBrowse(saved.length === 0 ? (current ?? '') : null);
     setResp(null);
     setErr(false);
   }, [open]);
@@ -133,7 +133,7 @@ export function FolderPicker({
           <button
             type="button"
             className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-primary hover:bg-accent"
-            onClick={() => setBrowse('')}
+            onClick={() => setBrowse(current ?? '')}
           >
             <Folder className="size-5 shrink-0" />
             {t('ws.browseOther')}
