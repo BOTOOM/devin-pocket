@@ -1,6 +1,34 @@
 import { mkdir } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
+test('Pocket doctor label, versions and fix follow the UI language', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('dp.lang', 'es'));
+  await page.route('**/api/doctor', (route) =>
+    route.fulfill({
+      json: {
+        checks: [
+          {
+            id: 'pocket-update',
+            label: 'Devin Pocket version',
+            detail: 'current 0.5.0 · latest known 99.0.0',
+            fix: 'Run: devin-pocket update',
+            status: 'warn',
+            update: { current: '0.5.0', latest: '99.0.0', updateAvailable: true },
+          },
+        ],
+        summary: 'warn',
+        at: Date.now(),
+      },
+    }),
+  );
+  await page.goto('/#/diagnostics');
+  await expect(page.getByText('Versión de Devin Pocket', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('actual 0.5.0 · última conocida 99.0.0', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Ejecuta: devin-pocket update', { exact: true })).toBeVisible();
+});
+
 for (const theme of ['light', 'dark'] as const) {
   test(`update notice at 390px ${theme}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });

@@ -109,8 +109,19 @@ export function DiagnosticsScreen() {
                 <div key={c.id} className="flex items-start gap-2.5 rounded-lg px-1 py-1.5">
                   <CheckIcon status={c.status} />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{c.label}</div>
-                    {c.detail && <div className="text-xs text-muted-foreground">{c.detail}</div>}
+                    <div className="text-sm font-medium">
+                      {c.id === 'pocket-update' ? t('doctor.label.pocket-update') : c.label}
+                    </div>
+                    {c.detail && (
+                      <div className="text-xs text-muted-foreground">
+                        {c.id === 'pocket-update' && c.update
+                          ? t('doctor.detail.pocket-update', {
+                              current: c.update.current,
+                              latest: c.update.latest,
+                            })
+                          : c.detail}
+                      </div>
+                    )}
                     {c.fix && (
                       <div className="mt-0.5 flex items-center gap-1 text-xs text-primary">
                         <span>{fixText(t, c)}</span>

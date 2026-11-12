@@ -479,6 +479,7 @@ export interface DoctorCheck {
   status: 'ok' | 'warn' | 'fail' | 'skip';
   detail?: string;
   fix?: string;
+  update?: UpdateInfo;
 }
 
 /** GET /api/doctor */

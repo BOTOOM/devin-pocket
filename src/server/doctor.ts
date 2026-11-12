@@ -115,6 +115,7 @@ export async function doctorReport(opts: {
   const update = cachedUpdate();
   checks.push({
     id: 'pocket-update',
+    update,
     label: 'Devin Pocket version',
     status: update.updateAvailable ? 'warn' : 'ok',
     detail: `current ${update.current} · latest known ${update.latest}`,
