@@ -280,8 +280,8 @@ devin-pocket stop
 
 Abre `http://127.0.0.1:7777` e inicia sesión desde la app. Si la política de
 PowerShell bloquea el shim `.ps1` de npm, usa `devin-pocket.cmd`. No relajes la
-política globalmente. Mantén loopback: no hay autenticación de clientes del
-navegador ni TLS incorporados.
+política globalmente. Mantén loopback: no se exige emparejamiento de dispositivos
+y no hay TLS incorporado. Consulta la sección de seguridad más abajo.
 
 - Configuración: `%APPDATA%\devin-pocket\config.json`.
 - Estado/logs/pidfile: `%LOCALAPPDATA%\devin-pocket\state`.
@@ -308,13 +308,36 @@ navegador ni TLS incorporados.
 
 ## Seguridad y acceso remoto
 
-Escucha predeterminada: **127.0.0.1:7777**. El login de Devin autentica al agente,
-**no a clientes de Pocket**. No hay autenticación de clientes, emparejamiento ni TLS
-integrados. `--host 0.0.0.0` expone la app y capacidades del agente a la red;
-los controles de origen no son autenticación. No lo expongas a Internet público.
-Si necesitas acceso remoto deliberadamente, usa un túnel/proxy con control de
-acceso. HTTP no local puede perder funciones de contexto seguro/PWA del navegador.
-Revisa permisos y reportes/registros antes de compartir: contienen rutas e información del proyecto.
+Escucha predeterminada: **127.0.0.1:7777** no exige emparejamiento y rechaza
+cabeceras Host inesperadas para evitar DNS rebinding. El login de Devin autentica
+al agente; el emparejamiento protege por separado a los clientes de Pocket cuando
+escucha fuera de loopback.
+
+`devin-pocket start --host 0.0.0.0` protege todas las API y WebSockets mediante
+emparejamiento. La terminal muestra un QR, URLs y un código de un solo uso que
+caducan en diez minutos. La interfaz estática sigue siendo pública, pero no accede
+a los datos del agente sin emparejarse. **La pantalla de emparejamiento del navegador
+llegará en un cambio de UI separado; este servidor/CLI ofrece la API, todavía no esa pantalla.**
+
+```sh
+devin-pocket pair                 # nuevo QR/código del servidor en ejecución
+devin-pocket pair --qr=ascii      # bloques sin color; sin TTY solo muestra texto
+devin-pocket devices
+devin-pocket devices revoke <id>
+devin-pocket devices revoke all
+```
+
+El CLI local se autentica con `admin.token` privado en el directorio de estado.
+Las credenciales emparejadas usan cookies HttpOnly/SameSite=Strict; `devices.json`
+solo guarda hashes SHA-256 (ambos archivos usan modo 0600). Los dispositivos
+caducan tras 30 días sin uso. Revocar desconecta sus WebSockets inmediatamente.
+Trata URLs/códigos como secretos: quien los canjee obtiene acceso completo a Pocket/agente.
+
+**El emparejamiento no proporciona TLS.** No expongas Pocket directamente a Internet
+público; usa un túnel/proxy HTTPS con control de acceso. HTTP en la LAN puede revelar
+códigos/cookies a observadores y perder funciones de contexto seguro/PWA. Solo se
+confía en HTTPS reenviado desde un socket loopback. Revisa permisos y reportes/registros
+antes de compartir: contienen rutas e información del proyecto.
 
 ## Diagnóstico y preguntas frecuentes
 
@@ -370,7 +393,7 @@ Se respeta `npm_config_registry` / `NPM_CONFIG_REGISTRY`; cada consulta vence a 
 ## Hoja de ruta y limitaciones
 
 Se planean flujos de cliente remoto para desktop/laptop. Hoy es una interfaz
-móvil servida por el equipo local. Quedan pendientes emparejamiento/acceso remoto
+móvil servida por el equipo local. Quedan pendientes la pantalla de emparejamiento/acceso remoto
 autenticado y virtualización de listas/transcripts grandes. Los comandos editados
 en permisos se muestran como solo lectura; las capacidades varían según el agente.
 

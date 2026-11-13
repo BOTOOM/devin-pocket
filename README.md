@@ -295,8 +295,8 @@ devin-pocket stop
 
 Open `http://127.0.0.1:7777` and sign in through the app. If PowerShell execution
 policy blocks npm's `.ps1` shim, use `devin-pocket.cmd` instead. Do not weaken
-execution policy globally. Keep loopback binding: there is no built-in browser
-client authentication or TLS.
+execution policy globally. Keep loopback binding: it does not require device
+pairing, and there is no built-in TLS. See the security section below.
 
 - Config: `%APPDATA%\devin-pocket\config.json`.
 - State/logs/pidfile: `%LOCALAPPDATA%\devin-pocket\state`.
@@ -323,12 +323,34 @@ client authentication or TLS.
 
 ## Security and remote access
 
-Default binding: **127.0.0.1:7777**. Devin login authenticates the agent,
-**not Pocket clients**. There is no built-in client authentication, pairing or TLS.
-`--host 0.0.0.0` exposes the app and agent capabilities to the network; origin
-checks are not authentication. Do not expose it to the public internet. If you
-deliberately need remote access, use an access-controlled tunnel/proxy. Non-local
-HTTP may also lose secure-context/PWA browser features. Review permissions and
+Default binding: **127.0.0.1:7777** needs no device pairing and rejects unexpected
+Host headers to prevent DNS rebinding. Devin login authenticates the agent;
+device pairing separately protects Pocket clients when binding beyond loopback.
+
+`devin-pocket start --host 0.0.0.0` enables pairing protection for every API and
+WebSocket. The terminal prints a QR, URLs and a short code valid for ten minutes,
+usable once. The app shell remains public, but it cannot access agent data without
+a paired device. **The browser pairing screen is a separate, forthcoming UI change;
+this server/CLI implementation exposes the pairing API, not that screen yet.**
+
+```sh
+devin-pocket pair                 # a fresh QR/code from the running server
+devin-pocket pair --qr=ascii      # plain block fallback; non-TTY output is text only
+devin-pocket devices
+devin-pocket devices revoke <id>
+devin-pocket devices revoke all
+```
+
+The local CLI authenticates with a private `admin.token` in the state directory.
+Paired credentials are HttpOnly/SameSite=Strict cookies; only SHA-256 hashes are
+stored in `devices.json` (both files use mode 0600). Devices expire after 30 days
+without use. Revocation immediately disconnects their WebSockets. Treat pairing
+URLs/codes as secrets: anyone redeeming one gains full Pocket/agent access.
+
+**Pairing does not provide TLS.** Do not expose Pocket directly to the public
+internet; use an HTTPS, access-controlled tunnel/proxy. Plain LAN HTTP can expose
+pairing codes/cookies to observers and may lose secure-context/PWA features.
+Forwarded HTTPS is trusted only from a loopback socket. Review permissions and
 reports/logs before sharing: they can contain paths and project information.
 
 ## Troubleshooting and FAQ
@@ -385,7 +407,7 @@ honor `npm_config_registry` / `NPM_CONFIG_REGISTRY` and time out after five seco
 ## Roadmap and limitations
 
 Desktop/laptop remote-client workflows are planned. Currently this is a
-mobile-first UI served by the local host. Authenticated pairing/remote access
+mobile-first UI served by the local host. The browser pairing screen/remote access
 and large-list/transcript virtualization remain work to do. Edited permission
 commands are currently displayed read-only; agent-dependent capabilities vary.
 

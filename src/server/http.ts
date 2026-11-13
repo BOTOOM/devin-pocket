@@ -1,25 +1,37 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import type { Duplex } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { z } from 'zod';
 import { estimateCost } from '../shared/cost.js';
 import type {
+  AuthStatus,
   BillingInfo,
   ClientEnvelope,
   ErrorCode,
   LocalPort,
+  PairedDevice,
+  PairingResponse,
   ServerMessage,
   ServerSettings,
 } from '../shared/protocol.js';
 import { PROTOCOL_VERSION } from '../shared/protocol.js';
 import type { AgentProcess } from './acp/agent.js';
 import { readBillingCache } from './acp/user-status.js';
+import {
+  AuthError,
+  AuthStore,
+  DEVICE_MAX_AGE,
+  defaultDeviceName,
+  deviceCookieToken,
+} from './auth.js';
 import { getCatalog, loadCatalog } from './catalog.js';
 import { doctorReport } from './doctor.js';
 import { browse, browsePath, cwdAllowed, homeDir, search } from './fs-search.js';
 import { type Logger, logFiles, readLogs, redact } from './log.js';
+import { isLoopback, loopbackHostAllowed, pairingUrls } from './network.js';
 import { agentStderrFile, type Config, platformInfo, stateDir, VERSION } from './paths.js';
 import { listPorts } from './ports.js';
 import type { SessionManager } from './sessions.js';
@@ -31,6 +43,44 @@ const Envelope = z.object({
   id: z.string(),
   cmd: z.object({ type: z.string() }).passthrough(),
 });
+
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+  'Content-Security-Policy': "frame-ancestors 'none'",
+};
+
+function requireJson(req: http.IncomingMessage): void {
+  if (req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json')
+    throw new AuthError(415, 'application/json required');
+}
+
+async function jsonBody(req: http.IncomingMessage): Promise<unknown> {
+  requireJson(req);
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > 4096) {
+        reject(new AuthError(413, 'request too large'));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (size > 4096) return;
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch {
+        reject(new AuthError(400, 'invalid JSON'));
+      }
+    });
+    req.on('error', reject);
+    req.on('aborted', () => reject(new AuthError(400, 'aborted request')));
+  });
+}
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -65,6 +115,9 @@ export interface ServerDeps {
   log: Logger;
   config: Config;
   dev: boolean;
+  /** Force pairing even when a tunnel listens on loopback. */
+  authRequired?: boolean;
+  auth?: AuthStore;
   /** agent/server cwd — default folder offered to the UI */
   agentCwd?: string;
 }
@@ -76,8 +129,20 @@ export class PocketServer {
   private portsTimer?: NodeJS.Timeout;
   private lastPorts: LocalPort[] = [];
   private lastBillingCache?: BillingInfo | null;
+  readonly authRequired: boolean;
+  private auth!: AuthStore;
+  private deviceClients = new Map<WebSocket, string>();
+  private verifiedDevices = new WeakMap<http.IncomingMessage, { id: string; token: string }>();
+  private unsubscribeRevoke?: () => void;
 
-  constructor(private deps: ServerDeps) {}
+  constructor(private deps: ServerDeps) {
+    this.authRequired = !!deps.authRequired || !isLoopback(deps.config.host);
+  }
+
+  get port(): number {
+    const address = this.http?.address();
+    return address && typeof address !== 'string' ? address.port : this.deps.config.port;
+  }
 
   /** Public so cli.ts can broadcast agent.status changes. */
   broadcast(msg: ServerMessage): void {
@@ -107,22 +172,77 @@ export class PocketServer {
   async start(): Promise<void> {
     const { config, sessions, log } = this.deps;
     const root = webRoot();
-
-    this.http = http.createServer((req, res) => void this.handleHttp(req, res, root));
+    this.http = http.createServer((req, res) => {
+      for (const [key, value] of Object.entries(SECURITY_HEADERS)) res.setHeader(key, value);
+      void this.handleHttp(req, res, root);
+    });
+    this.http.requestTimeout = 15000;
+    this.http.headersTimeout = 10000;
+    const rejectMalformed = (socket: Duplex) => {
+      socket.end(
+        `HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n${Object.entries(
+          SECURITY_HEADERS,
+        )
+          .map(([key, value]) => `${key}: ${value}\r\n`)
+          .join('')}\r\n`,
+      );
+    };
+    this.http.on('clientError', (_error, socket) => rejectMalformed(socket));
     this.wss = new WebSocketServer({
       server: this.http,
-      path: '/ws',
       // prompts can carry base64 images (composer caps ~1.5 MB per file)
       maxPayload: 2 * 1024 * 1024,
-      verifyClient: (info: { req: http.IncomingMessage }) =>
-        this.originAllowed(info.req.headers.origin, info.req.headers.host),
+      verifyClient: (info, done) => {
+        const req = info.req;
+        if (req.url?.split('?')[0] !== '/ws')
+          return done(false, 404, 'Not Found', SECURITY_HEADERS);
+        if (
+          (!this.authRequired && !loopbackHostAllowed(req.headers.host)) ||
+          !this.originAllowed(req.headers.origin, req.headers.host)
+        )
+          return done(false, 403, 'Forbidden', SECURITY_HEADERS);
+        try {
+          const token = deviceCookieToken(req.headers.cookie);
+          const device = this.auth.authenticate(token);
+          if (this.authRequired && !device)
+            return done(false, 401, 'Unauthorized', SECURITY_HEADERS);
+          if (device && token) this.verifiedDevices.set(req, { id: device.id, token });
+          done(true);
+        } catch {
+          done(false, 503, 'Authentication unavailable', SECURITY_HEADERS);
+        }
+      },
     });
-    this.wss.on('connection', (ws) => this.onConnect(ws));
+    this.wss.on('wsClientError', (_error, socket) => rejectMalformed(socket));
+    this.wss.on('error', (error) => log.error(`websocket server: ${error.message}`));
+    this.wss.on('headers', (headers, req) => {
+      for (const [key, value] of Object.entries(SECURITY_HEADERS)) headers.push(`${key}: ${value}`);
+      const device = this.verifiedDevices.get(req);
+      if (device) headers.push(`Set-Cookie: ${this.deviceCookie(req, device.token)}`);
+    });
+    this.wss.on('connection', (ws, req) => {
+      const device = this.verifiedDevices.get(req);
+      if (this.authRequired && !device) {
+        ws.terminate();
+        return;
+      }
+      if (device) this.deviceClients.set(ws, device.id);
+      this.onConnect(ws);
+    });
 
     await new Promise<void>((resolve, reject) => {
       this.http?.once('error', reject);
       this.http?.listen(config.port, config.host, () => resolve());
     });
+    try {
+      this.auth = this.deps.auth ?? new AuthStore();
+      this.unsubscribeRevoke = this.auth.onRevoke((id) => {
+        for (const [ws, device] of this.deviceClients) if (device === id) ws.terminate();
+      });
+    } catch (error) {
+      await this.stop();
+      throw error;
+    }
     log.info(`listening on http://${config.host}:${config.port} (web root ${root})`);
 
     sessions.onEvent((msg) => this.broadcast(msg));
@@ -160,8 +280,12 @@ export class PocketServer {
       open: this.deps.sessions.openStates(),
     });
     ws.on('message', (data) => void this.onMessage(ws, data));
-    ws.on('close', () => this.clients.delete(ws));
-    ws.on('error', () => this.clients.delete(ws));
+    const remove = () => {
+      this.clients.delete(ws);
+      this.deviceClients.delete(ws);
+    };
+    ws.on('close', remove);
+    ws.on('error', remove);
   }
 
   private ack(ws: WebSocket, id: string, ok: boolean, payload?: unknown, code?: ErrorCode): void {
@@ -174,6 +298,16 @@ export class PocketServer {
   }
 
   private async onMessage(ws: WebSocket, data: unknown): Promise<void> {
+    const device = this.deviceClients.get(ws);
+    try {
+      if (this.authRequired && (!device || !this.auth.touch(device))) {
+        ws.terminate();
+        return;
+      }
+    } catch {
+      ws.terminate();
+      return;
+    }
     let env: ClientEnvelope;
     try {
       const parsed = Envelope.safeParse(JSON.parse(String(data)));
@@ -308,6 +442,7 @@ export class PocketServer {
 
   private startPortsPolling(): void {
     this.portsTimer = setInterval(() => {
+      this.auth.sweep();
       if (this.clients.size === 0) return;
       const ports = listPorts(this.deps.config.port);
       if (JSON.stringify(ports) !== JSON.stringify(this.lastPorts)) {
@@ -332,7 +467,15 @@ export class PocketServer {
     res: http.ServerResponse,
     root: string,
   ): Promise<void> {
-    const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+    if (!this.authRequired && !loopbackHostAllowed(req.headers.host))
+      return this.json(res, { error: 'forbidden host' }, 403);
+    let url: URL;
+    try {
+      url = new URL(req.url ?? '/', 'http://localhost');
+    } catch {
+      return this.json(res, { error: 'invalid URL' }, 400);
+    }
+    if (url.pathname.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
     if (
       url.pathname.startsWith('/api/') &&
       !this.originAllowed(req.headers.origin, req.headers.host)
@@ -348,6 +491,17 @@ export class PocketServer {
       }
     }
     try {
+      if (url.pathname.startsWith('/api/') && (req.method === 'POST' || req.method === 'DELETE'))
+        requireJson(req);
+      const token = deviceCookieToken(req.headers.cookie);
+      const device = url.pathname.startsWith('/api/') ? this.auth.authenticate(token) : undefined;
+      if (device && token) res.setHeader('Set-Cookie', this.deviceCookie(req, token));
+      if (url.pathname.startsWith('/api/auth/'))
+        return await this.handleAuth(req, res, url, device);
+      if (this.authRequired && url.pathname.startsWith('/api/') && !device)
+        return this.json(res, { error: 'unauthorized' }, 401);
+      if (url.pathname.startsWith('/api/') && req.method !== 'GET')
+        return this.json(res, { error: 'method not allowed' }, 405);
       if (url.pathname === '/api/health') {
         return this.json(res, {
           ok: true,
@@ -405,9 +559,100 @@ export class PocketServer {
       // static / SPA
       return this.serveStatic(url.pathname, res, root);
     } catch (e) {
+      if (e instanceof AuthError) return this.json(res, { error: e.message }, e.status);
       this.deps.log.error(`http ${req.method} ${req.url}: ${(e as Error).message}`);
       return this.json(res, { error: (e as Error).message }, 500);
     }
+  }
+
+  private deviceCookie(req: http.IncomingMessage, token: string, maxAge = DEVICE_MAX_AGE): string {
+    const secure =
+      ('encrypted' in req.socket && req.socket.encrypted) ||
+      (isLoopback(req.socket.remoteAddress ?? '') && req.headers['x-forwarded-proto'] === 'https');
+    return `dp_device=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
+  }
+
+  private async handleAuth(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    url: URL,
+    device?: PairedDevice,
+  ): Promise<void> {
+    const route = url.pathname;
+    if (route === '/api/auth/status' && req.method === 'GET') {
+      const status: AuthStatus = {
+        required: this.authRequired,
+        paired: !!device,
+        ...(device ? { deviceId: device.id } : {}),
+      };
+      return this.json(res, status);
+    }
+    if (route === '/api/auth/pair' && req.method === 'POST') {
+      let body: unknown;
+      try {
+        body = await jsonBody(req);
+      } catch (error) {
+        if (error instanceof AuthError && error.status === 400)
+          this.auth.redeem({}, req.socket.remoteAddress ?? 'unknown');
+        throw error;
+      }
+      const parsed = z
+        .object({
+          token: z.string().min(1).max(128).optional(),
+          code: z.string().min(1).max(32).optional(),
+          name: z.string().max(80).optional(),
+        })
+        .strict()
+        .safeParse(body);
+      const paired = this.auth.redeem(
+        parsed.success
+          ? {
+              ...parsed.data,
+              name: parsed.data.name ?? defaultDeviceName(req.headers['user-agent']),
+            }
+          : {},
+        req.socket.remoteAddress ?? 'unknown',
+      );
+      res.setHeader('Set-Cookie', this.deviceCookie(req, paired.token));
+      return this.json(res, { device: paired.device });
+    }
+    const bearer = req.headers.authorization?.match(/^Bearer ([\w-]{43})$/)?.[1];
+    const admin =
+      isLoopback(req.socket.remoteAddress ?? '') && !!bearer && this.auth.isAdmin(bearer);
+    if (!device && !admin) return this.json(res, { error: 'unauthorized' }, 401);
+    if (req.method === 'POST' || req.method === 'DELETE') {
+      const body = await jsonBody(req);
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length)
+        throw new AuthError(400, 'expected empty JSON object');
+    }
+    if (route === '/api/auth/pairings' && req.method === 'POST') {
+      if (!this.authRequired) throw new AuthError(409, 'pairing is not required');
+      const grant = this.auth.createGrant();
+      const response: PairingResponse = {
+        ...grant,
+        urls: pairingUrls(this.deps.config.host, this.port, grant.token),
+      };
+      return this.json(res, response);
+    }
+    if (route === '/api/auth/devices' && req.method === 'GET')
+      return this.json(res, { devices: this.auth.list(device?.id) });
+    if (route === '/api/auth/devices' && req.method === 'DELETE') {
+      this.auth.revokeOthers(device?.id);
+      return this.json(res, { ok: true });
+    }
+    if (route.startsWith('/api/auth/devices/') && req.method === 'DELETE') {
+      if (!this.auth.revoke(decodeURIComponent(route.slice('/api/auth/devices/'.length))))
+        throw new AuthError(404, 'device not found');
+      if (route.endsWith(`/${device?.id}`))
+        res.setHeader('Set-Cookie', this.deviceCookie(req, '', 0));
+      return this.json(res, { ok: true });
+    }
+    if (route === '/api/auth/logout' && req.method === 'POST') {
+      if (device) this.auth.revoke(device.id);
+      res.setHeader('Set-Cookie', this.deviceCookie(req, '', 0));
+      return this.json(res, { ok: true });
+    }
+    return this.json(res, { error: 'not found' }, 404);
   }
 
   private report(res: http.ServerResponse): void {
@@ -477,6 +722,8 @@ export class PocketServer {
     if (this.portsTimer) clearInterval(this.portsTimer);
     for (const ws of this.clients) ws.close();
     this.clients.clear();
+    this.deviceClients.clear();
+    this.unsubscribeRevoke?.();
     await new Promise<void>((r) => this.wss?.close(() => r()));
     await new Promise<void>((r) => this.http?.close(() => r()));
   }
