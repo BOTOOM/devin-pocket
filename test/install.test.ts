@@ -47,18 +47,23 @@ function fixture(major?: number, platform = 'Linux', npm = true) {
   executable(
     'curl',
     `${record}
+[[ "\${MOCK_FAIL_STAGE:-}" != curl ]] || exit 1
+if [[ "\${MOCK_FAIL_STAGE:-}" == setup ]]; then printf 'exit 1\\n'; exit; fi
 target=\${2##*setup_}; target=\${target%.x}
 printf 'printf "%s" > "$MOCK_ROOT/node-target"\\n' "$target"`,
   );
-  executable(
-    'apt-get',
-    `${record}
+  if (platform !== 'Arch')
+    executable(
+      'apt-get',
+      `${record}
+if [[ "\${MOCK_FAIL_STAGE:-}" == update && "$1" == update ]]; then exit 1; fi
+if [[ "\${MOCK_FAIL_STAGE:-}" == dependencies && "$*" == *ca-certificates* ]]; then exit 1; fi
 if [[ "$*" == *nodejs* ]]; then
   [[ "\${MOCK_INSTALL_FAIL:-0}" != 1 ]] || exit 1
   printf '%s' "$(< "$MOCK_ROOT/node-target")" > "$MOCK_ROOT/node-major"
   /bin/cp "$MOCK_ROOT/node-template" "$MOCK_ROOT/bin/node"
 fi`,
-  );
+    );
   if (platform === 'Darwin')
     executable(
       'brew',
@@ -68,6 +73,7 @@ case "$1" in
     [[ "$3" != node@26 ]] || exit 1
     if [[ "$3" == node ]]; then printf 'node: stable %s.13.1 (bottled), HEAD\\n' "\${MOCK_BREW_MAJOR:-26}"; fi ;;
   install)
+    [[ "\${MOCK_INSTALL_FAIL:-0}" != 1 ]] || exit 1
     target=26; if [[ "$2" == node@24 ]]; then target=24; fi
     printf '%s' "$target" > "$MOCK_ROOT/node-major"
     /bin/mkdir -p "$MOCK_ROOT/brew-prefix/bin"
@@ -79,6 +85,7 @@ esac`,
     executable(
       'pkg',
       `${record}
+[[ "\${MOCK_INSTALL_FAIL:-0}" != 1 ]] || exit 1
 printf '%s' "\${MOCK_PKG_MAJOR:-26}" > "$MOCK_ROOT/node-major"
 /bin/cp "$MOCK_ROOT/node-template" "$MOCK_ROOT/bin/node"`,
     );
@@ -151,10 +158,49 @@ describe.skipIf(process.platform === 'win32')('Node selection in the general ins
       expect(f.commands()).toContain('pkg|install|-y|nodejs-lts|');
     else expect(f.commands()).not.toContain('pkg|');
   });
-  it('aborts on NodeSource installation failure before installing Pocket', () => {
-    const f = fixture(22);
-    expect(f.run({ MOCK_INSTALL_FAIL: '1' }).status).not.toBe(0);
-    expect(f.commands()).not.toContain('npm|');
+  it.each(['Linux', 'Darwin', 'Termux', 'Arch', 'DarwinNoBrew'])(
+    'continues on supported Node after a failed/unavailable %s upgrade',
+    (platform) => {
+      for (const major of [22, 23]) {
+        const f = fixture(major, platform);
+        const result = f.run({ MOCK_INSTALL_FAIL: '1' });
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stderr).toContain('Warning: continuing with supported Node.js');
+        expect(result.stderr).toContain('Aviso:');
+        expect(result.stderr).toContain('https://nodejs.org');
+        expect(f.commands()).toContain('npm|install|-g|devin-pocket@latest|');
+      }
+    },
+  );
+  it.each(['update', 'dependencies', 'curl', 'setup'])(
+    'continues after NodeSource %s failure without running later installation steps',
+    (stage) => {
+      const f = fixture(22);
+      const result = f.run({ MOCK_FAIL_STAGE: stage });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stderr).toContain('Warning: continuing with supported Node.js');
+      expect(f.commands()).not.toContain('apt-get|install|-y|nodejs|');
+      expect(f.commands()).toContain('npm|install|-g|devin-pocket@latest|');
+    },
+  );
+  it.each(['Linux', 'Darwin', 'Termux', 'Arch', 'DarwinNoBrew'])(
+    '%s rejects missing/unsupported Node if automatic installation fails or is unavailable',
+    (platform) => {
+      for (const major of [undefined, 20, 21]) {
+        const f = fixture(major, platform);
+        const result = f.run({ MOCK_INSTALL_FAIL: '1' });
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('Node.js >=22 required');
+        expect(f.commands()).not.toContain('npm|');
+      }
+    },
+  );
+  it('continues when native Termux can only supply supported Node 22', () => {
+    const f = fixture(undefined, 'Termux');
+    const result = f.run({ MOCK_PKG_MAJOR: '22' });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toContain('Warning: continuing with supported Node.js');
+    expect(f.commands()).toContain('npm|install|-g|devin-pocket@latest|');
   });
   it('does not replace a supported Node installation when npm is missing', () => {
     const f = fixture(26, 'Linux', false);

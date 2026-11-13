@@ -48,12 +48,15 @@ ubuntu_install() (
   if [[ "$node_target" != 0 ]]; then
     say "Instalando Node.js $node_target LTS desde NodeSource…"
     curl --fail --show-error --location --retry 3 --proto '=https' --proto-redir '=https' \
-      "https://deb.nodesource.com/setup_${node_target}.x" -o "$stage/node-setup.sh"
-    bash "$stage/node-setup.sh"
-    apt-get install -y nodejs
+      "https://deb.nodesource.com/setup_${node_target}.x" -o "$stage/node-setup.sh" &&
+      bash "$stage/node-setup.sh" &&
+      apt-get install -y nodejs || true
   fi
   node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || printf '0')
-  [[ "$node_major" -ge 24 ]] || err 'No se pudo preparar Node.js 24 o posterior. Revisa los errores de NodeSource e inténtalo de nuevo.'
+  [[ "$node_major" -ge 22 ]] || err 'Se necesita Node.js 22 o posterior / Node.js 22 or later is required. Revisa los errores de NodeSource / Check the NodeSource errors: https://nodejs.org'
+  if [[ "$node_major" -lt 24 ]]; then
+    say 'Aviso: se continúa con Node.js 22/23 compatible. Actualiza manualmente a Node.js 24 LTS: curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs / Warning: continuing with supported Node.js 22/23. Upgrade manually to Node.js 24 LTS with that command.' >&2
+  fi
   has npm || err 'Se necesita npm. Repara la instalación de Node.js y vuelve a intentarlo.'
 
   if ! has devin; then

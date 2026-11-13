@@ -74,8 +74,11 @@ y recurre a npm si falla. Si falta Devin CLI, solo muestra instrucciones:
 **no** instala Devin CLI ni inicia Pocket. Para Android completo usa el siguiente.
 
 Selección de Node: si falta, instala **Node 26 LTS**; si la versión mayor instalada
-es menor que 24, actualiza a **Node 24 LTS**; deja **24+** sin cambios. El mínimo de
-ejecución de la app sigue siendo **22**. Termux nativo usa el paquete disponible
+es menor que 24, intenta actualizar a **Node 24 LTS**; deja **24+** sin cambios.
+Si la actualización no está disponible o falla, continúa con Node **22/23**,
+un aviso e instrucciones para actualizar manualmente; si falta Node o su versión
+mayor es menor que **22**, se detiene. El mínimo de ejecución de la app sigue siendo
+**22**. Termux nativo usa el paquete disponible
 `pkg install nodejs-lts`, ya que `pkg` no permite elegir una versión mayor. En macOS,
 Homebrew ofrece actualmente 26 como `node` (aún no existe `node@26`) y 24 como
 `node@24`; añade al PATH de tu shell el directorio `bin` que muestra el instalador.
@@ -262,8 +265,7 @@ marcadores internos, no opciones del usuario; Termux/proot también usa marcador
 ## Windows (experimental)
 
 El servidor en Windows nativo es **experimental** y aún no se ha verificado en
-hardware real. Usa PowerShell en Windows Terminal con Node.js 24+ para el instalador
-(el mínimo de ejecución de la app sigue siendo 22+) y
+hardware real. Usa PowerShell en Windows Terminal con Node.js 22+ (se recomienda 24+) y
 [Devin CLI oficial para Windows](https://docs.devin.ai/work-with-devin/devin-cli).
 
 ```powershell
@@ -273,7 +275,8 @@ irm https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install.ps1 | iex
 El instalador no instala Node automáticamente. Si falta, muestra
 `winget install OpenJS.NodeJS.LTS --version 26.13.1` para Node 26. Si la versión
 mayor instalada es menor que 24, sugiere en su lugar
-`winget install OpenJS.NodeJS.LTS --version 24.22.1`. Deja Node 24+ sin cambios.
+`winget upgrade OpenJS.NodeJS.LTS --version 24.22.1`. Continúa con Node 22/23 y un
+aviso; rechaza versiones menores que 22. Deja Node 24+ sin cambios.
 Necesita `devin.exe` en PATH: instala Devin con
 `irm https://static.devin.ai/cli/setup.ps1 | iex` y vuelve a abrir PowerShell.
 Para autorizar explícitamente que el instalador ejecute el de Devin, descarga

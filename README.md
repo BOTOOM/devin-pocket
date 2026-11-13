@@ -75,8 +75,10 @@ missing; it does **not** install Devin CLI or start Pocket. For complete Android
 setup, use the next installer.
 
 Node selection: if absent, install **Node 26 LTS**; if the installed major is below
-24, upgrade to **Node 24 LTS**; leave **24+** unchanged. The packaged app's runtime
-minimum remains **22**. Native Termux uses the available `pkg install nodejs-lts`
+24, try upgrading to **Node 24 LTS**; leave **24+** unchanged. If upgrading is
+unavailable or fails, Node **22/23** continues with a warning and manual upgrade
+instructions; missing Node or a major below **22** is an error. The packaged app's
+runtime minimum remains **22**. Native Termux uses the available `pkg install nodejs-lts`
 package because `pkg` cannot select a major. On macOS, Homebrew currently provides
 26 as `node` (there is no `node@26` formula yet) and 24 as `node@24`; add the printed
 formula `bin` directory to your shell's PATH when prompted.
@@ -277,8 +279,7 @@ process markers, not user settings; Termux/proot also uses platform detection ma
 ## Windows (experimental)
 
 Native Windows hosting is **experimental**, not yet verified on real hardware.
-Use PowerShell in Windows Terminal with Node.js 24+ for the installer (the app
-runtime still supports 22+) and the official
+Use PowerShell in Windows Terminal with Node.js 22+ (24+ recommended) and the official
 [Devin CLI for Windows](https://docs.devin.ai/work-with-devin/devin-cli).
 
 ```powershell
@@ -288,7 +289,8 @@ irm https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install.ps1 | iex
 The installer does not install Node automatically. If missing, it prints
 `winget install OpenJS.NodeJS.LTS --version 26.13.1` for Node 26. If an installed
 Node major is below 24, it instead suggests
-`winget install OpenJS.NodeJS.LTS --version 24.22.1`. Existing Node 24+ is unchanged.
+`winget upgrade OpenJS.NodeJS.LTS --version 24.22.1`. Node 22/23 continues with a
+warning; Node below 22 is rejected. Existing Node 24+ is unchanged.
 It requires `devin.exe` on PATH; install Devin
 with `irm https://static.devin.ai/cli/setup.ps1 | iex`, then reopen PowerShell.
 To explicitly let Pocket's installer run the Devin installer, download

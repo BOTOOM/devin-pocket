@@ -43,11 +43,19 @@ describe.skipIf(!available)('PowerShell installer', () => {
       expect(result.stdout).toContain('experimental native Windows');
     },
   );
-  it.each(['v20.0.0', 'v22.0.0', 'v23.0.0'])('rejects old Node %s and suggests 24', (node) => {
+  it.each(['v20.0.0', 'v21.0.0'])('rejects unsupported Node %s and suggests 24', (node) => {
     const result = run('latest', node);
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('winget install OpenJS.NodeJS.LTS --version 24.22.1');
+    expect(result.stderr).toContain('winget upgrade OpenJS.NodeJS.LTS --version 24.22.1');
     expect(result.stdout).not.toContain('NPM:');
+  });
+  it.each(['v22.0.0', 'v23.0.0'])('warns and continues with supported Node %s', (node) => {
+    const result = run('latest', node);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('Continuing with supported Node.js');
+    expect(result.stdout).toContain('Node.js 22/23 es compatible');
+    expect(result.stdout).toContain('winget upgrade OpenJS.NodeJS.LTS --version 24.22.1');
+    expect(result.stdout).toContain('NPM: install|-g|devin-pocket@latest');
   });
   it('suggests Node 26 when Node is absent, without auto-installing it', () => {
     const result = run('latest', '');

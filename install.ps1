@@ -17,8 +17,11 @@ if ($nodeVersion -match '^v([0-9]+)\.') { $nodeMajor = [int]$Matches[1] }
 if ($nodeExit -ne 0 -or $nodeMajor -eq 0) {
     throw 'Could not determine the Node.js version. Repair the installation, reopen PowerShell and retry.'
 }
+if ($nodeMajor -lt 22) {
+    throw 'Node.js 22+ is required. Upgrade to Node.js 24 LTS with: winget upgrade OpenJS.NodeJS.LTS --version 24.22.1. Then reopen PowerShell.'
+}
 if ($nodeMajor -lt 24) {
-    throw 'Upgrade Node.js <24 to Node.js 24 LTS with: winget install OpenJS.NodeJS.LTS --version 24.22.1. Then reopen PowerShell. Existing Node.js 24+ is left unchanged; the app runtime minimum remains 22.'
+    Write-Warning 'Continuing with supported Node.js 22/23. Upgrade manually to Node.js 24 LTS with: winget upgrade OpenJS.NodeJS.LTS --version 24.22.1. / Node.js 22/23 es compatible; se permite continuar. Actualiza manualmente a Node.js 24 LTS con ese comando.'
 }
 if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
     throw 'npm is required. Reinstall Node.js LTS, then reopen PowerShell.'

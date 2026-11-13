@@ -66,7 +66,10 @@ exec /bin/bash "$MOCK_ROOT/guest-script.sh" "$@"`,
   executable(
     guestBin,
     'apt-get',
-    `${record}\nif [[ "$*" == *nodejs* && "\${MOCK_NODE_INSTALL_FAIL:-0}" != 1 ]]; then cp "$MOCK_ROOT/node-target" "$MOCK_ROOT/node-installed"; fi`,
+    `${record}\nif [[ "$*" == *nodejs* ]]; then
+  [[ "\${MOCK_NODE_INSTALL_FAIL:-0}" != 1 ]] || exit 1
+  if [[ "\${MOCK_NODE_INSTALL_FAIL:-0}" != unchanged ]]; then cp "$MOCK_ROOT/node-target" "$MOCK_ROOT/node-installed"; fi
+fi`,
   );
   executable(
     guestBin,
@@ -93,7 +96,11 @@ while [[ $# -gt 0 ]]; do
 done
 case "$url" in
   */tarball/*) cp "$MOCK_ROOT/source.tar.gz" "$output" ;;
-  */setup_24.x|*/setup_26.x) target=\${url##*setup_}; printf '%s\\n' "\${target%.x}" > "$MOCK_ROOT/node-target"; printf 'true\\n' > "$output" ;;
+  */setup_24.x|*/setup_26.x)
+    [[ "\${MOCK_NODE_SETUP_FAIL:-}" != download ]] || exit 1
+    target=\${url##*setup_}; printf '%s\\n' "\${target%.x}" > "$MOCK_ROOT/node-target"
+    if [[ "\${MOCK_NODE_SETUP_FAIL:-}" == script ]]; then printf 'exit 1\\n' > "$output"
+    else printf 'true\\n' > "$output"; fi ;;
   https://cli.devin.ai/install.sh)
     printf '#!/bin/bash\\nprintf "#!/bin/bash\\\\nprintf devin-mock\\\\n" > "$HOME/.local/bin/devin"\\nchmod +x "$HOME/.local/bin/devin"\\n' > "$output" ;;
   *) printf 'mock package' > "$output" ;;
@@ -413,16 +420,40 @@ describe.skipIf(process.platform === 'win32')('Termux bootstrap installer', () =
     }
   });
 
-  it('reports a failed Node upgrade clearly before installing Pocket', () => {
-    const f = fixture();
-    const result = f.run(['--package', 'devin-pocket@0.1.5'], {
-      MOCK_NODE_MAJOR: '22',
-      MOCK_NODE_INSTALL_FAIL: '1',
-    });
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('No se pudo preparar Node.js 24 o posterior');
-    expect(f.commands()).not.toContain('npm|install|');
-  });
+  it.each(['download', 'script', 'install', 'unchanged'])(
+    'warns and continues after a NodeSource %s failure on supported Node',
+    (stage) => {
+      for (const major of ['22', '23']) {
+        const f = fixture();
+        const result = f.run(['--package', 'devin-pocket@0.1.5'], {
+          MOCK_NODE_MAJOR: major,
+          MOCK_NODE_INSTALL_FAIL:
+            stage === 'install' ? '1' : stage === 'unchanged' ? 'unchanged' : '0',
+          MOCK_NODE_SETUP_FAIL: stage,
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stderr).toContain('Aviso: se continúa con Node.js 22/23 compatible');
+        expect(result.stderr).toContain('Warning:');
+        expect(result.stderr).toContain('https://deb.nodesource.com/setup_24.x');
+        expect(f.commands()).toContain('npm|install|-g|devin-pocket@0.1.5|');
+        if (stage === 'download' || stage === 'script')
+          expect(f.commands()).not.toContain('apt-get|install|-y|nodejs|');
+      }
+    },
+  );
+  it.each(['missing', '20', '21'])(
+    'rejects unsupported Node %s after a failed installation',
+    (major) => {
+      const f = fixture();
+      const result = f.run(['--package', 'devin-pocket@0.1.5'], {
+        MOCK_NODE_MAJOR: major,
+        MOCK_NODE_INSTALL_FAIL: '1',
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('Node.js 22 or later is required');
+      expect(f.commands()).not.toContain('npm|install|');
+    },
+  );
 
   it('downloads an HTTPS tarball before installing it with npm', () => {
     const f = fixture();
