@@ -21,25 +21,48 @@ if [[ "$(id -u)" -ne 0 ]] && ! is_termux_host && has sudo; then SUDO=sudo; fi
 node_major() { node -p "process.versions.node.split('.')[0]" 2>/dev/null || printf '0'; }
 
 install_node() {
+  local target=$1 formula formula_major formula_prefix
   if is_termux_host; then
+    # pkg cannot pin a Node major: use its available LTS for both install and upgrade.
     say 'Installing Node.js LTS in Termux / Instalando Node.js LTS en Termux…'
-    pkg install -y nodejs-lts
+    pkg install -y nodejs-lts || return 1
   elif [[ "$(uname -s)" == Darwin* ]]; then
-    has brew || err 'Install Homebrew first / Instala Homebrew primero: https://brew.sh'
-    brew install node@22 || brew upgrade node@22 || true
+    has brew || return 1
+    formula="node@$target"
+    if ! brew info --formula "$formula" >/dev/null 2>&1; then
+      # Active LTS may still be the unversioned formula (currently Node 26).
+      formula_major=$(HOMEBREW_NO_COLOR=1 brew info --formula node | sed -n '1s/.*stable \([0-9][0-9]*\)\..*/\1/p') || return 1
+      [[ "$formula_major" == "$target" ]] || return 1
+      formula=node
+    fi
+    say "Installing Node.js $target (Homebrew) / Instalando Node.js $target…"
+    brew install "$formula" || return 1
+    formula_prefix=$(brew --prefix "$formula") || return 1
+    export PATH="$formula_prefix/bin:$PATH"
+    say "Add to PATH / Añade al PATH: $formula_prefix/bin"
   elif has apt-get; then
-    say 'Installing Node.js 22 (NodeSource) / Instalando Node.js 22…'
-    $SUDO apt-get update
-    $SUDO apt-get install -y ca-certificates curl
-    curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO bash -
-    $SUDO apt-get install -y nodejs
+    say "Installing Node.js $target (NodeSource) / Instalando Node.js $target…"
+    $SUDO apt-get update || return 1
+    $SUDO apt-get install -y ca-certificates curl || return 1
+    curl -fsSL "https://deb.nodesource.com/setup_${target}.x" | $SUDO bash - || return 1
+    $SUDO apt-get install -y nodejs || return 1
   else
-    err 'Install Node.js 22+ first / Instala Node.js 22+ primero: https://nodejs.org'
+    return 1
   fi
 }
 
-if ! has node || [[ "$(node_major)" -lt "$MIN_NODE" ]]; then install_node; fi
-[[ "$(node_major)" -ge "$MIN_NODE" ]] || err "Node.js >=${MIN_NODE} required / Se requiere Node.js >=${MIN_NODE}"
+major=$(node_major)
+target=0
+if [[ "$major" == 0 ]]; then target=26
+elif [[ "$major" -lt 24 ]]; then target=24
+fi
+if [[ "$target" != 0 ]]; then install_node "$target" || true; fi
+major=$(node_major)
+[[ "$major" -ge "$MIN_NODE" ]] || err "Node.js >=${MIN_NODE} required / Se requiere Node.js >=${MIN_NODE}. Install Node.js $target manually / Instala Node.js $target manualmente: https://nodejs.org"
+if [[ "$major" -lt 24 ]]; then
+  say 'Warning: continuing with supported Node.js 22/23. Upgrade manually to Node.js 24 LTS with your package manager or https://nodejs.org / Aviso: se continúa con Node.js 22/23 compatible. Actualiza manualmente a Node.js 24 LTS con tu gestor de paquetes o https://nodejs.org' >&2
+fi
+has npm || err 'npm is required / Se necesita npm. Repair your Node.js installation / Repara la instalación de Node.js.'
 
 NPM_G=(npm install -g)
 # Global npm dir usually needs root outside Termux; fall back to sudo only if not writable.

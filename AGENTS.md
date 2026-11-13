@@ -125,6 +125,13 @@ devin-pocket devices [revoke <id|all>]
 
 ## Termux / proot notes
 
+- Installer policy: missing Node → 26 LTS; installed major <24 → try 24 LTS; ≥24 →
+  no Node installation. If upgrading fails/is unavailable, warn with manual upgrade
+  instructions and continue on Node 22/23; reject missing Node or <22 after the attempt.
+  The packaged runtime minimum remains Node 22. NodeSource
+  uses setup_26.x/setup_24.x. Native Termux `pkg` cannot pin majors and uses its
+  available nodejs-lts. Homebrew currently uses `node` for 26 and `node@24` for 24;
+  the installer sets its PATH and prints the persistent shell PATH instruction.
 - `install-termux.sh` creates host-side `devin-pocket` (primary) and
   `devin-pocket-ubuntu` (compatibility alias), forwarding all arguments into the
   selected `--distro`. Existing launchers/widget shortcuts are preserved. An
@@ -144,7 +151,11 @@ devin-pocket devices [revoke <id|all>]
   PowerShell / Windows Terminal: `irm https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install.ps1 | iex`.
   Manual install: `npm.cmd install -g devin-pocket@latest`; launch `devin-pocket`
   (or `devin-pocket.cmd` if PowerShell blocks npm's script shim).
-- Node 22+ required; installer only prints the winget hint. Devin's official
+- Runtime Node 22+ remains supported; the installer only prints winget hints:
+  missing Node → 26.13.1 install hint, installed major <24 → 24.22.1 upgrade hint
+  (OpenJS.NodeJS.LTS), ≥24 unchanged. Node 22/23 warns and continues; <22 errors.
+  Both pinned versions were verified in microsoft/winget-pkgs manifests. It never
+  auto-installs Node. Devin's official
   PowerShell installer runs only with explicit `-InstallDevin` consent.
 - PATH/PATHEXT resolution prefers native executables; batch agent launchers are
   rejected without a shell. Quote executable paths containing spaces in `--agent`.
