@@ -3,6 +3,58 @@ import { useSyncExternalStore } from 'react';
 export type Lang = 'es' | 'en';
 
 const es = {
+  'pair.title': 'Conecta tu dispositivo',
+  'pair.intro': 'Este Devin Pocket está protegido. Escanea el QR que muestra',
+  'pair.introEnd': 'o escribe el código.',
+  'pair.security':
+    'Empareja solo dispositivos de confianza. El acceso permite controlar el agente. En redes remotas, usa HTTPS.',
+  'pair.code': 'Código de acceso',
+  'pair.placeholder': 'ABCD-EFGH',
+  'pair.name': 'Nombre del dispositivo (opcional)',
+  'pair.namePlaceholder': 'Mi teléfono',
+  'pair.submit': 'Emparejar dispositivo',
+  'pair.connecting': 'Comprobando la conexión…',
+  'pair.redeeming': 'Emparejando este dispositivo…',
+  'pair.error.invalid':
+    'El código o enlace no es válido, ya se usó o ha caducado. Genera otro con devin-pocket pair.',
+  'pair.error.limited': 'Demasiados intentos. Espera un minuto antes de volver a intentarlo.',
+  'pair.error.network':
+    'No se pudo conectar. Comprueba la red y que Devin Pocket siga en ejecución, e inténtalo de nuevo.',
+  'pair.spanish': 'Usar español',
+  'pair.english': 'Usar inglés',
+  'devices.title': 'Dispositivos',
+  'devices.description': 'Administra quién puede acceder a este Devin Pocket.',
+  'devices.current': 'Este dispositivo',
+  'devices.created': 'Emparejado: {date}',
+  'devices.seen': 'Último uso: {time}',
+  'devices.empty': 'No hay dispositivos emparejados.',
+  'devices.loading': 'Cargando dispositivos…',
+  'devices.revoke': 'Revocar',
+  'devices.revokeLabel': 'Revocar acceso de {name}',
+  'devices.others': 'Revocar los demás',
+  'devices.logout': 'Desvincular este dispositivo',
+  'devices.confirm': '¿Revocar el acceso?',
+  'devices.confirm.one': 'Se desconectará {name}. Necesitará un nuevo código para volver a entrar.',
+  'devices.confirm.others':
+    'Se desconectarán todos los demás dispositivos. Este seguirá emparejado.',
+  'devices.confirm.logout':
+    'Este dispositivo se desconectará. Necesitarás un nuevo código para volver a entrar.',
+  'devices.revoked': 'Acceso revocado',
+  'devices.new': 'Nuevo QR de acceso',
+  'devices.qrDescription':
+    'Escanea desde otro dispositivo o introduce el código. El acceso es de un solo uso y caduca en diez minutos.',
+  'devices.qrLabel': 'QR de acceso a Devin Pocket',
+  'devices.generating': 'Generando acceso…',
+  'devices.limit':
+    'Hay demasiados códigos activos. Espera a que caduque uno (hasta diez minutos) y vuelve a intentarlo.',
+  'devices.expires': 'Caduca en {time}',
+  'devices.expired': 'Caducado',
+  'devices.regenerate': 'Generar otro',
+  'devices.copyLink': 'Copiar enlace',
+  'devices.copyCode': 'Copiar código',
+  'devices.copyError': 'No se pudo copiar. Selecciona el texto y cópialo manualmente.',
+  'devices.url': 'Enlace de acceso',
+  'devices.alternatives': 'Otras direcciones del servidor',
   'update.title': 'Actualización disponible',
   'update.notice': 'Nueva versión {version} disponible · ejecuta',
   'update.manual':
@@ -217,6 +269,58 @@ const es = {
 };
 
 const en: Record<keyof typeof es, string> = {
+  'pair.title': 'Connect your device',
+  'pair.intro': 'This Devin Pocket is protected. Scan the QR shown by',
+  'pair.introEnd': 'or enter the code.',
+  'pair.security':
+    'Only pair trusted devices. Access allows control of the agent. Use HTTPS on remote networks.',
+  'pair.code': 'Access code',
+  'pair.placeholder': 'ABCD-EFGH',
+  'pair.name': 'Device name (optional)',
+  'pair.namePlaceholder': 'My phone',
+  'pair.submit': 'Pair device',
+  'pair.connecting': 'Checking your connection…',
+  'pair.redeeming': 'Pairing this device…',
+  'pair.error.invalid':
+    'The code or link is invalid, already used or expired. Generate another with devin-pocket pair.',
+  'pair.error.limited': 'Too many attempts. Wait a minute before trying again.',
+  'pair.error.network':
+    'Could not connect. Check your network and that Devin Pocket is still running, then try again.',
+  'pair.spanish': 'Use Spanish',
+  'pair.english': 'Use English',
+  'devices.title': 'Devices',
+  'devices.description': 'Manage who can access this Devin Pocket.',
+  'devices.current': 'This device',
+  'devices.created': 'Paired: {date}',
+  'devices.seen': 'Last seen: {time}',
+  'devices.empty': 'No paired devices.',
+  'devices.loading': 'Loading devices…',
+  'devices.revoke': 'Revoke',
+  'devices.revokeLabel': 'Revoke access for {name}',
+  'devices.others': 'Revoke other devices',
+  'devices.logout': 'Unpair this device',
+  'devices.confirm': 'Revoke access?',
+  'devices.confirm.one':
+    '{name} will be disconnected and will need a new code to access Pocket again.',
+  'devices.confirm.others': 'All other devices will be disconnected. This device will stay paired.',
+  'devices.confirm.logout':
+    'This device will be disconnected. You will need a new code to access Pocket again.',
+  'devices.revoked': 'Access revoked',
+  'devices.new': 'New access QR',
+  'devices.qrDescription':
+    'Scan from another device or enter the code. Access is single-use and expires in ten minutes.',
+  'devices.qrLabel': 'Devin Pocket access QR',
+  'devices.generating': 'Generating access…',
+  'devices.limit':
+    'Too many active codes. Wait for one to expire (up to ten minutes), then try again.',
+  'devices.expires': 'Expires in {time}',
+  'devices.expired': 'Expired',
+  'devices.regenerate': 'Generate another',
+  'devices.copyLink': 'Copy link',
+  'devices.copyCode': 'Copy code',
+  'devices.copyError': 'Could not copy. Select the text and copy it manually.',
+  'devices.url': 'Access link',
+  'devices.alternatives': 'Other server addresses',
   'update.title': 'Update available',
   'update.notice': 'New version {version} available · run',
   'update.manual':

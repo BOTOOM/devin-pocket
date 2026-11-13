@@ -48,6 +48,19 @@ describe('parseArgs', () => {
 });
 
 describe('serializeArgs', () => {
+  it.each([
+    ['pair', '--qr=ascii', '--port', '7790'],
+    ['devices'],
+    ['devices', 'revoke', 'all'],
+    ['devices', 'revoke', 'device-id', '--host', '127.0.0.1'],
+    ['start', '--qr=ascii', '--no-open'],
+  ])('roundtrips pairing/device options: %j', (...argv) => {
+    const args = parseArgs(argv);
+    expect(parseArgs(serializeArgs(args))).toEqual(args);
+  });
+  it('requires a revoke target', () => {
+    expect(() => parseArgs(['devices', 'revoke'])).toThrow('revoke requires');
+  });
   it('roundtrips update options without treating the target as --version output', () => {
     const args = parseArgs(['update', '--check', '--version', '1.2.3', '--yes']);
     expect(args).toMatchObject({ cmd: 'update', check: true, version: '1.2.3', yes: true });

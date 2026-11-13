@@ -5,10 +5,12 @@ import path from 'node:path';
 import type { AgentStatus, BillingInfo } from '../shared/protocol.js';
 import { AgentProcess } from './acp/agent.js';
 import { type Args, parseArgs, serializeArgs } from './args.js';
+import { adminRequest, listDevices, pairing, printPairing, runningServerUrl } from './auth-cli.js';
 import { getCatalog, loadCatalog } from './catalog.js';
 import { doctorReport } from './doctor.js';
 import { PocketServer } from './http.js';
 import { Logger, readLogs, StderrSink } from './log.js';
+import { isLoopback } from './network.js';
 import {
   type Config,
   ensureDirs,
@@ -47,10 +49,6 @@ function wakeLock(): void {
   } catch {
     // termux-api missing — fine
   }
-}
-
-function isLoopback(host: string): boolean {
-  return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
 }
 
 function readPid(): number | null {
@@ -204,6 +202,7 @@ async function runServer(args: Args): Promise<ServerHandle> {
     log,
     config: merged,
     dev: args.dev,
+    authRequired: !isLoopback(merged.host),
     agentCwd: args.cwd ?? process.cwd(),
   });
   statusListeners.add((s) =>
@@ -220,6 +219,11 @@ async function runServer(args: Args): Promise<ServerHandle> {
     }
     throw e;
   }
+  fs.writeFileSync(
+    path.join(stateDir(), 'server.json'),
+    JSON.stringify({ host: merged.host, port: server.port }),
+    { mode: 0o600 },
+  );
   void loadCatalog(false, log).then((c) => server.broadcast({ type: 'catalog', catalog: c }));
   // refresh pricing once a day
   setInterval(
@@ -238,7 +242,9 @@ async function runServer(args: Args): Promise<ServerHandle> {
     prevPhase = s.phase;
   });
   if (!isLoopback(merged.host)) {
-    log.warn(`listening on ${merged.host} — exposed on the network without authentication`);
+    log.info(
+      `listening on ${merged.host} — protegido por emparejamiento / protected by pairing (no TLS)`,
+    );
   }
   agent.spawn();
 
@@ -258,7 +264,58 @@ const { config: fileConfig } = loadConfig();
 const port = args.port ?? fileConfig.port;
 const host = args.host ?? fileConfig.host;
 
+async function showPairing(open = false, waitForServer = false): Promise<void> {
+  const until = Date.now() + (waitForServer ? 15000 : 0);
+  while (true) {
+    try {
+      const grant = await pairing(args);
+      if (grant) {
+        printPairing(grant, args.qr === 'ascii');
+        if (open) {
+          const browserGrant = await pairing(args);
+          if (browserGrant?.urls[0]) openBrowser(browserGrant.urls[0]);
+        }
+      } else if (open) openBrowser(runningServerUrl(args).href);
+      return;
+    } catch (error) {
+      if (Date.now() < until) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        continue;
+      }
+      process.stderr.write(
+        `No se pudo conectar al servidor / Could not contact the running server: ${(error as Error).message}\n`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+  }
+}
+
 switch (args.cmd) {
+  case 'pair': {
+    await showPairing();
+    break;
+  }
+  case 'devices': {
+    try {
+      if (args.revoke) {
+        await adminRequest(
+          args.revoke === 'all'
+            ? '/api/auth/devices'
+            : `/api/auth/devices/${encodeURIComponent(args.revoke)}`,
+          'DELETE',
+          args,
+        );
+        process.stdout.write('Dispositivos revocados / Devices revoked\n');
+      } else await listDevices(args);
+    } catch (error) {
+      process.stderr.write(
+        `No se pudo contactar al servidor / Could not contact the running server: ${(error as Error).message}\n`,
+      );
+      process.exitCode = 1;
+    }
+    break;
+  }
   case 'update': {
     const packageDir = runningPackageDir();
     let startArgs = ['start'];
@@ -321,16 +378,17 @@ switch (args.cmd) {
           isTermux() ? 'Termux detectado — wake lock on' : '',
           isLoopback(host)
             ? ''
-            : 'Expuesta en la red sin autenticación / Exposed on the network without authentication — usa solo en redes de confianza / trusted networks only',
+            : 'Protegida por emparejamiento / Protected by pairing — sin TLS / no TLS',
         ].filter(Boolean),
       );
       const supervised = process.env.DEVIN_POCKET_DAEMON === '1';
-      if (args.open && !supervised) openBrowser(url);
       if (!supervised) wakeLock();
       await runServer(args);
       if (!supervised) {
         recordStartArgs(args);
         fs.writeFileSync(pidFile(), String(process.pid));
+        if (!isLoopback(host)) await showPairing(args.open);
+        else if (args.open) openBrowser(url);
       }
     } else {
       const pid = readPid();
@@ -346,10 +404,11 @@ switch (args.cmd) {
           `http://${host}:${port}`,
           isLoopback(host)
             ? ''
-            : 'Expuesta en la red sin autenticación / Exposed on the network without authentication — trusted networks only',
+            : 'Protegida por emparejamiento / Protected by pairing — sin TLS / no TLS',
         ].filter(Boolean),
       );
-      if (args.open) openBrowser(`http://${host}:${port}`);
+      if (!isLoopback(host)) await showPairing(args.open, true);
+      else if (args.open) openBrowser(`http://${host}:${port}`);
     }
     break;
   }
@@ -454,7 +513,7 @@ switch (args.cmd) {
     break;
   }
   case 'open': {
-    openBrowser(`http://127.0.0.1:${port}`);
+    await showPairing(true);
     break;
   }
   case 'version':
@@ -465,9 +524,11 @@ switch (args.cmd) {
       `devin-pocket — Devin en tu navegador / Devin in your browser
 
 Uso / Usage:
-  devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD] [--no-open] [--dev] [--foreground]
+  devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD] [--no-open] [--dev] [--foreground] [--qr=ascii]
   devin-pocket stop | restart | status | logs [-f] [-n N] | doctor | models | open | version | help
   devin-pocket update [--check] [--version X] [--yes]
+  devin-pocket pair [--qr=ascii] [--port N]
+  devin-pocket devices [revoke <id|all>]
 
 Sin comando = start · No command = start
 `,

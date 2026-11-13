@@ -28,6 +28,40 @@ export interface UpdateInfo {
   installManager?: 'npm' | 'pnpm' | null;
 }
 
+export interface AuthStatus {
+  required: boolean;
+  paired: boolean;
+  deviceId?: string;
+}
+
+export interface PairedDevice {
+  id: string;
+  name: string;
+  createdAt: number;
+  lastSeenAt: number;
+  current?: boolean;
+}
+
+export interface PairingGrant {
+  token: string;
+  code: string;
+  expiresAt: number;
+}
+
+export interface PairingResponse extends PairingGrant {
+  urls: string[];
+}
+
+export type PairRequest = ({ token: string; code?: never } | { code: string; token?: never }) & {
+  name?: string;
+};
+export interface PairResponse {
+  device: PairedDevice;
+}
+export interface DevicesResponse {
+  devices: PairedDevice[];
+}
+
 export type {
   ContentBlock,
   PermissionOption,

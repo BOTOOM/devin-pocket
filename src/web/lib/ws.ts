@@ -10,6 +10,7 @@ let seq = 0;
 let attempt = 0;
 let closed = false;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let checkAccess: (() => Promise<boolean>) | undefined;
 const pending = new Map<string, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 const sessionCreations = new Map<string, Promise<unknown>>();
 
@@ -19,7 +20,8 @@ function url(): string {
 
 function connect() {
   if (closed) return;
-  ws = new WebSocket(url());
+  const socket = new WebSocket(url());
+  ws = socket;
   ws.onopen = () => {
     attempt = 0;
     for (const h of connHandlers) h(true);
@@ -42,19 +44,23 @@ function connect() {
     }
     for (const h of handlers) h(msg);
   };
-  ws.onclose = () => {
+  ws.onclose = async () => {
+    if (ws !== socket) return;
     ws = null;
     for (const h of connHandlers) h(false);
     for (const p of pending.values()) p.reject(new Error('connection closed'));
     pending.clear();
-    if (!closed) {
+    if (!closed && (!checkAccess || (await checkAccess())) && !closed) {
       const delay = Math.min(1000 * 2 ** attempt++, 15000);
       retryTimer = setTimeout(connect, delay);
     }
   };
 }
 
-export function startSocket() {
+export function startSocket(check?: () => Promise<boolean>) {
+  if (ws) return;
+  if (retryTimer) clearTimeout(retryTimer);
+  checkAccess = check;
   closed = false;
   connect();
 }
@@ -62,7 +68,12 @@ export function startSocket() {
 export function stopSocket() {
   closed = true;
   if (retryTimer) clearTimeout(retryTimer);
-  ws?.close();
+  const socket = ws;
+  ws = null;
+  socket?.close();
+  for (const h of connHandlers) h(false);
+  for (const p of pending.values()) p.reject(new Error('connection closed'));
+  pending.clear();
 }
 
 export function onMessage(h: Handler): () => void {

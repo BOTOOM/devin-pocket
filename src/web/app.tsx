@@ -3,11 +3,14 @@ import { AgentGate } from '@/components/AgentGate';
 import { ChatScreen } from '@/components/Chat';
 import { DiagnosticsScreen } from '@/components/Diagnostics';
 import { DesktopWelcome, HomeScreen, SessionList } from '@/components/Home';
+import { PairScreen } from '@/components/PairScreen';
 import { SettingsScreen } from '@/components/Settings';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useT } from '@/i18n';
+import { initAuth, refreshAuth, useAuth } from '@/lib/auth';
 import { useRoute } from '@/lib/router';
+import { stopSocket } from '@/lib/ws';
 import { initStore, useStore } from '@/store';
 
 const desktopQuery = matchMedia('(min-width: 1024px)');
@@ -18,12 +21,22 @@ const subscribeDesktop = (notify: () => void) => {
 
 export function App() {
   const t = useT();
+  const auth = useAuth();
   const route = useRoute();
   const connected = useStore((s) => s.connected);
   const agent = useStore((s) => s.agent);
   const desktop = useSyncExternalStore(subscribeDesktop, () => desktopQuery.matches);
 
-  useEffect(() => initStore(), []);
+  useEffect(() => {
+    void initAuth();
+  }, []);
+  useEffect(() => {
+    if (auth.phase !== 'ready') return;
+    initStore(refreshAuth);
+    return stopSocket;
+  }, [auth.phase]);
+
+  if (auth.phase !== 'ready') return <PairScreen />;
 
   return (
     <TooltipProvider delayDuration={400}>

@@ -119,6 +119,8 @@ pnpm pack && npm install -g ./devin-pocket-*.tgz
 devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD] [--no-open]
 devin-pocket stop | restart | status | logs [-f] [-n N] | doctor | models | open
 devin-pocket update [--check] [--version X] [--yes]
+devin-pocket pair [--qr=ascii]
+devin-pocket devices [revoke <id|all>]
 ```
 
 ## Termux / proot notes
@@ -153,7 +155,7 @@ devin-pocket update [--check] [--version X] [--yes]
   Stop/restart kills the entire daemon tree via `taskkill /T /F` (forceful).
   SIGTERM/SIGINT handlers are used on POSIX; Windows stop does not rely on them.
 - No Windows Termux-like widget. WSL is not officially supported. Preserve the
-  loopback/no-client-auth warning. Windows CI runs Node 24 and parses install.ps1.
+  loopback/pairing/no-TLS warnings. Windows CI runs Node 24 and parses install.ps1.
 
 ## ACP facts we rely on
 
@@ -210,8 +212,18 @@ notifications `_cognition.ai/turn_stats` and `_cognition.ai/output`.
   not show — verify against the real agent (check `devin acp` behavior with
   `session/list` without cwd) and, if needed, persist **workspaces** (not sessions)
   the user has used. Product rule: no local session storage.
-- LAN binding (`--host 0.0.0.0`) is unauthenticated — origin checks only; token/pairing
-  auth is a TODO.
+- LAN binding (`--host 0.0.0.0`) is pairing-protected: device cookie required for
+  APIs/WS; `/api/auth/status` and grant redemption stay public. `auth.ts` stores
+  device hashes and a loopback-only CLI admin token (0600). `authRequired` in
+  ServerDeps can force pairing for a future loopback tunnel. No built-in TLS:
+  never expose directly to the internet. `web/lib/auth.ts` gates startup before
+  the socket and rechecks status before reconnecting; revocation returns to
+  PairScreen. Settings → Devices manages grants/revocation. Browser QR URLs use
+  location.origin (proxy-compatible), ECC M and an explicit white quiet zone.
+- `e2e/pairing.spec.ts` starts its own auth-required server on `0.0.0.0` with an
+  ephemeral test port and isolated XDG state under `test-results/pairing-server`.
+  It uses the loopback admin API; no production/test authentication bypass exists.
+  Pairing screenshots are saved to `test-results/pairing-web` (not committed).
 - Rename uses the agent's `/rename` slash command or a local `titles.json` override —
   the `cognition.ai/sessionRename` meta path is not wired.
 - `editedCommand` can't be sent back in the standard ACP permission response — the

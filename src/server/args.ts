@@ -12,6 +12,8 @@ export interface Args {
   check?: boolean;
   version?: string;
   yes?: boolean;
+  qr?: 'ascii';
+  revoke?: string;
 }
 
 export function parseArgs(argv: string[]): Args {
@@ -29,6 +31,16 @@ export function parseArgs(argv: string[]): Args {
       : argv.slice(a.cmd === argv[0] ? 1 : 0);
   for (let i = 0; i < rest.length; i++) {
     const t = rest[i];
+    if (t === '--qr=ascii') {
+      a.qr = 'ascii';
+      continue;
+    }
+    if (a.cmd === 'devices' && t === 'revoke') {
+      a.revoke = rest[++i];
+      if (!a.revoke || a.revoke.startsWith('-'))
+        throw new Error('revocar requiere un id o all / revoke requires an id or all');
+      continue;
+    }
     switch (t) {
       case '--port':
         a.port = Number(rest[++i]);
@@ -90,6 +102,15 @@ export function parseArgs(argv: string[]): Args {
  * supervised-child command lines so `restart` (or any cmd) always yields `start`.
  */
 export function serializeArgs(a: Args): string[] {
+  if (a.cmd === 'pair' || a.cmd === 'devices' || a.cmd === 'open') {
+    return [
+      a.cmd,
+      ...(a.revoke ? ['revoke', a.revoke] : []),
+      ...(a.port !== undefined ? ['--port', String(a.port)] : []),
+      ...(a.host ? ['--host', a.host] : []),
+      ...(a.qr ? ['--qr=ascii'] : []),
+    ];
+  }
   if (a.cmd === 'update') {
     return [
       'update',
@@ -104,5 +125,6 @@ export function serializeArgs(a: Args): string[] {
   if (a.cwd !== undefined) out.push('--cwd', a.cwd);
   if (a.agent !== undefined) out.push('--agent', a.agent);
   if (!a.open) out.push('--no-open');
+  if (a.qr) out.push('--qr=ascii');
   return out;
 }
