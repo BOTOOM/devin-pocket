@@ -225,7 +225,7 @@ export function Composer({
     <div className="safe-x safe-bottom relative border-t bg-background px-3 pb-2 pt-2">
       {(state?.queue.length ?? 0) > 0 && (
         <Collapsible open={queueOpen} onOpenChange={setQueueOpen} className="mb-2">
-          <CollapsibleTrigger className="flex min-h-8 w-full items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-accent/60">
+          <CollapsibleTrigger className="flex min-h-10 w-full items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-accent/60">
             {t('composer.queue', { count: state?.queue.length ?? 0 })}
             <ChevronDown
               className={`size-4 transition-transform ${queueOpen ? 'rotate-180' : ''}`}
@@ -382,7 +382,7 @@ export function Composer({
             <button
               key={m.uri}
               type="button"
-              className="rounded-md bg-accent px-2 py-1 text-xs text-accent-foreground"
+              className="min-h-10 max-w-full break-all rounded-md bg-accent px-2 py-1 text-left text-xs text-accent-foreground"
               onClick={() => setMentions((ms) => ms.filter((x) => x.uri !== m.uri))}
             >
               @{m.name} ×
@@ -419,7 +419,7 @@ export function Composer({
           <Button
             variant="ghost"
             size="icon"
-            className="size-7 shrink-0"
+            className="size-10 shrink-0"
             aria-label={t('common.cancel')}
             onClick={cancelEdit}
           >
@@ -427,18 +427,34 @@ export function Composer({
           </Button>
         </div>
       )}
-      <div className="flex items-end gap-1.5">
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={(e) => onFiles(e.target.files)}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={(e) => onFiles(e.target.files)}
+      />
+      <div className="min-w-0 rounded-xl border border-input bg-card shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+        <Textarea
+          ref={taRef}
+          value={text}
+          onChange={(e) => onTextChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !mentionOpen && enterToSend) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          placeholder={agentReady ? t('composer.placeholder') : t('chat.agentNotReady')}
+          disabled={!agentReady}
+          rows={1}
+          className={`max-h-36 min-h-11 w-full min-w-0 resize-none rounded-xl border-0 bg-transparent px-3 py-2.5 shadow-none focus-visible:ring-0 dark:bg-transparent ${
+            overflow ? 'overflow-y-auto' : 'overflow-y-hidden'
+          }`}
         />
-        {/* Utility buttons sit inside the input box so the textarea keeps room. */}
-        <div className="flex min-h-11 min-w-0 flex-1 items-end rounded-xl border border-input shadow-xs transition-[color,box-shadow] has-[:disabled]:opacity-50 focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 bg-card">
-          <div className="flex items-center self-end pb-1 pl-1">
+        <div className="flex items-center justify-between gap-2 p-1">
+          <div className="flex min-w-0 flex-wrap items-center">
             <Button
               variant="ghost"
               size="icon"
@@ -480,53 +496,39 @@ export function Composer({
               </span>
             </Button>
           </div>
-          <Textarea
-            ref={taRef}
-            value={text}
-            onChange={(e) => onTextChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !mentionOpen && enterToSend) {
-                e.preventDefault();
-                submit();
+          <div className="flex shrink-0 items-center gap-1.5">
+            {working && (
+              <Button
+                variant="destructive"
+                size="icon"
+                className="size-10 shrink-0 rounded-full"
+                aria-label={t('composer.stop')}
+                onClick={() => send({ type: 'cancel', sessionId }).catch(() => {})}
+              >
+                <Square className="size-4 fill-current" />
+              </Button>
+            )}
+            <Button
+              size="icon"
+              className="size-10 shrink-0 rounded-full"
+              aria-label={
+                editingId
+                  ? t('composer.saveEdit')
+                  : text.trim().startsWith('/btw ') && btwOk
+                    ? t('aside.ask')
+                    : working
+                      ? t('composer.queued')
+                      : t('composer.send')
               }
-            }}
-            placeholder={agentReady ? t('composer.placeholder') : t('chat.agentNotReady')}
-            disabled={!agentReady}
-            rows={1}
-            className={`max-h-36 min-h-11 min-w-0 flex-1 resize-none rounded-xl border-0 bg-transparent px-1 py-2.5 shadow-none focus-visible:ring-0 dark:bg-transparent ${
-              overflow ? 'overflow-y-auto' : 'overflow-y-hidden'
-            }`}
-          />
+              disabled={
+                !agentReady || (!text.trim() && images.length === 0 && mentions.length === 0)
+              }
+              onClick={submit}
+            >
+              {editingId ? <Check className="size-5" /> : <Send className="size-5" />}
+            </Button>
+          </div>
         </div>
-
-        {working && (
-          <Button
-            variant="destructive"
-            size="icon"
-            className="size-10 shrink-0 rounded-full"
-            aria-label={t('composer.stop')}
-            onClick={() => send({ type: 'cancel', sessionId }).catch(() => {})}
-          >
-            <Square className="size-4 fill-current" />
-          </Button>
-        )}
-        <Button
-          size="icon"
-          className="size-10 shrink-0 rounded-full"
-          aria-label={
-            editingId
-              ? t('composer.saveEdit')
-              : text.trim().startsWith('/btw ') && btwOk
-                ? t('aside.ask')
-                : working
-                  ? t('composer.queued')
-                  : t('composer.send')
-          }
-          disabled={!agentReady || (!text.trim() && images.length === 0 && mentions.length === 0)}
-          onClick={submit}
-        >
-          {editingId ? <Check className="size-5" /> : <Send className="size-5" />}
-        </Button>
       </div>
 
       <CommandPalette
