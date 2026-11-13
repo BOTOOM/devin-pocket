@@ -216,8 +216,14 @@ notifications `_cognition.ai/turn_stats` and `_cognition.ai/output`.
   APIs/WS; `/api/auth/status` and grant redemption stay public. `auth.ts` stores
   device hashes and a loopback-only CLI admin token (0600). `authRequired` in
   ServerDeps can force pairing for a future loopback tunnel. No built-in TLS:
-  never expose directly to the internet. The browser pairing UI is a separate
-  handoff; the server/CLI and shared response types are implemented first.
+  never expose directly to the internet. `web/lib/auth.ts` gates startup before
+  the socket and rechecks status before reconnecting; revocation returns to
+  PairScreen. Settings → Devices manages grants/revocation. Browser QR URLs use
+  location.origin (proxy-compatible), ECC M and an explicit white quiet zone.
+- `e2e/pairing.spec.ts` starts its own auth-required server on `0.0.0.0` with an
+  ephemeral test port and isolated XDG state under `test-results/pairing-server`.
+  It uses the loopback admin API; no production/test authentication bypass exists.
+  Pairing screenshots are saved to `test-results/pairing-web` (not committed).
 - Rename uses the agent's `/rename` slash command or a local `titles.json` override —
   the `cognition.ai/sessionRename` meta path is not wired.
 - `editedCommand` can't be sent back in the standard ACP permission response — the

@@ -316,8 +316,19 @@ escucha fuera de loopback.
 `devin-pocket start --host 0.0.0.0` protege todas las API y WebSockets mediante
 emparejamiento. La terminal muestra un QR, URLs y un código de un solo uso que
 caducan en diez minutos. La interfaz estática sigue siendo pública, pero no accede
-a los datos del agente sin emparejarse. **La pantalla de emparejamiento del navegador
-llegará en un cambio de UI separado; este servidor/CLI ofrece la API, todavía no esa pantalla.**
+a los datos del agente sin emparejarse. Escanea el QR para emparejar automáticamente,
+o abre Pocket e introduce el código (con o sin guion/espacios). Puedes asignar un
+nombre al dispositivo. El token del enlace se elimina de la barra de direcciones
+de inmediato. Los intentos inválidos, caducados o limitados muestran instrucciones
+sin conectarse al agente.
+
+En **Ajustes → Dispositivos**, consulta la fecha de emparejamiento, la actividad y
+la etiqueta del dispositivo actual. Revoca uno, todos los demás, o desvincula este;
+la revocación lo desconecta y devuelve su navegador a la pantalla de emparejamiento.
+**Nuevo QR de acceso** abre un QR con cuenta atrás, botones para copiar y regenerar.
+Usa la dirección desde la que accediste (incluido un proxy HTTPS); las direcciones
+del servidor aparecen como alternativas. Mientras el diálogo está abierto, los
+dispositivos recién emparejados aparecen automáticamente.
 
 ```sh
 devin-pocket pair                 # nuevo QR/código del servidor en ejecución
@@ -393,8 +404,8 @@ Se respeta `npm_config_registry` / `NPM_CONFIG_REGISTRY`; cada consulta vence a 
 ## Hoja de ruta y limitaciones
 
 Se planean flujos de cliente remoto para desktop/laptop. Hoy es una interfaz
-móvil servida por el equipo local. Quedan pendientes la pantalla de emparejamiento/acceso remoto
-autenticado y virtualización de listas/transcripts grandes. Los comandos editados
+móvil servida por el equipo local. Quedan pendientes los túneles de acceso remoto
+administrados y la virtualización de listas/transcripts grandes. Los comandos editados
 en permisos se muestran como solo lectura; las capacidades varían según el agente.
 
 ## Desarrollo

@@ -207,10 +207,11 @@ function handle(msg: ServerMessage) {
 }
 
 let started = false;
-export function initStore() {
-  if (started) return;
-  started = true;
-  onMessage(handle);
-  onConnection((c) => set({ connected: c }));
-  startSocket();
+export function initStore(checkAccess?: () => Promise<boolean>) {
+  if (!started) {
+    started = true;
+    onMessage(handle);
+    onConnection((c) => set({ connected: c }));
+  }
+  startSocket(checkAccess);
 }

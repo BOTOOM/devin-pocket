@@ -330,8 +330,17 @@ device pairing separately protects Pocket clients when binding beyond loopback.
 `devin-pocket start --host 0.0.0.0` enables pairing protection for every API and
 WebSocket. The terminal prints a QR, URLs and a short code valid for ten minutes,
 usable once. The app shell remains public, but it cannot access agent data without
-a paired device. **The browser pairing screen is a separate, forthcoming UI change;
-this server/CLI implementation exposes the pairing API, not that screen yet.**
+a paired device. Scan the QR to pair automatically, or open Pocket and enter the
+code (with or without its dash/spaces). You can optionally name your device.
+The link token is removed from the address bar immediately. Invalid, expired or
+rate-limited attempts show instructions without connecting to the agent.
+
+In **Settings → Devices**, see paired dates, last activity and the current-device
+badge. Revoke one device, revoke all others, or unpair this device; revocation
+disconnects it and returns its browser to the pairing screen. **New access QR**
+opens a scannable QR with a live countdown, copy buttons and regeneration. It uses
+the address you opened (including an HTTPS proxy); server addresses are listed as
+alternatives. While the dialog is open, newly paired devices appear automatically.
 
 ```sh
 devin-pocket pair                 # a fresh QR/code from the running server
@@ -407,7 +416,7 @@ honor `npm_config_registry` / `NPM_CONFIG_REGISTRY` and time out after five seco
 ## Roadmap and limitations
 
 Desktop/laptop remote-client workflows are planned. Currently this is a
-mobile-first UI served by the local host. The browser pairing screen/remote access
+mobile-first UI served by the local host. Managed remote-access tunnels
 and large-list/transcript virtualization remain work to do. Edited permission
 commands are currently displayed read-only; agent-dependent capabilities vary.
 
