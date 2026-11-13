@@ -27,7 +27,8 @@ describe.skipIf(!available)('PowerShell installer', () => {
         if ($Name -ne 'devin.exe' -or $${devin ? 'true' : 'false'}) { 'mock executable' }
       }
       function global:Invoke-RestMethod { throw 'Unexpected network request' }
-      & '${installer}' -Version '${version}'
+      try { & '${installer}' -Version '${version}' }
+      catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
     `,
       ],
       { encoding: 'utf8', timeout: 15_000 },
@@ -54,7 +55,7 @@ describe.skipIf(!available)('PowerShell installer', () => {
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain('Continuing with supported Node.js');
     expect(result.stdout).toContain('Node.js 22/23 es compatible');
-    expect(result.stdout).toContain('winget upgrade OpenJS.NodeJS.LTS --version 24.22.1');
+    expect(result.stdout).toMatch(/winget\s+upgrade\s+OpenJS\.NodeJS\.LTS\s+--version\s+24\.22\.1/);
     expect(result.stdout).toContain('NPM: install|-g|devin-pocket@latest');
   });
   it('suggests Node 26 when Node is absent, without auto-installing it', () => {
