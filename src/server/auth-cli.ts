@@ -19,7 +19,7 @@ export function runningServerUrl(options: Partial<Args> = {}): URL {
         ? '::1'
         : host;
   return new URL(
-    `http://${hostname.includes(':') && !hostname.startsWith('[') ? `[${hostname}]` : hostname}:${options.port ?? info.port}`,
+    `http://${hostname.includes(':') && !hostname.startsWith('[') ? `[${hostname}]` : hostname}:${options.port || info.port}`,
   );
 }
 

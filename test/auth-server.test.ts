@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { AgentProcess } from '../src/server/acp/agent.js';
 import { AuthStore } from '../src/server/auth.js';
-import { adminRequest, runningServerUrl } from '../src/server/auth-cli.js';
+import { adminRequest, pairing, runningServerUrl } from '../src/server/auth-cli.js';
 import { PocketServer, type ServerDeps } from '../src/server/http.js';
 import { Logger, StderrSink } from '../src/server/log.js';
 import { stateDir } from '../src/server/paths.js';
@@ -163,6 +163,16 @@ it('lets the CLI discover the actual port, request grants, list and revoke throu
   expect(await adminRequest<DevicesResponse>('/api/auth/devices')).toEqual({ devices: [] });
   await server.stop();
   await expect(adminRequest('/api/auth/status')).rejects.toThrow();
+});
+
+it('uses the bound port for startup pairing when the CLI requested port zero', async () => {
+  const options = { host: '0.0.0.0', port: 0 };
+  const grant = await pairing(options);
+  expect(runningServerUrl(options).href).toBe(`${base}/`);
+  expect(grant?.urls.length).toBeGreaterThan(0);
+  expect(grant?.urls.every((url) => new URL(url).port === String(server.port))).toBe(true);
+  expect((await post('/api/auth/pair', { token: grant?.token })).status).toBe(200);
+  expect(runningServerUrl({ port: 12345 }).port).toBe('12345');
 });
 
 it('does not rotate the running server admin token when another listener fails to bind', async () => {
