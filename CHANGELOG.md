@@ -1,3 +1,17 @@
+## [0.7.0](https://github.com/BOTOOM/devin-pocket/compare/v0.6.0...v0.7.0) (2026-11-13)
+
+### Features
+
+* **auth:** add browser pairing and device management ([56dbc26](https://github.com/BOTOOM/devin-pocket/commit/56dbc2650991130154e5e6a0287dd6ca277922ec))
+* **auth:** protect network access with QR device pairing ([396f870](https://github.com/BOTOOM/devin-pocket/commit/396f87058642684eea23a49f77dc2976e4991a06))
+
+### Bug Fixes
+
+* **auth:** discover IPv6 pairing addresses for IPv6 listeners ([c10049c](https://github.com/BOTOOM/devin-pocket/commit/c10049cfc528593c5c3ccd3acbb9351a08f3cd71))
+* **auth:** use bound port for ephemeral startup pairing ([9a70b56](https://github.com/BOTOOM/devin-pocket/commit/9a70b560ac18fc53d47ac0b6771530639ebe19bb))
+* **installer:** install Node 26 LTS and upgrade Node <24 to 24 ([8ba876c](https://github.com/BOTOOM/devin-pocket/commit/8ba876c55de895bb9117304ce5b1270233778b44))
+* **installer:** retain supported Node when optional upgrades fail ([1fd71bd](https://github.com/BOTOOM/devin-pocket/commit/1fd71bdcaf11b760366d33a477b81abfb360f448))
+
 ## [0.6.0](https://github.com/BOTOOM/devin-pocket/compare/v0.5.0...v0.6.0) (2026-11-12)
 
 ### Features
