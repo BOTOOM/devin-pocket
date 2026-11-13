@@ -16,6 +16,9 @@ minimumReleaseAgeExclude:
   - vitest
   - ws
 allowBuilds:
+  onnxruntime-node: false # browser-only inference; no native runtime download
+  protobufjs: false
+  sharp: false # dictation uses PCM, not native image processing
   esbuild: true
   '@biomejs/biome': true
   '@tailwindcss/oxide': true

@@ -28,6 +28,7 @@ import {
   deviceCookieToken,
 } from './auth.js';
 import { getCatalog, loadCatalog } from './catalog.js';
+import { DictationModels } from './dictation-model.js';
 import { doctorReport } from './doctor.js';
 import { browse, browsePath, cwdAllowed, homeDir, search } from './fs-search.js';
 import { type Logger, logFiles, readLogs, redact } from './log.js';
@@ -94,6 +95,8 @@ const MIME: Record<string, string> = {
   '.woff2': 'font/woff2',
   '.map': 'application/json',
   '.txt': 'text/plain; charset=utf-8',
+  '.wasm': 'application/wasm',
+  '.mjs': 'text/javascript; charset=utf-8',
 };
 
 function webRoot(): string {
@@ -123,6 +126,9 @@ export interface ServerDeps {
 }
 
 export class PocketServer {
+  private dictationModels = new DictationModels(undefined, undefined, (message) =>
+    this.deps.log.info(message),
+  );
   private http?: http.Server;
   private wss?: WebSocketServer;
   private clients = new Set<WebSocket>();
@@ -494,12 +500,14 @@ export class PocketServer {
       if (url.pathname.startsWith('/api/') && (req.method === 'POST' || req.method === 'DELETE'))
         requireJson(req);
       const token = deviceCookieToken(req.headers.cookie);
-      const device = url.pathname.startsWith('/api/') ? this.auth.authenticate(token) : undefined;
+      const protectedRoute = url.pathname.startsWith('/api/') || req.url?.startsWith('/models/');
+      const device = protectedRoute ? this.auth.authenticate(token) : undefined;
       if (device && token) res.setHeader('Set-Cookie', this.deviceCookie(req, token));
       if (url.pathname.startsWith('/api/auth/'))
         return await this.handleAuth(req, res, url, device);
-      if (this.authRequired && url.pathname.startsWith('/api/') && !device)
+      if (this.authRequired && protectedRoute && !device)
         return this.json(res, { error: 'unauthorized' }, 401);
+      if (req.url?.startsWith('/models/')) return await this.dictationModels.serve(req, res);
       if (url.pathname.startsWith('/api/') && req.method !== 'GET')
         return this.json(res, { error: 'method not allowed' }, 405);
       if (url.pathname === '/api/health') {

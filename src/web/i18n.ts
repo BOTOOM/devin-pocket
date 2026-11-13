@@ -3,6 +3,37 @@ import { useSyncExternalStore } from 'react';
 export type Lang = 'es' | 'en';
 
 const es = {
+  'dictation.title': 'Dictado por voz',
+  'dictation.spanish': 'Español',
+  'dictation.english': 'English',
+  'dictation.start': 'Dictar por voz',
+  'dictation.stop': 'Detener dictado',
+  'dictation.cancel': 'Cancelar dictado',
+  'dictation.preparing': 'Preparando / descargando el modelo…',
+  'dictation.listening': 'Escuchando… Tu audio se procesa en este dispositivo.',
+  'dictation.transcribing': 'Transcribiendo en este dispositivo…',
+  'dictation.error':
+    'No se pudo dictar. Revisa el permiso del micrófono, el espacio libre y la conexión para la primera descarga. Puedes reintentar o usar el dictado del teclado.',
+  'dictation.consent':
+    '¿Descargar Whisper (~80–160 MB, según el dispositivo)? Se descarga una sola vez al servidor Pocket y se guarda en este navegador. El audio se procesa solo en este dispositivo, no se envía al servidor ni a un servicio. El navegador puede borrar la caché si falta espacio.',
+  'dictation.download': 'Descargar modelo',
+  'dictation.pack':
+    'El navegador puede instalar el paquete de voz local para este idioma. ¿Instalarlo? El reconocimiento seguirá siendo local. Si falla, se ofrecerá Whisper.',
+  'dictation.install': 'Instalar paquete local',
+  'dictation.insecureTitle': 'El micrófono necesita HTTPS o localhost',
+  'dictation.insecure':
+    'Los navegadores bloquean el micrófono en direcciones HTTP de la red local. Usa el dictado del teclado del teléfono (Gboard/iOS), o abre Pocket desde localhost/HTTPS. El emparejamiento no añade HTTPS.',
+  'dictation.engine': 'Último motor seleccionado automáticamente',
+  'dictation.engineAuto': 'Se seleccionará al iniciar el dictado',
+  'dictation.speech': 'Reconocimiento local del navegador',
+  'dictation.whisper': 'Whisper local (WebGPU / WASM)',
+  'dictation.downloaded': 'Modelo Whisper descargado en este navegador.',
+  'dictation.notDownloaded': 'Modelo Whisper aún no descargado en este navegador.',
+  'dictation.language': 'Idioma del dictado',
+  'dictation.auto': 'Auto (idioma de la app)',
+  'dictation.delete': 'Eliminar modelo descargado',
+  'dictation.privacy':
+    'El dictado nunca envía el mensaje. Hasta 60 segundos por grabación. Eliminar borra el modelo y el consentimiento de este navegador; el servidor conserva su copia para evitar otra descarga de Internet.',
   'pair.title': 'Conecta tu dispositivo',
   'pair.intro': 'Este Devin Pocket está protegido. Escanea el QR que muestra',
   'pair.introEnd': 'o escribe el código.',
@@ -269,6 +300,37 @@ const es = {
 };
 
 const en: Record<keyof typeof es, string> = {
+  'dictation.title': 'Voice dictation',
+  'dictation.spanish': 'Español',
+  'dictation.english': 'English',
+  'dictation.start': 'Dictate by voice',
+  'dictation.stop': 'Stop dictation',
+  'dictation.cancel': 'Cancel dictation',
+  'dictation.preparing': 'Preparing / downloading the model…',
+  'dictation.listening': 'Listening… Your audio is processed on this device.',
+  'dictation.transcribing': 'Transcribing on this device…',
+  'dictation.error':
+    'Dictation failed. Check microphone permission, free storage and your connection for the first download. Retry or use keyboard dictation.',
+  'dictation.consent':
+    'Download Whisper (~80–160 MB, depending on the device)? It downloads once to the Pocket host and is cached in this browser. Audio is processed only on this device, never sent to the host or a service. Browsers may evict cached models when storage is low.',
+  'dictation.download': 'Download model',
+  'dictation.pack':
+    'Your browser can install the local speech pack for this language. Install it? Recognition stays on-device. If installation fails, Whisper will be offered.',
+  'dictation.install': 'Install local pack',
+  'dictation.insecureTitle': 'Microphone requires HTTPS or localhost',
+  'dictation.insecure':
+    "Browsers block the microphone on plain HTTP LAN addresses. Use your phone keyboard's dictation (Gboard/iOS), or open Pocket via localhost/HTTPS. Pairing does not add HTTPS.",
+  'dictation.engine': 'Last automatically selected engine',
+  'dictation.engineAuto': 'Selected when dictation starts',
+  'dictation.speech': 'Browser on-device recognition',
+  'dictation.whisper': 'Local Whisper (WebGPU / WASM)',
+  'dictation.downloaded': 'Whisper model downloaded in this browser.',
+  'dictation.notDownloaded': 'Whisper model not yet downloaded in this browser.',
+  'dictation.language': 'Dictation language',
+  'dictation.auto': 'Auto (app language)',
+  'dictation.delete': 'Delete downloaded model',
+  'dictation.privacy':
+    "Dictation never sends the message. Up to 60 seconds per recording. Delete clears this browser's model and consent; the host keeps its copy to avoid another internet download.",
   'pair.title': 'Connect your device',
   'pair.intro': 'This Devin Pocket is protected. Scan the QR shown by',
   'pair.introEnd': 'or enter the code.',

@@ -14,11 +14,14 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CommandPalette } from '@/components/CommandPalette';
+import { DictationButton, DictationStatus } from '@/components/Dictation';
 import { currentValue, selectOptions } from '@/components/StatusStrip';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
 import { useT } from '@/i18n';
+import { insertAtCaret } from '@/lib/dictation/helpers';
+import { useDictation } from '@/lib/dictation/use-dictation';
 import { send } from '@/lib/ws';
 import { useStore } from '@/store';
 
@@ -60,6 +63,21 @@ export function Composer({
   const submitting = useRef(false);
   // Bumped when the draft clears — stale FileReader results are dropped.
   const draftEpoch = useRef(0);
+  const dictation = useDictation((transcript) => {
+    const input = taRef.current;
+    if (!input) return;
+    const insertion = insertAtCaret(
+      input.value,
+      transcript,
+      input.selectionStart,
+      input.selectionEnd,
+    );
+    setText(insertion.value);
+    requestAnimationFrame(() => {
+      input.focus();
+      input.setSelectionRange(insertion.caret, insertion.caret);
+    });
+  });
 
   const working =
     state?.turn === 'working' ||
@@ -138,6 +156,7 @@ export function Composer({
 
   const submit = useCallback(async () => {
     if (submitting.current) return;
+    dictation.cancel();
     const blocks: ContentBlock[] = [];
     const trimmed = text.trim();
     if (trimmed.startsWith('/btw ') && btwOk && !images.length && !mentions.length) {
@@ -179,9 +198,10 @@ export function Composer({
     } finally {
       submitting.current = false;
     }
-  }, [text, mentions, images, sessionId, btwOk, editingId, t]);
+  }, [text, mentions, images, sessionId, btwOk, editingId, t, dictation.cancel]);
 
   const cancelEdit = () => {
+    dictation.cancel();
     draftEpoch.current++;
     setEditingId(null);
     setText('');
@@ -299,6 +319,7 @@ export function Composer({
                       }
                       onClick={() => {
                         // Edit in place: keep the item queued; prompt.update preserves its position.
+                        dictation.cancel();
                         setEditingId(item.id);
                         setText(
                           item.blocks
@@ -436,6 +457,7 @@ export function Composer({
         onChange={(e) => onFiles(e.target.files)}
       />
       <div className="min-w-0 rounded-xl border border-input bg-card shadow-xs transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+        <DictationStatus dictation={dictation} />
         <Textarea
           ref={taRef}
           value={text}
@@ -495,6 +517,7 @@ export function Composer({
                 /
               </span>
             </Button>
+            <DictationButton dictation={dictation} disabled={!agentReady} />
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {working && (

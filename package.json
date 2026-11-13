@@ -32,7 +32,7 @@
     "dev:web": "vite --config vite.config.ts",
     "dev:fake": "DEVIN_POCKET_AGENT=\"pnpm exec tsx test/fake-agent.ts\" pnpm run dev",
     "build": "pnpm run build:web && pnpm run build:server",
-    "build:web": "vite build --config vite.config.ts",
+    "build:web": "vite build --config vite.config.ts && node scripts/copy-onnx-assets.mjs",
     "build:server": "tsdown",
     "check": "biome check .",
     "check:fix": "biome check --write .",
@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.5.0",
+    "@huggingface/transformers": "3.8.1",
     "cmdk": "^1.1.1",
     "qrcode": "1.5.4",
     "sonner": "^2.0.8",

@@ -335,6 +335,31 @@ pairing, and there is no built-in TLS. See the security section below.
   processes under memory pressure. Termux:Boot can run your launcher if separately
   configured; the installer does not configure boot startup.
 
+## On-device voice dictation
+
+The composer microphone inserts editable text at the cursor; it never sends a
+message. Spanish and English follow the app language by default, or choose
+Auto/Español/English in **Settings → Voice dictation**. Stop finishes a recording
+(up to 60 seconds); cancel discards it.
+
+Pocket prefers the browser's strictly on-device SpeechRecognition, offering a
+local language-pack install when needed. Otherwise it asks once before downloading
+Whisper base (~80–160 MB per backend). Whisper runs in a Web Worker using WebGPU
+fp16 when available, otherwise WASM q8. Audio stays in your browser, never uploaded
+to Pocket or a speech service. Runtime assets ship with Pocket, not a CDN.
+
+The host fetches allowlisted model files from a fixed Hugging Face revision once,
+atomically caching them under the Pocket cache directory's `models/`. Each browser
+caches its copy across reloads. **Delete downloaded model** clears this browser's
+model and consent; the host retains its copy to avoid another internet download.
+Browser storage eviction or manual deletion may require copying it from the host
+again. Model downloads require pairing when network authentication is enabled.
+
+Microphone access needs **localhost or HTTPS**. On plain HTTP LAN addresses,
+Pocket explains the restriction: use Gboard/iOS keyboard dictation instead, or
+open Pocket through localhost/HTTPS. Pairing does not provide HTTPS. Local speech,
+WebGPU, storage and microphone support vary by browser; WASM is the portable fallback.
+
 ## Security and remote access
 
 Default binding: **127.0.0.1:7777** needs no device pairing and rejects unexpected

@@ -321,6 +321,33 @@ y no hay TLS incorporado. Consulta la sección de seguridad más abajo.
   terminar procesos por falta de memoria. Termux:Boot puede ejecutar tu lanzador
   si lo configuras aparte; el instalador no configura el arranque automático.
 
+## Dictado por voz en el dispositivo
+
+El micrófono del compositor inserta texto editable en el cursor; nunca envía un
+mensaje. Español e inglés siguen el idioma de la app por defecto, o puedes elegir
+Auto/Español/English en **Ajustes → Dictado por voz**. Detener termina la grabación
+(hasta 60 segundos); cancelar la descarta.
+
+Pocket prefiere SpeechRecognition estrictamente local del navegador y ofrece
+instalar el paquete local del idioma si hace falta. Como alternativa pide permiso
+una vez antes de descargar Whisper base (~80–160 MB por backend). Whisper funciona
+en un Web Worker con WebGPU fp16 si está disponible, o WASM q8. El audio permanece
+en el navegador: no se envía a Pocket ni a servicios de voz. Los archivos del runtime
+se incluyen con Pocket, sin CDN.
+
+El servidor descarga una vez los archivos permitidos de una revisión fija de
+Hugging Face y los guarda atómicamente en `models/` dentro de la caché de Pocket.
+Cada navegador conserva su copia entre recargas. **Eliminar modelo descargado**
+borra modelo y consentimiento del navegador; el servidor conserva su copia para
+evitar otra descarga de Internet. El borrado manual o automático de la caché puede
+exigir copiarlo de nuevo desde el servidor. Las descargas exigen emparejamiento
+cuando está activada la autenticación de red.
+
+El micrófono necesita **localhost o HTTPS**. En direcciones LAN con HTTP, Pocket
+explica la restricción: usa el dictado del teclado Gboard/iOS o abre Pocket desde
+localhost/HTTPS. Emparejar no añade HTTPS. El soporte de voz local, WebGPU,
+almacenamiento y micrófono depende del navegador; WASM es la alternativa portátil.
+
 ## Seguridad y acceso remoto
 
 Escucha predeterminada: **127.0.0.1:7777** no exige emparejamiento y rechaza

@@ -16,7 +16,7 @@ self.addEventListener('activate', (e) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== SHELL && k !== ASSETS).map((k) => caches.delete(k))),
+        Promise.all(keys.filter((k) => (k.startsWith('dp-shell-') || k.startsWith('dp-assets-')) && k !== SHELL && k !== ASSETS).map((k) => caches.delete(k))),
       )
       .then(() => self.clients.claim()),
   );
@@ -24,7 +24,7 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.pathname.startsWith('/api') || url.pathname === '/ws')
+  if (e.request.method !== 'GET' || url.pathname.startsWith('/api') || url.pathname.startsWith('/models/') || url.pathname === '/ws')
     return;
 
   // Hashed vite assets: cache-first.

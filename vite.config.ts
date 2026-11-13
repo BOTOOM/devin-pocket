@@ -9,6 +9,7 @@ export default defineConfig({
   root: 'src/web',
   publicDir: 'public',
   plugins: [react(), tailwindcss()],
+  worker: { format: 'es' },
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, 'src/web'),
@@ -24,6 +25,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      '/models': 'http://127.0.0.1:7777',
+      '/onnx': 'http://127.0.0.1:7777',
       '/api': 'http://127.0.0.1:7777',
       '/ws': { target: 'ws://127.0.0.1:7777', ws: true },
     },
