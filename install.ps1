@@ -8,14 +8,17 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) {
-    throw 'Node.js 22+ is required. Install it with: winget install OpenJS.NodeJS.LTS. Then reopen PowerShell.'
+    throw 'Node.js is missing. Install Node.js 26 LTS with: winget install OpenJS.NodeJS.LTS --version 26.13.1. Then reopen PowerShell.'
 }
 $nodeVersion = & node.exe --version
 $nodeExit = $LASTEXITCODE
 $nodeMajor = 0
 if ($nodeVersion -match '^v([0-9]+)\.') { $nodeMajor = [int]$Matches[1] }
-if ($nodeExit -ne 0 -or $nodeMajor -lt 22) {
-    throw 'Node.js 22+ is required. Upgrade with: winget install OpenJS.NodeJS.LTS. Then reopen PowerShell.'
+if ($nodeExit -ne 0 -or $nodeMajor -eq 0) {
+    throw 'Could not determine the Node.js version. Repair the installation, reopen PowerShell and retry.'
+}
+if ($nodeMajor -lt 24) {
+    throw 'Upgrade Node.js <24 to Node.js 24 LTS with: winget install OpenJS.NodeJS.LTS --version 24.22.1. Then reopen PowerShell. Existing Node.js 24+ is left unchanged; the app runtime minimum remains 22.'
 }
 if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {
     throw 'npm is required. Reinstall Node.js LTS, then reopen PowerShell.'

@@ -23,6 +23,7 @@ describe.skipIf(!available)('PowerShell installer', () => {
       ${devin ? 'function global:devin.exe {}' : ''}
       function global:Get-Command {
         param([string]$Name, $ErrorAction)
+        if ($Name -eq 'node.exe' -and '${node}' -eq '') { return }
         if ($Name -ne 'devin.exe' -or $${devin ? 'true' : 'false'}) { 'mock executable' }
       }
       function global:Invoke-RestMethod { throw 'Unexpected network request' }
@@ -42,11 +43,20 @@ describe.skipIf(!available)('PowerShell installer', () => {
       expect(result.stdout).toContain('experimental native Windows');
     },
   );
-  it('rejects old Node before installation and prints the winget hint', () => {
-    const result = run('latest', 'v20.0.0');
+  it.each(['v20.0.0', 'v22.0.0', 'v23.0.0'])('rejects old Node %s and suggests 24', (node) => {
+    const result = run('latest', node);
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('winget install OpenJS.NodeJS.LTS');
+    expect(result.stderr).toContain('winget install OpenJS.NodeJS.LTS --version 24.22.1');
     expect(result.stdout).not.toContain('NPM:');
+  });
+  it('suggests Node 26 when Node is absent, without auto-installing it', () => {
+    const result = run('latest', '');
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('winget install OpenJS.NodeJS.LTS --version 26.13.1');
+    expect(result.stdout).not.toContain('NPM:');
+  });
+  it.each(['v24.0.0', 'v26.0.0', 'v28.0.0'])('leaves supported Node %s alone', (node) => {
+    expect(run('latest', node).status).toBe(0);
   });
   it('does not install Devin without consent', () => {
     const result = run('latest', 'v24.0.0', 0, false);

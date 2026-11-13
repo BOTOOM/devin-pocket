@@ -12,13 +12,13 @@ usage() {
   say '  --source REF     Compila una rama, tag o commit de BOTOOM/devin-pocket.'
   say '  --package SPEC   devin-pocket@VERSION, URL HTTPS de un .tgz o archivo .tgz local.'
   say '  --distro NOMBRE  Nombre del Ubuntu instalado o a crear (por defecto: ubuntu).'
-  say '  --no-upgrade     No actualiza paquetes existentes; sí instala requisitos faltantes.'
+  say '  --no-upgrade     No actualiza paquetes generales; sí prepara los requisitos de Node.'
   say '  --help           Muestra esta ayuda, sin instalar nada.'
 }
 
 ubuntu_install() (
   set -euo pipefail
-  local mode=$1 spec=$2 upgrade=$3 stage pidfile pid node_major package_version ref
+  local mode=$1 spec=$2 upgrade=$3 stage pidfile pid node_major node_target package_version ref
   export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
   export DEBIAN_FRONTEND=noninteractive
   pidfile="${XDG_STATE_HOME:-$HOME/.local/state}/devin-pocket/server.pid"
@@ -33,21 +33,28 @@ ubuntu_install() (
   [[ "${ID:-}" == ubuntu ]] || err 'Este instalador necesita Ubuntu; la distro elegida es otra.'
   [[ $(id -u) == 0 ]] || err 'Entra a Ubuntu como root (no requiere root en Android).'
 
+  node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || printf '0')
+  node_target=0
+  if [[ "$node_major" == 0 ]]; then node_target=26
+  elif [[ "$node_major" -lt 24 ]]; then node_target=24
+  fi
+
   stage=$(mktemp -d)
   trap 'rm -rf -- "$stage"' EXIT
   say 'Preparando paquetes de Ubuntu…'
   apt-get update
   if [[ "$upgrade" == 1 ]]; then apt-get upgrade -y -o Dpkg::Options::=--force-confold; fi
   apt-get install -y ca-certificates curl git ripgrep jq python3 build-essential tar xz-utils unzip libatomic1 procps
-  node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || printf '0')
-  if [[ "$node_major" -lt 22 ]] || ! has npm; then
-    say 'Instalando Node.js 22 LTS desde NodeSource…'
+  if [[ "$node_target" != 0 ]]; then
+    say "Instalando Node.js $node_target LTS desde NodeSource…"
     curl --fail --show-error --location --retry 3 --proto '=https' --proto-redir '=https' \
-      https://deb.nodesource.com/setup_22.x -o "$stage/node-setup.sh"
+      "https://deb.nodesource.com/setup_${node_target}.x" -o "$stage/node-setup.sh"
     bash "$stage/node-setup.sh"
     apt-get install -y nodejs
   fi
-  [[ $(node -p 'process.versions.node.split(".")[0]') -ge 22 ]] || err 'Se necesita Node.js 22 o posterior.'
+  node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || printf '0')
+  [[ "$node_major" -ge 24 ]] || err 'No se pudo preparar Node.js 24 o posterior. Revisa los errores de NodeSource e inténtalo de nuevo.'
+  has npm || err 'Se necesita npm. Repara la instalación de Node.js y vuelve a intentarlo.'
 
   if ! has devin; then
     say 'Instalando Devin CLI con el instalador oficial…'

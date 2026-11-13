@@ -4,7 +4,7 @@
 set -euo pipefail
 
 APP=devin-pocket
-MIN_NODE=22
+MIN_NODE=24
 LOCAL=${DEVIN_POCKET_LOCAL:-0}
 
 say() { printf '%s\n' "$*"; }
@@ -21,25 +21,41 @@ if [[ "$(id -u)" -ne 0 ]] && ! is_termux_host && has sudo; then SUDO=sudo; fi
 node_major() { node -p "process.versions.node.split('.')[0]" 2>/dev/null || printf '0'; }
 
 install_node() {
+  local target=$1 formula formula_major
   if is_termux_host; then
+    # pkg cannot pin a Node major: use its available LTS for both install and upgrade.
     say 'Installing Node.js LTS in Termux / Instalando Node.js LTS en Termux…'
     pkg install -y nodejs-lts
   elif [[ "$(uname -s)" == Darwin* ]]; then
     has brew || err 'Install Homebrew first / Instala Homebrew primero: https://brew.sh'
-    brew install node@22 || brew upgrade node@22 || true
+    formula="node@$target"
+    if ! brew info --formula "$formula" >/dev/null 2>&1; then
+      # Active LTS may still be the unversioned formula (currently Node 26).
+      formula_major=$(HOMEBREW_NO_COLOR=1 brew info --formula node | sed -n '1s/.*stable \([0-9][0-9]*\)\..*/\1/p')
+      [[ "$formula_major" == "$target" ]] || err "Install Node.js $target manually / Instala Node.js $target manualmente: https://nodejs.org"
+      formula=node
+    fi
+    say "Installing Node.js $target (Homebrew) / Instalando Node.js $target…"
+    brew install "$formula"
+    export PATH="$(brew --prefix "$formula")/bin:$PATH"
+    say "Add to PATH / Añade al PATH: $(brew --prefix "$formula")/bin"
   elif has apt-get; then
-    say 'Installing Node.js 22 (NodeSource) / Instalando Node.js 22…'
+    say "Installing Node.js $target (NodeSource) / Instalando Node.js $target…"
     $SUDO apt-get update
     $SUDO apt-get install -y ca-certificates curl
-    curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO bash -
+    curl -fsSL "https://deb.nodesource.com/setup_${target}.x" | $SUDO bash -
     $SUDO apt-get install -y nodejs
   else
-    err 'Install Node.js 22+ first / Instala Node.js 22+ primero: https://nodejs.org'
+    err "Install Node.js $target first / Instala Node.js $target primero: https://nodejs.org"
   fi
 }
 
-if ! has node || [[ "$(node_major)" -lt "$MIN_NODE" ]]; then install_node; fi
+major=$(node_major)
+if [[ "$major" == 0 ]]; then install_node 26
+elif [[ "$major" -lt "$MIN_NODE" ]]; then install_node 24
+fi
 [[ "$(node_major)" -ge "$MIN_NODE" ]] || err "Node.js >=${MIN_NODE} required / Se requiere Node.js >=${MIN_NODE}"
+has npm || err 'npm is required / Se necesita npm. Repair your Node.js installation / Repara la instalación de Node.js.'
 
 NPM_G=(npm install -g)
 # Global npm dir usually needs root outside Termux; fall back to sudo only if not writable.

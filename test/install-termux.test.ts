@@ -66,12 +66,16 @@ exec /bin/bash "$MOCK_ROOT/guest-script.sh" "$@"`,
   executable(
     guestBin,
     'apt-get',
-    `${record}\nif [[ "$*" == *nodejs* ]]; then touch "$MOCK_ROOT/node-installed"; fi`,
+    `${record}\nif [[ "$*" == *nodejs* && "\${MOCK_NODE_INSTALL_FAIL:-0}" != 1 ]]; then cp "$MOCK_ROOT/node-target" "$MOCK_ROOT/node-installed"; fi`,
   );
   executable(
     guestBin,
     'node',
-    `if [[ "\${MOCK_OLD_NODE:-0}" == 1 && ! -f "$MOCK_ROOT/node-installed" && "\${2:-}" == 'process.versions.node.split(".")[0]' ]]; then printf '20\\n'; else exec '${process.execPath}' "$@"; fi`,
+    `if [[ "\${1:-}" == -p && "\${2:-}" == process.versions.node* ]]; then
+  if [[ -f "$MOCK_ROOT/node-installed" ]]; then cat "$MOCK_ROOT/node-installed"
+  elif [[ "\${MOCK_NODE_MAJOR:-24}" == missing ]]; then exit 127
+  else printf '%s\\n' "\${MOCK_NODE_MAJOR:-24}"; fi
+else exec '${process.execPath}' "$@"; fi`,
   );
   if (!options.missingDevin) executable(guestBin, 'devin', `${record}\nprintf 'devin mock\\n'`);
   executable(
@@ -89,7 +93,7 @@ while [[ $# -gt 0 ]]; do
 done
 case "$url" in
   */tarball/*) cp "$MOCK_ROOT/source.tar.gz" "$output" ;;
-  */setup_22.x) printf 'true\\n' > "$output" ;;
+  */setup_24.x|*/setup_26.x) target=\${url##*setup_}; printf '%s\\n' "\${target%.x}" > "$MOCK_ROOT/node-target"; printf 'true\\n' > "$output" ;;
   https://cli.devin.ai/install.sh)
     printf '#!/bin/bash\\nprintf "#!/bin/bash\\\\nprintf devin-mock\\\\n" > "$HOME/.local/bin/devin"\\nchmod +x "$HOME/.local/bin/devin"\\n' > "$output" ;;
   *) printf 'mock package' > "$output" ;;
@@ -387,13 +391,37 @@ describe.skipIf(process.platform === 'win32')('Termux bootstrap installer', () =
     expect(f.commands()).toContain('https://cli.devin.ai/install.sh|-o|');
   });
 
-  it('installs Node.js 22 when the existing runtime is too old', () => {
+  it.each([
+    ['missing', 26],
+    ['20', 24],
+    ['22', 24],
+    ['23', 24],
+    ['24', 0],
+    ['26', 0],
+    ['28', 0],
+  ])('selects Node for existing major %s (target %s)', (major, target) => {
     const f = fixture();
-    const result = f.run(['--package', 'devin-pocket@0.1.5'], { MOCK_OLD_NODE: '1' });
+    const result = f.run(['--package', 'devin-pocket@0.1.5'], { MOCK_NODE_MAJOR: String(major) });
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
-    expect(f.commands()).toContain('https://deb.nodesource.com/setup_22.x|-o|');
-    expect(f.commands()).toContain('apt-get|install|-y|nodejs|');
+    if (target) {
+      expect(f.commands()).toContain(`https://deb.nodesource.com/setup_${target}.x|-o|`);
+      expect(f.commands()).toContain('apt-get|install|-y|nodejs|');
+    } else {
+      expect(f.commands()).not.toContain('deb.nodesource.com');
+      expect(f.commands()).not.toContain('apt-get|install|-y|nodejs|');
+    }
+  });
+
+  it('reports a failed Node upgrade clearly before installing Pocket', () => {
+    const f = fixture();
+    const result = f.run(['--package', 'devin-pocket@0.1.5'], {
+      MOCK_NODE_MAJOR: '22',
+      MOCK_NODE_INSTALL_FAIL: '1',
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('No se pudo preparar Node.js 24 o posterior');
+    expect(f.commands()).not.toContain('npm|install|');
   });
 
   it('downloads an HTTPS tarball before installing it with npm', () => {
