@@ -183,3 +183,51 @@ it('recognizes loopback sockets, rejects rebinding hosts and builds private-firs
   expect(pairingUrls('::', 7777, 'secret', {})).toEqual(['http://127.0.0.1:7777/#/pair?t=secret']);
   expect(pairingUrls('::1', 7777, 'secret')).toEqual(['http://[::1]:7777/#/pair?t=secret']);
 });
+
+function interfaceAddress(address: string, internal = false): os.NetworkInterfaceInfo {
+  const info = { address, internal, netmask: '', mac: '00:00:00:00:00:00', cidr: null };
+  return address.includes(':')
+    ? { ...info, family: 'IPv6', scopeid: 0 }
+    : { ...info, family: 'IPv4' };
+}
+
+it.each(['::', '[::]'])('discovers usable IPv6-only pairing addresses on %s', (host) => {
+  const interfaces = {
+    eth0: [
+      interfaceAddress('fe80::1'),
+      interfaceAddress('febf::1'),
+      interfaceAddress('2001:db8::1'),
+      interfaceAddress('fd12:3456::2'),
+      interfaceAddress('::1', true),
+      interfaceAddress('ff02::1'),
+    ],
+  };
+  expect(pairingUrls(host, 7777, 'secret', interfaces)).toEqual([
+    'http://[2001:db8::1]:7777/#/pair?t=secret',
+    'http://[fd12:3456::2]:7777/#/pair?t=secret',
+  ]);
+});
+
+it('keeps private IPv4 first and only offers IPv6 for IPv6 listeners', () => {
+  const interfaces = {
+    eth0: [
+      interfaceAddress('2001:db8::1'),
+      interfaceAddress('8.8.8.8'),
+      interfaceAddress('192.168.1.2'),
+      interfaceAddress('2001:db8::1'),
+    ],
+    empty: undefined,
+  };
+  expect(pairingUrls('::', 7777, 'secret', interfaces)).toEqual([
+    'http://192.168.1.2:7777/#/pair?t=secret',
+    'http://[2001:db8::1]:7777/#/pair?t=secret',
+    'http://8.8.8.8:7777/#/pair?t=secret',
+  ]);
+  expect(pairingUrls('0.0.0.0', 7777, 'secret', interfaces)).toEqual([
+    'http://192.168.1.2:7777/#/pair?t=secret',
+    'http://8.8.8.8:7777/#/pair?t=secret',
+  ]);
+  expect(pairingUrls('2001:db8::2', 7777, 'secret', interfaces)).toEqual([
+    'http://[2001:db8::2]:7777/#/pair?t=secret',
+  ]);
+});

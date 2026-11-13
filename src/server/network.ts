@@ -24,7 +24,16 @@ export function pairingUrls(
   if (host === '0.0.0.0' || host === '::' || host === '[::]') {
     hosts = Object.values(interfaces).flatMap((entries) =>
       (entries ?? [])
-        .filter((entry) => entry.family === 'IPv4' && !entry.internal)
+        .filter(
+          (entry) =>
+            !entry.internal &&
+            (entry.family === 'IPv4' ||
+              (host !== '0.0.0.0' &&
+                entry.family === 'IPv6' &&
+                !/^(fe[89ab]|ff)/i.test(entry.address) &&
+                entry.address !== '::' &&
+                !isLoopback(entry.address))),
+        )
         .map((entry) => entry.address),
     );
     const privateAddress = (address: string) =>
