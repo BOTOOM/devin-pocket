@@ -21,7 +21,7 @@ export default defineConfig({
         const directory = path.dirname(transformers.resolve('onnxruntime-web'));
         server.middlewares.use((req, res, next) => {
           const match = req.url?.match(/^\/onnx\/(ort-wasm-simd-threaded(?:\.jsep)?\.(wasm|mjs))$/);
-          if (!match) return next();
+          if (!match?.[1]) return next();
           res.setHeader(
             'Content-Type',
             match[2] === 'wasm' ? 'application/wasm' : 'text/javascript',
