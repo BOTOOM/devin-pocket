@@ -67,6 +67,11 @@ test.beforeEach(async ({ page }) => {
             if (!this.stopped) this.onmessage?.({ data: { type: 'ready', id: message.id } });
           }, 100);
         } else {
+          if (localStorage.getItem('test.dictation.batch')) {
+            for (const text of ['First fragment', 'second fragment'])
+              this.onmessage?.({ data: { type: 'result', id: message.id, text } });
+            return;
+          }
           this.onmessage?.({
             data: {
               type: 'result',
@@ -90,6 +95,19 @@ test.beforeEach(async ({ page }) => {
     }
     Object.defineProperty(window, 'AudioContext', { value: StubContext });
   });
+});
+
+test('back-to-back transcript callbacks preserve both fragments and the caret', async ({ page }) => {
+  await page.goto(`${base}/#/`);
+  await startSession(page);
+  await page.evaluate(() => localStorage.setItem('test.dictation.batch', 'true'));
+  const input = page.locator('textarea');
+  await input.fill('Hello world');
+  await input.evaluate((el) => el.setSelectionRange(5, 5));
+  await page.getByRole('button', { name: 'Dictate by voice', exact: true }).click();
+  await page.getByRole('button', { name: 'Download model', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop dictation', exact: true }).click();
+  await expect(input).toHaveValue('Hello First fragment second fragment world');
 });
 
 test('mic shares the action row; consent, transcript insertion, reload and deletion', async ({

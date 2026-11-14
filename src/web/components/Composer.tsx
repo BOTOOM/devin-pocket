@@ -72,6 +72,8 @@ export function Composer({
       input.selectionStart,
       input.selectionEnd,
     );
+    input.value = insertion.value;
+    input.setSelectionRange(insertion.caret, insertion.caret);
     setText(insertion.value);
     requestAnimationFrame(() => {
       input.focus();
