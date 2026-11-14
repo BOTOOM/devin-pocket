@@ -32,7 +32,7 @@
     "dev:web": "vite --config vite.config.ts",
     "dev:fake": "DEVIN_POCKET_AGENT=\"pnpm exec tsx test/fake-agent.ts\" pnpm run dev",
     "build": "pnpm run build:web && pnpm run build:server",
-    "build:web": "vite build --config vite.config.ts",
+    "build:web": "vite build --config vite.config.ts && node scripts/copy-onnx-assets.mjs",
     "build:server": "tsdown",
     "check": "biome check .",
     "check:fix": "biome check --write .",
@@ -75,6 +75,7 @@
     "developer-tools"
   ],
   "devDependencies": {
+    "@huggingface/transformers": "3.8.1",
     "@biomejs/biome": "2.5.14",
     "@playwright/test": "1.63.0",
     "@semantic-release/changelog": "7.0.0",

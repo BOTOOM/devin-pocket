@@ -12,6 +12,7 @@ import { PocketServer, type ServerDeps } from '../src/server/http.js';
 import { Logger, StderrSink } from '../src/server/log.js';
 import { stateDir } from '../src/server/paths.js';
 import { SessionManager } from '../src/server/sessions.js';
+import { WHISPER_REVISION } from '../src/shared/dictation.js';
 import type {
   AuthStatus,
   DevicesResponse,
@@ -85,6 +86,16 @@ function post(route: string, body: unknown, headers: Record<string, string> = {}
     body: JSON.stringify(body),
   });
 }
+
+it('guards allowlisted model downloads with pairing auth', async () => {
+  const route = '/models/hf/onnx-community/whisper-base/main/config.json';
+  expect((await fetch(`${base}${route.replace('/main/', `/${WHISPER_REVISION}/`)}`)).status).toBe(
+    401,
+  );
+  const paired = await pair();
+  // Authenticated requests reach the fixed-revision allowlist, not upstream.
+  expect((await fetch(`${base}${route}`, { headers: { Cookie: paired.cookie } })).status).toBe(404);
+});
 async function pair(method: 'token' | 'code' = 'token') {
   const grant = auth.createGrant();
   const response = await post(

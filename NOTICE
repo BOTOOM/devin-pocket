@@ -1,5 +1,8 @@
 devin-pocket, Copyright 2026 Edwar Díaz (BOTOOM)
 
+Dictation audio capture, local SpeechRecognition checks and caret insertion
+adapted from Frame Notes (BOTOOM/frame-notes), Apache License 2.0.
+
 Portions ported from devin-tui, Copyright Mark Fenner, MIT License.
 
 MIT License

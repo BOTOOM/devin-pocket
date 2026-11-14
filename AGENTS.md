@@ -67,6 +67,10 @@ devin acp child (stdio JSON-RPC)
 - `src/server/sessions.ts` — SessionManager (list/create/open/close/delete/rename/
   prompt/cancel/setMode/setConfigOption, pending permissions).
 - `src/server/catalog.ts` — model catalog fetch/parse/cache/debug.
+- `src/server/dictation-model.ts`, `src/shared/dictation.ts` — pinned model proxy,
+  pairing guard integration and atomic disk cache.
+- `src/web/lib/dictation/`, `components/Dictation.tsx`,
+  `scripts/copy-onnx-assets.mjs` — on-device engines/worker, mic/settings and bundled runtime.
 - `src/server/doctor.ts`, `ports.ts`, `fs-search.ts`, `log.ts`, `paths.ts` — diagnostics,
   port checks, workspace search, ring-buffer logger, XDG/config paths.
 - `src/shared/protocol.ts` — all wire types; `reducer.ts` — `applyEvent`,
@@ -167,6 +171,25 @@ devin-pocket devices [revoke <id|all>]
   SIGTERM/SIGINT handlers are used on POSIX; Windows stop does not rely on them.
 - No Windows Termux-like widget. WSL is not officially supported. Preserve the
   loopback/pairing/no-TLS warnings. Windows CI runs Node 24 and parses install.ps1.
+
+## Dictation
+
+- `src/web/lib/dictation/`: local SpeechRecognition availability/install checks,
+  PCM capture (16 kHz, max 60 seconds), preferences, reducer and Whisper Web Worker.
+  Ported from Frame Notes. `components/Dictation.tsx` owns mic/consent/status/settings;
+  Composer inserts at the selection, never auto-sends. Auto language follows EN/ES.
+- Prefer strictly on-device SpeechRecognition; otherwise transformers.js 3.x uses
+  whisper-base, WebGPU fp16 or WASM q8. No remote speech service and no audio upload.
+  Worker terminates on cancel/unmount and after 60 seconds idle.
+- `src/server/dictation-model.ts` proxies only allowlisted files at the pinned
+  revision in `src/shared/dictation.ts`, behind pairing. Atomic host cache under
+  cacheDir/models; browser Cache Storage reuses files across reloads. First Whisper
+  use asks consent. Deleting in Settings clears browser files/consent, not host files.
+- `scripts/copy-onnx-assets.mjs` ships runtime WASM/MJS in dist/web/onnx during
+  build:web; no CDN runtime. pnpm skips native onnxruntime-node/sharp build scripts
+  because inference is browser-only. Do not loosen minimumReleaseAge.
+- Microphone needs localhost/HTTPS. Plain HTTP LAN clients get an explanation and
+  can use phone keyboard dictation instead. Pairing does not provide HTTPS.
 
 ## ACP facts we rely on
 
