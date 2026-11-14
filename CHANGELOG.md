@@ -1,3 +1,9 @@
+## [0.8.0](https://github.com/BOTOOM/devin-pocket/compare/v0.7.0...v0.8.0) (2026-11-14)
+
+### Features
+
+* **ui:** give the composer a full-width input with an action row ([b1e3f26](https://github.com/BOTOOM/devin-pocket/commit/b1e3f266e04f3685bbcef8544f4f2b5b6bd87ff4))
+
 ## [0.7.0](https://github.com/BOTOOM/devin-pocket/compare/v0.6.0...v0.7.0) (2026-11-13)
 
 ### Features
