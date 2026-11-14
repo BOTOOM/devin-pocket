@@ -18,12 +18,16 @@ export function useDictation(insert: (text: string) => void) {
   const worker = useRef<Worker | null>(null);
   const capture = useRef<PcmCapture | null>(null);
   const speech = useRef<SpeechRecognitionInstance | null>(null);
+  const speechFinals = useRef<string[]>([]);
+  const speechStopped = useRef(false);
   const language = useRef(resolveLanguage('auto', getLang()));
   const idle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const limit = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const cancel = useCallback(() => {
     generation.current++;
+    speechFinals.current = [];
+    speechStopped.current = false;
     clearTimeout(idle.current);
     clearTimeout(limit.current);
     worker.current?.terminate();
@@ -103,6 +107,8 @@ export function useDictation(insert: (text: string) => void) {
 
   const startSpeech = async (install: boolean) => {
     const id = ++generation.current;
+    speechFinals.current = [];
+    speechStopped.current = false;
     dispatch({ type: 'phase', phase: 'preparing', engine: 'speech' });
     const api = findSpeechRecognitionApi();
     if (!api) {
@@ -119,7 +125,7 @@ export function useDictation(insert: (text: string) => void) {
       save('engine', 'speech');
       speech.current = startLocalRecognition(api, language.current.speech, {
         onResult: (text, final) => {
-          if (id === generation.current && final) insertRef.current(text);
+          if (id === generation.current && final) speechFinals.current.push(text);
         },
         onError: () => {
           if (id === generation.current) fail();
@@ -127,6 +133,9 @@ export function useDictation(insert: (text: string) => void) {
         onEnd: () => {
           if (id === generation.current) {
             speech.current = null;
+            if (speechStopped.current && speechFinals.current.length)
+              insertRef.current(speechFinals.current.join(' '));
+            speechFinals.current = [];
             dispatch({ type: 'phase', phase: 'idle' });
           }
         },
@@ -169,6 +178,7 @@ export function useDictation(insert: (text: string) => void) {
     clearTimeout(limit.current);
     dispatch({ type: 'phase', phase: 'transcribing' });
     if (speech.current) {
+      speechStopped.current = true;
       speech.current.stop();
       return;
     }

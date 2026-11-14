@@ -97,7 +97,9 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('back-to-back transcript callbacks preserve both fragments and the caret', async ({ page }) => {
+test('back-to-back transcript callbacks preserve both fragments and the caret', async ({
+  page,
+}) => {
   await page.goto(`${base}/#/`);
   await startSession(page);
   await page.evaluate(() => localStorage.setItem('test.dictation.batch', 'true'));
@@ -170,3 +172,72 @@ test('insecure LAN context keeps mic visible and explains keyboard dictation', a
   await expect(page.getByRole('dialog')).toContainText('Gboard/iOS');
   await expect(page.getByRole('dialog')).toContainText('Pairing does not add HTTPS');
 });
+
+for (const outcome of ['stop', 'cancel', 'empty', 'error', 'end'] as const) {
+  test(`native speech buffers finals and handles ${outcome}`, async ({ page }) => {
+    await page.addInitScript(() => {
+      class LocalSpeech {
+        static available = async () => 'available';
+        static install = async () => true;
+        processLocally = false;
+        continuous = false;
+        interimResults = false;
+        lang = '';
+        onresult: ((event: unknown) => void) | null = null;
+        onend: (() => void) | null = null;
+        onerror: ((event: { error: string }) => void) | null = null;
+        start() {
+          Reflect.set(window, '__speech', this);
+        }
+        stop() {
+          this.onresult?.({
+            resultIndex: 0,
+            results: [{ isFinal: true, 0: { transcript: 'last fragment' } }],
+          });
+          this.onend?.();
+        }
+        abort() {
+          this.onend?.();
+        }
+      }
+      Object.defineProperty(window, 'SpeechRecognition', { value: LocalSpeech });
+    });
+    await page.goto(`${base}/#/`);
+    await startSession(page);
+    const input = page.locator('textarea');
+    await input.fill('Draft');
+    await page.getByRole('button', { name: 'Dictate by voice', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop dictation', exact: true })).toBeVisible();
+    await page.evaluate((empty) => {
+      Reflect.get(window, '__speech').onresult({
+        resultIndex: 0,
+        results: empty
+          ? []
+          : [
+              { isFinal: true, 0: { transcript: 'First fragment' } },
+              { isFinal: true, 0: { transcript: 'second fragment' } },
+              { isFinal: false, 0: { transcript: 'unfinished' } },
+            ],
+      });
+    }, outcome === 'empty');
+    await expect(input).toHaveValue('Draft');
+    if (outcome === 'error' || outcome === 'end') {
+      await page.evaluate((error) => {
+        const speech = Reflect.get(window, '__speech');
+        if (error) speech.onerror({ error: 'network' });
+        else speech.onend();
+      }, outcome === 'error');
+    } else if (outcome === 'cancel') {
+      await page.getByRole('button', { name: 'Cancel dictation', exact: true }).click();
+    } else {
+      await page.getByRole('button', { name: 'Stop dictation', exact: true }).click();
+    }
+    await expect(input).toHaveValue(
+      outcome === 'stop'
+        ? 'Draft First fragment second fragment last fragment'
+        : outcome === 'empty'
+          ? 'Draft last fragment'
+          : 'Draft',
+    );
+  });
+}
