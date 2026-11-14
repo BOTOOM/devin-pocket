@@ -1,3 +1,5 @@
+import { createReadStream } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -8,7 +10,27 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   root: 'src/web',
   publicDir: 'public',
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: 'local-onnx-assets',
+      configureServer(server) {
+        const require = createRequire(import.meta.url);
+        const transformers = createRequire(require.resolve('@huggingface/transformers'));
+        const directory = path.dirname(transformers.resolve('onnxruntime-web'));
+        server.middlewares.use((req, res, next) => {
+          const match = req.url?.match(/^\/onnx\/(ort-wasm-simd-threaded(?:\.jsep)?\.(wasm|mjs))$/);
+          if (!match) return next();
+          res.setHeader(
+            'Content-Type',
+            match[2] === 'wasm' ? 'application/wasm' : 'text/javascript',
+          );
+          createReadStream(path.join(directory, match[1])).on('error', next).pipe(res);
+        });
+      },
+    },
+  ],
   worker: { format: 'es' },
   resolve: {
     alias: {
@@ -26,7 +48,6 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/models': 'http://127.0.0.1:7777',
-      '/onnx': 'http://127.0.0.1:7777',
       '/api': 'http://127.0.0.1:7777',
       '/ws': { target: 'ws://127.0.0.1:7777', ws: true },
     },
