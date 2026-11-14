@@ -1,3 +1,17 @@
+## [0.9.0](https://github.com/BOTOOM/devin-pocket/compare/v0.8.0...v0.9.0) (2026-11-14)
+
+### Features
+
+* **dictation:** add private on-device bilingual voice input ([784f5cb](https://github.com/BOTOOM/devin-pocket/commit/784f5cb11cf0ce5cdbf4c85938b2ec0ee867a22d))
+
+### Bug Fixes
+
+* **dictation:** discard native speech unless recording is stopped ([c62bd88](https://github.com/BOTOOM/devin-pocket/commit/c62bd88be1b62dd19fe57f1959a3fb633fdf9024))
+* **dictation:** keep browser inference out of runtime dependencies ([1e5aa1f](https://github.com/BOTOOM/devin-pocket/commit/1e5aa1f3d6119aaa99438ec4cd99fc78139efde6))
+* **dictation:** narrow ONNX asset path for strict type checking ([cfa489a](https://github.com/BOTOOM/devin-pocket/commit/cfa489a5515f879f0d3e2ae105f2a5c6adae0d51))
+* **dictation:** preserve consecutive transcript insertions ([f678714](https://github.com/BOTOOM/devin-pocket/commit/f678714065ddf9063a9e32daad7df978e7e594bd))
+* **dictation:** serve local ONNX assets during development ([2967772](https://github.com/BOTOOM/devin-pocket/commit/2967772ddca173a14fa9e9fb8ef3233ca6382b07))
+
 ## [0.8.0](https://github.com/BOTOOM/devin-pocket/compare/v0.7.0...v0.8.0) (2026-11-14)
 
 ### Features
