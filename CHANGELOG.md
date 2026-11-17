@@ -1,3 +1,10 @@
+## [0.9.1](https://github.com/BOTOOM/devin-pocket/compare/v0.9.0...v0.9.1) (2026-11-17)
+
+### Bug Fixes
+
+* **update:** exempt only devin-pocket from release-age; never sudo pnpm ([5ccbcfb](https://github.com/BOTOOM/devin-pocket/commit/5ccbcfb9bee86afa960ba77302029eb647110c77))
+* **update:** install through sudo in root-owned globals and bypass release-age guards ([627ce0a](https://github.com/BOTOOM/devin-pocket/commit/627ce0a0e99205f52478bb68edb765e13fb2de29))
+
 ## [0.9.0](https://github.com/BOTOOM/devin-pocket/compare/v0.8.0...v0.9.0) (2026-11-14)
 
 ### Features
