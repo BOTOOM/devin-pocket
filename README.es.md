@@ -430,6 +430,13 @@ confirmación; `--yes` omite la pregunta. Detiene el daemon de Pocket, instala l
 y lo inicia con las opciones de arranque registradas, o las predeterminadas en
 instalaciones antiguas. Si falla la instalación, intenta reiniciar la versión anterior.
 No modifica versiones iguales o posteriores ni actualiza Devin CLI: usa su propio instalador.
+Cuando el directorio global pertenece a root (p. ej. `/usr` de NodeSource), la
+instalación usa `sudo` y puede pedir tu contraseña; sin `sudo` se detiene antes e
+imprime el comando manual en vez de fallar a mitad de la actualización. Los globals
+de pnpm nunca se elevan —`pnpm add -g` rechaza sudo— así que una instalación pnpm
+de root imprime instrucciones de recuperación. Las instalaciones con pnpm pasan
+`--config.minimumReleaseAgeExclude=devin-pocket`, así que devin-pocket se actualiza
+recién publicado mientras sus dependencias mantienen la guardia de antigüedad.
 
 No modifica instalaciones desde código, npx o desconocidas: repite el instalador original
 o compila y reinstala el paquete. Con la instalación automática de Termux puedes ejecutar

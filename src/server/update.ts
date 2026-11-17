@@ -176,6 +176,27 @@ export function installPackage(command: string, args: string[]): Promise<number>
   });
 }
 
+export type GlobalAccess = 'writable' | 'sudo' | 'denied';
+
+// Mirrors install.sh: a root-owned global dir (e.g. NodeSource /usr) needs sudo.
+// pnpm refuses `sudo pnpm add -g` outright (ERR_PNPM_SUDO_NOT_SUPPORTED), so a
+// root-owned pnpm global can only be reported, never elevated.
+export async function globalAccess(
+  manager: 'pnpm' | 'npm',
+  root = commandOutput(manager, ['root', '-g']),
+  sudo = commandOutput('sudo', ['--version']),
+): Promise<GlobalAccess> {
+  if (process.platform === 'win32' || process.getuid?.() === 0) return 'writable';
+  const global = await root;
+  if (!global) return 'writable';
+  try {
+    fs.accessSync(fs.realpathSync(global), fs.constants.W_OK);
+    return 'writable';
+  } catch {}
+  if (manager === 'pnpm') return 'denied';
+  return (await sudo) ? 'sudo' : 'denied';
+}
+
 export interface UpdateOptions {
   check?: boolean;
   version?: string;
@@ -189,6 +210,7 @@ export async function runUpdate(
     current?: string;
     latest?: (version?: string) => Promise<string>;
     manager?: () => Promise<'pnpm' | 'npm' | null>;
+    globalAccess?: (manager: 'pnpm' | 'npm') => Promise<GlobalAccess>;
     install?: typeof installPackage;
     print?: (message: string) => void;
     confirm?: () => Promise<boolean>;
@@ -235,11 +257,44 @@ export async function runUpdate(
       print('Cancelled / Cancelado. Use --yes to confirm non-interactively.');
       return 1;
     }
+    const access = await (deps.globalAccess ?? globalAccess)(manager);
+    if (access === 'denied') {
+      print(
+        manager === 'pnpm'
+          ? `Global pnpm directory is not writable and sudo cannot manage it. Fix its ownership or reinstall as your user / El directorio global de pnpm no es escribible y sudo no puede gestionarlo. Corrige los permisos o reinstala con tu usuario: pnpm add -g devin-pocket@${latest}`
+          : `Global directory is not writable and sudo is unavailable. Update manually / El directorio global no es escribible y sudo no está disponible. Actualiza manualmente: sudo npm install -g devin-pocket@${latest}`,
+      );
+      return 1;
+    }
+    const args = [manager === 'pnpm' ? 'add' : 'install', '-g', `devin-pocket@${latest}`];
+    // Releases younger than 7 days must still update: exempt devin-pocket from
+    // any inherited minimumReleaseAge (repo workspace or user pnpm config)
+    // while keeping the guard for its dependencies.
+    if (manager === 'pnpm') args.push('--config.minimumReleaseAgeExclude=devin-pocket');
+    let command = manager as string;
+    if (access === 'sudo') {
+      print(
+        'Global directory needs administrator rights; sudo may ask for your password / El directorio global requiere permisos de administrador; sudo puede pedir tu contraseña.',
+      );
+      command = 'sudo';
+      // env PATH keeps user-installed Node (nvm/n) visible to sudo; -n avoids
+      // a silent password wait when stdin is not a TTY.
+      args.unshift(
+        ...(process.stdin.isTTY ? [] : ['-n']),
+        'env',
+        `PATH=${process.env.PATH ?? ''}`,
+        manager,
+      );
+      // Under sudo, npm resolves the prefix from root's env — pin the user's.
+      if (manager === 'npm') {
+        const prefix = await commandOutput('npm', ['prefix', '-g']);
+        if (prefix) args.push(`--prefix=${prefix}`);
+      }
+    }
     const stopped = await deps.stop();
     let installed = false;
     try {
-      const args = [manager === 'pnpm' ? 'add' : 'install', '-g', `devin-pocket@${latest}`];
-      installed = (await (deps.install ?? installPackage)(manager, args)) === 0;
+      installed = (await (deps.install ?? installPackage)(command, args)) === 0;
       if (!installed) print('Installation failed; attempting to restart the previous version.');
     } finally {
       if (stopped) await deps.restart(installed);
