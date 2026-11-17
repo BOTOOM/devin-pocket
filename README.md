@@ -439,6 +439,11 @@ available). Updating detects npm/pnpm global installations and asks for confirma
 then starts it with its recorded launch options, or defaults for older installations.
 If installation fails it still attempts to restart the previous version. It never
 updates Devin CLI; use that CLI's own installer. Current or newer versions are left alone.
+When the global directory is root-owned (e.g. NodeSource's `/usr`), the install runs
+through `sudo` and may ask for your password; without `sudo` it stops early and prints
+the manual command instead of failing mid-update. pnpm installs pass
+`--config.minimumReleaseAge=0`, so fresh releases update immediately regardless of any
+inherited release-age guard.
 
 Source checkouts, npx and unknown installations are not modified: rerun your original
 installer or rebuild/reinstall the source package. On automated Termux installs, run

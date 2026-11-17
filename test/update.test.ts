@@ -11,6 +11,7 @@ import {
   checkForUpdate,
   compareVersions,
   detectManager,
+  globalAccess,
   refreshInstallManager,
   registryVersion,
   runUpdate,
@@ -158,6 +159,7 @@ function fixture() {
     current: '1.0.0',
     latest: vi.fn(async () => '2.0.0'),
     manager: vi.fn(async (): Promise<'npm' | 'pnpm' | null> => 'npm'),
+    globalAccess: vi.fn(async (): Promise<'writable' | 'sudo' | 'denied'> => 'writable'),
     install: vi.fn(async () => 0),
     print: vi.fn(),
     confirm: vi.fn(async () => true),
@@ -206,12 +208,53 @@ it('installs the requested version with the detected manager and restarts', asyn
       manager === 'pnpm' ? 'add' : 'install',
       '-g',
       'devin-pocket@2.0.0',
+      ...(manager === 'pnpm' ? ['--config.minimumReleaseAge=0'] : []),
     ]);
     expect(deps.restart).toHaveBeenCalledWith(true);
     expect(deps.stop.mock.invocationCallOrder[0]).toBeLessThan(
       deps.install.mock.invocationCallOrder[0] ?? 0,
     );
     expect(deps.confirm).not.toHaveBeenCalled();
+  }
+});
+
+it('updates a root-owned global through sudo and skips it without sudo', async () => {
+  const deps = fixture();
+  deps.globalAccess.mockResolvedValue('sudo');
+  expect(await runUpdate({ yes: true }, deps)).toBe(0);
+  expect(deps.install).toHaveBeenCalledWith(
+    'sudo',
+    expect.arrayContaining(['env', 'npm', 'install', '-g', 'devin-pocket@2.0.0']),
+  );
+  deps.globalAccess.mockResolvedValue('denied');
+  deps.install.mockClear();
+  expect(await runUpdate({ yes: true }, deps)).toBe(1);
+  expect(deps.print.mock.calls.flat().join(' ')).toContain('not writable');
+  expect(deps.install).not.toHaveBeenCalled();
+  expect(deps.stop).toHaveBeenCalledTimes(1);
+});
+
+it('classifies global access by writability and sudo availability', async () => {
+  const writable = fs.mkdtempSync(path.join(os.tmpdir(), 'pocket-root-'));
+  const locked = path.join(writable, 'locked');
+  fs.mkdirSync(locked, 0o555);
+  try {
+    expect(await globalAccess('npm', Promise.resolve(writable), Promise.resolve(''))).toBe(
+      'writable',
+    );
+    // Root and Windows CI take the early 'writable' branch before touching the fs.
+    if (process.platform !== 'win32' && process.getuid?.() !== 0) {
+      expect(await globalAccess('npm', Promise.resolve(locked), Promise.resolve('sudo 1'))).toBe(
+        'sudo',
+      );
+      expect(await globalAccess('npm', Promise.resolve(locked), Promise.resolve(''))).toBe(
+        'denied',
+      );
+    }
+    expect(await globalAccess('npm', Promise.resolve(''), Promise.resolve(''))).toBe('writable');
+  } finally {
+    fs.chmodSync(locked, 0o755);
+    fs.rmSync(writable, { recursive: true, force: true });
   }
 });
 
