@@ -179,6 +179,8 @@ export function installPackage(command: string, args: string[]): Promise<number>
 export type GlobalAccess = 'writable' | 'sudo' | 'denied';
 
 // Mirrors install.sh: a root-owned global dir (e.g. NodeSource /usr) needs sudo.
+// pnpm refuses `sudo pnpm add -g` outright (ERR_PNPM_SUDO_NOT_SUPPORTED), so a
+// root-owned pnpm global can only be reported, never elevated.
 export async function globalAccess(
   manager: 'pnpm' | 'npm',
   root = commandOutput(manager, ['root', '-g']),
@@ -191,6 +193,7 @@ export async function globalAccess(
     fs.accessSync(fs.realpathSync(global), fs.constants.W_OK);
     return 'writable';
   } catch {}
+  if (manager === 'pnpm') return 'denied';
   return (await sudo) ? 'sudo' : 'denied';
 }
 
@@ -257,14 +260,17 @@ export async function runUpdate(
     const access = await (deps.globalAccess ?? globalAccess)(manager);
     if (access === 'denied') {
       print(
-        `Global directory is not writable and sudo is unavailable. Update manually / El directorio global no es escribible y sudo no está disponible. Actualiza manualmente: sudo ${manager} ${manager === 'pnpm' ? 'add' : 'install'} -g devin-pocket@${latest}`,
+        manager === 'pnpm'
+          ? `Global pnpm directory is not writable and sudo cannot manage it. Fix its ownership or reinstall as your user / El directorio global de pnpm no es escribible y sudo no puede gestionarlo. Corrige los permisos o reinstala con tu usuario: pnpm add -g devin-pocket@${latest}`
+          : `Global directory is not writable and sudo is unavailable. Update manually / El directorio global no es escribible y sudo no está disponible. Actualiza manualmente: sudo npm install -g devin-pocket@${latest}`,
       );
       return 1;
     }
     const args = [manager === 'pnpm' ? 'add' : 'install', '-g', `devin-pocket@${latest}`];
-    // Releases younger than 7 days must still update: ignore any inherited
-    // minimumReleaseAge (repo workspace or user pnpm config).
-    if (manager === 'pnpm') args.push('--config.minimumReleaseAge=0');
+    // Releases younger than 7 days must still update: exempt devin-pocket from
+    // any inherited minimumReleaseAge (repo workspace or user pnpm config)
+    // while keeping the guard for its dependencies.
+    if (manager === 'pnpm') args.push('--config.minimumReleaseAgeExclude=devin-pocket');
     let command = manager as string;
     if (access === 'sudo') {
       print(

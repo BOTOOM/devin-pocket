@@ -208,7 +208,7 @@ it('installs the requested version with the detected manager and restarts', asyn
       manager === 'pnpm' ? 'add' : 'install',
       '-g',
       'devin-pocket@2.0.0',
-      ...(manager === 'pnpm' ? ['--config.minimumReleaseAge=0'] : []),
+      ...(manager === 'pnpm' ? ['--config.minimumReleaseAgeExclude=devin-pocket'] : []),
     ]);
     expect(deps.restart).toHaveBeenCalledWith(true);
     expect(deps.stop.mock.invocationCallOrder[0]).toBeLessThan(
@@ -248,6 +248,11 @@ it('classifies global access by writability and sudo availability', async () => 
         'sudo',
       );
       expect(await globalAccess('npm', Promise.resolve(locked), Promise.resolve(''))).toBe(
+        'denied',
+      );
+      // pnpm refuses `sudo pnpm add -g` outright, so a locked pnpm global is
+      // always 'denied' even when sudo exists.
+      expect(await globalAccess('pnpm', Promise.resolve(locked), Promise.resolve('sudo 1'))).toBe(
         'denied',
       );
     }
