@@ -52,11 +52,21 @@ export const ToolCard = memo(function ToolCard({ item, cwd }: { item: ToolItem; 
   const [open, setOpen] = useState(!(item.toolKind === 'execute' && done));
   const diffs = item.content.filter((c) => c.type === 'diff');
   const texts = item.content.filter((c) => c.type === 'content' && c.content?.type === 'text');
+  const hasBody =
+    !!item.command ||
+    !!item.cwd ||
+    diffs.length > 0 ||
+    texts.length > 0 ||
+    item.locations.length > 0 ||
+    item.rawOutput !== undefined;
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger className="flex min-h-11 w-full items-center gap-2.5 px-3 text-left">
+      <Collapsible open={hasBody && open} onOpenChange={setOpen} disabled={!hasBody}>
+        <CollapsibleTrigger
+          data-empty={hasBody ? undefined : ''}
+          className="flex min-h-11 w-full items-center gap-2.5 px-3 text-left disabled:cursor-default"
+        >
           <Icon className="size-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1 truncate text-sm font-medium">{item.title}</span>
           {item.exitCode !== undefined && (
@@ -65,9 +75,13 @@ export const ToolCard = memo(function ToolCard({ item, cwd }: { item: ToolItem; 
             </Badge>
           )}
           {statusDot(item.status)}
-          <ChevronRight
-            className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
-          />
+          {hasBody ? (
+            <ChevronRight
+              className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`}
+            />
+          ) : (
+            <span className="size-4 shrink-0" />
+          )}
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="space-y-2 border-t px-3 py-2.5">

@@ -1,9 +1,19 @@
-import { ChevronLeft, Loader2, MessageCircleQuestion, MoreVertical, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronLeft,
+  Loader2,
+  Lock,
+  LockOpen,
+  MessageCircleQuestion,
+  MoreVertical,
+  X,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Composer } from '@/components/Composer';
 import { PermissionSheet } from '@/components/PermissionSheet';
 import { PlanPanel } from '@/components/PlanPanel';
 import { RenameDialog } from '@/components/RenameDialog';
+import { SessionSwitcher } from '@/components/SessionSwitcher';
 import { StatusStrip } from '@/components/StatusStrip';
 import { Transcript } from '@/components/Transcript';
 import { Button } from '@/components/ui/button';
@@ -23,11 +33,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from '@/i18n';
+import { clearDraft } from '@/lib/drafts';
 import { baseName } from '@/lib/format';
 import { Markdown } from '@/lib/markdown';
 import { navigate } from '@/lib/router';
 import { send } from '@/lib/ws';
-import { useStore } from '@/store';
+import { setViewingSession, useStore } from '@/store';
 
 export function ChatScreen({ sessionId }: { sessionId: string }) {
   const t = useT();
@@ -39,6 +50,8 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
   // /btw needs side-chain support; the real agent doesn't list it in commands.
   const btwOk = state?.commands.some((c) => c.name === 'btw') || agentInfo?.caps.chains === true;
   const [renameOpen, setRenameOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const canForceClose = useStore((s) => s.agentInfo?.caps.forceClose === true);
   const [delOpen, setDelOpen] = useState(false);
   const [asideOpen, setAsideOpen] = useState(false);
   const [asideQuestion, setAsideQuestion] = useState('');
@@ -53,6 +66,11 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
       });
     }
   }, [hydrated, state, summary, sessionId]);
+
+  useEffect(() => {
+    setViewingSession(sessionId);
+    return () => setViewingSession(undefined);
+  }, [sessionId]);
 
   useEffect(() => {
     if (state?.aside?.status === 'working') setAsideOpen(true);
@@ -88,10 +106,16 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
         </Button>
         <button
           type="button"
-          className="min-w-0 flex-1 rounded-md px-2 py-1 text-left"
-          onClick={() => setRenameOpen(true)}
+          data-testid="session-switcher-trigger"
+          aria-haspopup="dialog"
+          aria-label={t('switcher.open', { title })}
+          className="min-w-0 flex-1 rounded-md px-2 py-1 text-left hover:bg-accent/60 focus-visible:outline-2 focus-visible:outline-ring"
+          onClick={() => setSwitcherOpen(true)}
         >
-          <div className="truncate font-semibold">{title}</div>
+          <div className="flex min-w-0 items-center gap-1">
+            <span className="truncate font-semibold">{title}</span>
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+          </div>
           <div
             data-testid="session-folder"
             title={cwd}
@@ -146,7 +170,32 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
       <StatusStrip state={state} sessionId={sessionId} />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!state ? (
+        {summary?.locked && !state ? (
+          <div
+            data-testid="session-locked"
+            className="flex flex-col items-center gap-3 px-6 py-12 text-center text-sm text-muted-foreground"
+          >
+            <Lock className="size-6" />
+            <p className="max-w-xs">{t('chat.lockedBody')}</p>
+            {canForceClose && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={async () => {
+                  try {
+                    await send({ type: 'session.forceClose', sessionId });
+                    void import('sonner').then(({ toast }) => toast.success(t('home.unlockDone')));
+                  } catch (e) {
+                    void import('sonner').then(({ toast }) => toast.error((e as Error).message));
+                  }
+                }}
+              >
+                <LockOpen className="size-4" />
+                {t('home.unlock')}
+              </Button>
+            )}
+          </div>
+        ) : !state ? (
           <div className="space-y-3 p-4">
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-16 w-full" />
@@ -247,6 +296,11 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
 
       {state?.permission && <PermissionSheet request={state.permission} sessionId={sessionId} />}
 
+      <SessionSwitcher
+        open={switcherOpen}
+        onOpenChange={setSwitcherOpen}
+        currentSessionId={sessionId}
+      />
       <RenameDialog
         sessionId={sessionId}
         current={state?.title ?? summary?.title}
@@ -266,7 +320,9 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
             <Button
               variant="destructive"
               onClick={async () => {
-                await send({ type: 'session.delete', sessionId, cwd }).catch(() => {});
+                await send({ type: 'session.delete', sessionId, cwd })
+                  .then(() => clearDraft(sessionId))
+                  .catch(() => {});
                 navigate('home');
               }}
             >

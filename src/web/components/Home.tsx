@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BrandMark } from '@/components/BrandMark';
 import { NewSessionSheet } from '@/components/NewSessionSheet';
 import { RenameDialog } from '@/components/RenameDialog';
+import { SessionActivityBadge } from '@/components/SessionSwitcher';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useT } from '@/i18n';
+import { clearDraft } from '@/lib/drafts';
 import { baseName, dayGroup, relTime } from '@/lib/format';
 import { navigate } from '@/lib/router';
 import { send } from '@/lib/ws';
@@ -257,12 +259,7 @@ function SessionRow({
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="truncate font-medium">{title}</span>
-            {open && (
-              <span
-                className="size-2 shrink-0 rounded-full bg-success"
-                title={t('home.openBadge')}
-              />
-            )}
+            <SessionActivityBadge sessionId={s.sessionId} open={open} />
             {s.locked && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -351,7 +348,10 @@ function DeleteDialog({
                   sessionId: s.sessionId,
                   cwd: s.cwd,
                 })
-                  .then(() => onDeleted(s.sessionId))
+                  .then(() => {
+                    clearDraft(s.sessionId);
+                    onDeleted(s.sessionId);
+                  })
                   .catch(() => {});
               onClose();
             }}
