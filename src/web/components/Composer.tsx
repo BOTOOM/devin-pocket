@@ -54,6 +54,7 @@ export function Composer({
   const [fsResults, setFsResults] = useState<FsEntry[]>([]);
   const [fsLoading, setFsLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [queueOpen, setQueueOpen] = useState(true);
   const [overflow, setOverflow] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -61,7 +62,7 @@ export function Composer({
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fsSeq = useRef(0);
   const submitting = useRef(false);
-  // Bumped when the draft clears — stale FileReader results are dropped.
+  // Drop stale FileReader results when an edit is cancelled.
   const draftEpoch = useRef(0);
   const dictation = useDictation((transcript) => {
     const input = taRef.current;
@@ -161,44 +162,43 @@ export function Composer({
     dictation.cancel();
     const blocks: ContentBlock[] = [];
     const trimmed = text.trim();
-    if (trimmed.startsWith('/btw ') && btwOk && !images.length && !mentions.length) {
-      submitting.current = true;
-      try {
-        await send({ type: 'aside.ask', sessionId, question: trimmed.slice(5) });
-        setText('');
-      } catch (e) {
-        void import('sonner').then(({ toast }) => toast.error((e as Error).message));
-      } finally {
-        submitting.current = false;
-      }
-      return;
-    }
+    const isAside = trimmed.startsWith('/btw ') && btwOk && !images.length && !mentions.length;
     if (trimmed) blocks.push({ type: 'text', text: trimmed });
     for (const m of mentions) blocks.push({ type: 'resource_link', uri: m.uri, name: m.name });
     for (const img of images)
       blocks.push({ type: 'image', data: img.data, mimeType: img.mimeType });
     if (blocks.length === 0) return;
+    const epoch = draftEpoch.current;
     submitting.current = true;
+    setIsSubmitting(true);
     try {
       await send(
-        editingId
-          ? { type: 'prompt.update', sessionId, id: editingId, blocks }
-          : { type: 'prompt.enqueue', sessionId, blocks },
+        isAside
+          ? { type: 'aside.ask', sessionId, question: trimmed.slice(5) }
+          : editingId
+            ? { type: 'prompt.update', sessionId, id: editingId, blocks }
+            : { type: 'prompt.enqueue', sessionId, blocks },
       );
-      draftEpoch.current++;
-      setText('');
-      setImages([]);
-      setMentions([]);
-      setEditingId(null);
+      if (draftEpoch.current !== epoch) return;
+      // Clear what was sent, not changes made while waiting for the ack.
+      setText((current) => (current === text ? '' : current));
+      if (!isAside) {
+        if (images.length) setImages((current) => current.filter((img) => !images.includes(img)));
+        if (mentions.length) {
+          setMentions((current) => current.filter((mention) => !mentions.includes(mention)));
+        }
+        setEditingId(null);
+      }
     } catch (e) {
       const msg = (e as Error).message;
       void import('sonner').then(({ toast }) =>
-        toast.error(editingId && /not found/i.test(msg) ? t('composer.editGone') : msg),
+        toast.error(!isAside && editingId && /not found/i.test(msg) ? t('composer.editGone') : msg),
       );
       // The queued item may already have been sent; drop edit mode so a retry enqueues fresh.
-      setEditingId(null);
+      if (!isAside && draftEpoch.current === epoch) setEditingId(null);
     } finally {
       submitting.current = false;
+      setIsSubmitting(false);
     }
   }, [text, mentions, images, sessionId, btwOk, editingId, t, dictation.cancel]);
 
@@ -314,6 +314,7 @@ export function Composer({
                       className="size-10 shrink-0"
                       aria-label={t('composer.editQueued')}
                       disabled={
+                        isSubmitting ||
                         editingId != null ||
                         !!text.trim() ||
                         images.length > 0 ||
@@ -546,8 +547,11 @@ export function Composer({
                       : t('composer.send')
               }
               disabled={
-                !agentReady || (!text.trim() && images.length === 0 && mentions.length === 0)
+                !agentReady ||
+                isSubmitting ||
+                (!text.trim() && images.length === 0 && mentions.length === 0)
               }
+              aria-busy={isSubmitting}
               onClick={submit}
             >
               {editingId ? <Check className="size-5" /> : <Send className="size-5" />}

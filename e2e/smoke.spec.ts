@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { ClientEnvelope, ServerMessage } from '../src/shared/protocol';
 import { startSession } from './session-helpers';
 import './theme-screens';
 import './responsive-screens';
@@ -107,31 +108,71 @@ test('settings shows the plan & quota card when the agent pushes billing info', 
 });
 
 test('queued message edits in place keeping its position', async ({ page }) => {
+  let firstQueuedId: string | undefined;
+  let releaseFirstAck: (() => void) | undefined;
+  await page.routeWebSocket(/\/ws$/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((msg) => {
+      const { cmd, id } = JSON.parse(String(msg)) as ClientEnvelope;
+      if (cmd.type === 'prompt.enqueue' && cmd.blocks[0]?.type === 'text') {
+        if (cmd.blocks[0].text === 'FIRST_QUEUED') firstQueuedId = id;
+      }
+      server.send(msg);
+    });
+    server.onMessage((msg) => {
+      const data = JSON.parse(String(msg)) as ServerMessage;
+      if (data.type === 'ack' && data.id === firstQueuedId) {
+        releaseFirstAck = () => ws.send(msg);
+        return;
+      }
+      ws.send(msg);
+    });
+  });
   await page.goto('/#/');
   await startSession(page);
   const input = page.locator('textarea');
-  await input.fill('QUEUE_HOLD');
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('button', { name: /Añadir a la cola|Add to queue/i })).toBeVisible();
-  await input.fill('FIRST_QUEUED');
-  await page.keyboard.press('Enter');
-  await input.fill('SECOND_QUEUED');
-  await page.keyboard.press('Enter');
   const queue = page.getByRole('region', { name: /En cola|Queued/i });
-  await expect(queue.getByText('SECOND_QUEUED')).toBeVisible();
-  const row = queue.locator('div', { hasText: 'SECOND_QUEUED' });
-  await row.getByRole('button', { name: /Editar mensaje|Edit message/i }).click();
-  await expect(page.getByText(/Editando mensaje en cola|Editing queued message/i)).toBeVisible();
-  await expect(input).toHaveValue('SECOND_QUEUED');
-  // the item stays queued while being edited, and its send-now can't fire the old content
-  await expect(queue.getByText('SECOND_QUEUED')).toBeVisible();
-  await expect(row.getByRole('button', { name: /Enviar ahora|Send now/i })).toBeDisabled();
-  await input.fill('SECOND_EDITED');
-  await page.getByRole('button', { name: /Guardar cambios|Save changes/i }).click();
-  await expect(page.getByText(/Editando mensaje en cola|Editing queued message/i)).toHaveCount(0);
-  const rows = queue.locator('> div');
-  await expect(rows.nth(0)).toContainText('FIRST_QUEUED');
-  await expect(rows.nth(1)).toContainText('SECOND_EDITED');
+  const addToQueue = page.getByRole('button', { name: /Añadir a la cola|Add to queue/i });
+  const stop = page.getByRole('button', { name: /^(Detener|Stop)$/ });
+  await input.fill('QUEUE_HOLD');
+  await input.press('Enter');
+  try {
+    await expect(page.getByText('Working on queued task')).toBeVisible();
+    await expect(input).toHaveValue('');
+    await input.fill('FIRST_QUEUED');
+    await input.press('Enter');
+    await expect(queue.getByText('FIRST_QUEUED')).toBeVisible();
+    await expect.poll(() => !!releaseFirstAck).toBe(true);
+
+    await input.fill('SECOND_QUEUED');
+    await expect(addToQueue).toBeDisabled();
+    releaseFirstAck?.();
+    await expect(addToQueue).toBeEnabled();
+    await expect(input).toHaveValue('SECOND_QUEUED');
+    await input.press('Enter');
+    await expect(input).toHaveValue('');
+
+    const rows = queue.locator(':scope > div');
+    const row = rows.filter({ hasText: 'SECOND_QUEUED' });
+    await row.getByRole('button', { name: /Editar mensaje|Edit message/i }).click();
+    const editing = page.getByText(/Editando mensaje en cola|Editing queued message/i);
+    await expect(editing).toBeVisible();
+    await expect(input).toHaveValue('SECOND_QUEUED');
+    await expect(row.getByText('SECOND_QUEUED')).toBeVisible();
+    await expect(row.getByRole('button', { name: /Enviar ahora|Send now/i })).toBeDisabled();
+    await input.fill('SECOND_EDITED');
+    await page.getByRole('button', { name: /Guardar cambios|Save changes/i }).click();
+    await expect(editing).toHaveCount(0);
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('FIRST_QUEUED');
+    await expect(rows.nth(1)).toContainText('SECOND_EDITED');
+  } finally {
+    // Stop does not drain queued prompts into the shared fake agent.
+    if (await stop.isVisible()) {
+      await stop.click();
+      await expect(stop).toHaveCount(0);
+    }
+  }
 });
 
 test('new session shows busy state, blocks double-clicks and reports errors', async ({ page }) => {
