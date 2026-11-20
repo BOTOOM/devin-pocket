@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BrandMark } from '@/components/BrandMark';
 import { NewSessionSheet } from '@/components/NewSessionSheet';
 import { RenameDialog } from '@/components/RenameDialog';
-import { SessionActivityBadge } from '@/components/SessionSwitcher';
+import { SessionActivityBadge } from '@/components/SessionActivityBadge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import {
@@ -253,6 +253,7 @@ function SessionRow({
       <button
         type="button"
         aria-current={active ? 'page' : undefined}
+        data-session-id={s.sessionId}
         className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-ring"
         onClick={() => navigate({ name: 'chat', sessionId: s.sessionId })}
       >

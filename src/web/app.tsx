@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect } from 'react';
 import { AgentGate } from '@/components/AgentGate';
 import { ChatScreen } from '@/components/Chat';
 import { DiagnosticsScreen } from '@/components/Diagnostics';
@@ -10,14 +10,9 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useT } from '@/i18n';
 import { initAuth, refreshAuth, useAuth } from '@/lib/auth';
 import { useRoute } from '@/lib/router';
+import { useDesktop } from '@/lib/use-desktop';
 import { stopSocket } from '@/lib/ws';
 import { initStore, useStore } from '@/store';
-
-const desktopQuery = matchMedia('(min-width: 1024px)');
-const subscribeDesktop = (notify: () => void) => {
-  desktopQuery.addEventListener('change', notify);
-  return () => desktopQuery.removeEventListener('change', notify);
-};
 
 export function App() {
   const t = useT();
@@ -25,7 +20,7 @@ export function App() {
   const route = useRoute();
   const connected = useStore((s) => s.connected);
   const agent = useStore((s) => s.agent);
-  const desktop = useSyncExternalStore(subscribeDesktop, () => desktopQuery.matches);
+  const desktop = useDesktop();
 
   useEffect(() => {
     void initAuth();

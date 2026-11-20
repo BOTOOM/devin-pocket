@@ -1,4 +1,4 @@
-import type { SessionState, SessionSummary } from './protocol.js';
+import type { SessionState } from './protocol.js';
 
 export type SessionActivity = 'permission' | 'working' | 'unseen';
 
@@ -10,14 +10,4 @@ export function sessionActivity(
   if (state?.permission || state?.turn === 'awaitingPermission') return 'permission';
   if (state?.turn === 'working' || state?.turn === 'cancelling') return 'working';
   return unseen ? 'unseen' : undefined;
-}
-
-export function filterSessions(
-  sessions: SessionSummary[],
-  query: string,
-  untitled: string,
-): SessionSummary[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return sessions;
-  return sessions.filter((s) => `${s.title || untitled}\n${s.cwd}`.toLowerCase().includes(q));
 }
