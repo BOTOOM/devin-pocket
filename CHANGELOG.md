@@ -1,3 +1,15 @@
+## [0.10.0](https://github.com/BOTOOM/devin-pocket/compare/v0.9.1...v0.10.0) (2026-11-20)
+
+### Features
+
+* **chat:** one side panel for sessions and menu; no back button ([1b676cc](https://github.com/BOTOOM/devin-pocket/commit/1b676cca31ad48d759fdb7aefaefed162386a456))
+* **chat:** quick session switcher, live session status and per-session drafts ([a7130c9](https://github.com/BOTOOM/devin-pocket/commit/a7130c9e8d327da9590035e75e23d06a4e1de089))
+
+### Bug Fixes
+
+* **chat:** close the side panel when its current session is tapped ([ef2faf8](https://github.com/BOTOOM/devin-pocket/commit/ef2faf8bc995a24aecb867e369094d2e4b5e440b))
+* **composer:** keep drafts in memory when localStorage rejects the write ([81b258d](https://github.com/BOTOOM/devin-pocket/commit/81b258d73e524bf3b699eb0cb2c204127c4956c1))
+
 ## [0.9.1](https://github.com/BOTOOM/devin-pocket/compare/v0.9.0...v0.9.1) (2026-11-17)
 
 ### Bug Fixes
