@@ -45,7 +45,8 @@ test('chat side panel switches sessions and drafts survive switching', async ({ 
     'aria-current',
     'page',
   );
-  await page.keyboard.press('Escape');
+  await panel.locator(`[data-session-id="${idOf(second)}"]`).click();
+  await expect(panel).toHaveCount(0);
 
   await switchTo(page, first);
   await expect(page.locator('textarea')).toHaveValue('BORRADOR_UNO');

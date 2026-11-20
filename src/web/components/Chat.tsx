@@ -300,7 +300,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
           >
             <SheetTitle className="sr-only">{t('home.sessions')}</SheetTitle>
             <SheetDescription className="sr-only">{t('nav.openPanel')}</SheetDescription>
-            <SessionList currentSessionId={sessionId} />
+            <SessionList currentSessionId={sessionId} onPick={() => setPanelOpen(false)} />
           </SheetContent>
         </Sheet>
       )}

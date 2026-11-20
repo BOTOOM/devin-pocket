@@ -72,7 +72,14 @@ export function DesktopWelcome() {
   );
 }
 
-export function SessionList({ currentSessionId }: { currentSessionId?: string }) {
+export function SessionList({
+  currentSessionId,
+  onPick,
+}: {
+  currentSessionId?: string;
+  /** Called after a row is tapped, e.g. to close the panel hosting the list. */
+  onPick?: () => void;
+}) {
   const t = useT();
   const sessions = useStore((s) => s.sessions);
   const hydrated = useStore((s) => s.hydrated);
@@ -201,6 +208,7 @@ export function SessionList({ currentSessionId }: { currentSessionId?: string })
                       active={s.sessionId === currentSessionId}
                       onRename={() => setRename(s)}
                       onDelete={() => setDel(s)}
+                      onPick={onPick}
                     />
                   ))}
                 </section>
@@ -235,12 +243,14 @@ function SessionRow({
   active,
   onRename,
   onDelete,
+  onPick,
 }: {
   s: SessionSummary;
   open: boolean;
   active: boolean;
   onRename: () => void;
   onDelete: () => void;
+  onPick?: () => void;
 }) {
   const t = useT();
   // "Forzar cierre" needs the agent's cognition.ai/force close capability.
@@ -255,7 +265,10 @@ function SessionRow({
         aria-current={active ? 'page' : undefined}
         data-session-id={s.sessionId}
         className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-ring"
-        onClick={() => navigate({ name: 'chat', sessionId: s.sessionId })}
+        onClick={() => {
+          navigate({ name: 'chat', sessionId: s.sessionId });
+          onPick?.();
+        }}
       >
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
