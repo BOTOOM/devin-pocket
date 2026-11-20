@@ -1,3 +1,9 @@
+## [0.10.1](https://github.com/BOTOOM/devin-pocket/compare/v0.10.0...v0.10.1) (2026-11-20)
+
+### Bug Fixes
+
+* **composer:** preserve drafts while a send is pending ([012efed](https://github.com/BOTOOM/devin-pocket/commit/012efed533fd512b3656c993edd024160be22a76))
+
 ## [0.10.0](https://github.com/BOTOOM/devin-pocket/compare/v0.9.1...v0.10.0) (2026-11-20)
 
 ### Features
