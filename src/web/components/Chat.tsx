@@ -1,6 +1,15 @@
-import { ChevronLeft, Loader2, MessageCircleQuestion, MoreVertical, X } from 'lucide-react';
+import {
+  Loader2,
+  Lock,
+  LockOpen,
+  Menu,
+  MessageCircleQuestion,
+  MoreVertical,
+  X,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Composer } from '@/components/Composer';
+import { SessionList } from '@/components/Home';
 import { PermissionSheet } from '@/components/PermissionSheet';
 import { PlanPanel } from '@/components/PlanPanel';
 import { RenameDialog } from '@/components/RenameDialog';
@@ -21,13 +30,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useT } from '@/i18n';
+import { clearDraft } from '@/lib/drafts';
 import { baseName } from '@/lib/format';
 import { Markdown } from '@/lib/markdown';
 import { navigate } from '@/lib/router';
+import { useDesktop } from '@/lib/use-desktop';
 import { send } from '@/lib/ws';
-import { useStore } from '@/store';
+import { setViewingSession, useStore } from '@/store';
 
 export function ChatScreen({ sessionId }: { sessionId: string }) {
   const t = useT();
@@ -39,6 +51,9 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
   // /btw needs side-chain support; the real agent doesn't list it in commands.
   const btwOk = state?.commands.some((c) => c.name === 'btw') || agentInfo?.caps.chains === true;
   const [renameOpen, setRenameOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const desktop = useDesktop();
+  const canForceClose = useStore((s) => s.agentInfo?.caps.forceClose === true);
   const [delOpen, setDelOpen] = useState(false);
   const [asideOpen, setAsideOpen] = useState(false);
   const [asideQuestion, setAsideQuestion] = useState('');
@@ -53,6 +68,11 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
       });
     }
   }, [hydrated, state, summary, sessionId]);
+
+  useEffect(() => {
+    setViewingSession(sessionId);
+    return () => setViewingSession(undefined);
+  }, [sessionId]);
 
   useEffect(() => {
     if (state?.aside?.status === 'working') setAsideOpen(true);
@@ -75,22 +95,20 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="safe-top safe-x flex items-center gap-1 border-b px-4 py-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t('common.back')}
-          onClick={() => {
-            if (history.length > 1) history.back();
-            else navigate('home');
-          }}
-        >
-          <ChevronLeft className="size-5" />
-        </Button>
-        <button
-          type="button"
-          className="min-w-0 flex-1 rounded-md px-2 py-1 text-left"
-          onClick={() => setRenameOpen(true)}
-        >
+        {/* Desktop keeps the session sidebar on screen; phones open it as a panel. */}
+        {!desktop && (
+          <Button
+            variant="ghost"
+            size="icon"
+            data-testid="session-panel-trigger"
+            aria-label={t('nav.openPanel')}
+            aria-haspopup="dialog"
+            onClick={() => setPanelOpen(true)}
+          >
+            <Menu className="size-5" />
+          </Button>
+        )}
+        <div className="min-w-0 flex-1 px-2 py-1">
           <div className="truncate font-semibold">{title}</div>
           <div
             data-testid="session-folder"
@@ -99,7 +117,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
           >
             {baseName(cwd) || cwd}
           </div>
-        </button>
+        </div>
         {btwOk && (
           <Button
             variant={asideOpen ? 'secondary' : 'ghost'}
@@ -146,7 +164,32 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
       <StatusStrip state={state} sessionId={sessionId} />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!state ? (
+        {summary?.locked && !state ? (
+          <div
+            data-testid="session-locked"
+            className="flex flex-col items-center gap-3 px-6 py-12 text-center text-sm text-muted-foreground"
+          >
+            <Lock className="size-6" />
+            <p className="max-w-xs">{t('chat.lockedBody')}</p>
+            {canForceClose && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={async () => {
+                  try {
+                    await send({ type: 'session.forceClose', sessionId });
+                    void import('sonner').then(({ toast }) => toast.success(t('home.unlockDone')));
+                  } catch (e) {
+                    void import('sonner').then(({ toast }) => toast.error((e as Error).message));
+                  }
+                }}
+              >
+                <LockOpen className="size-4" />
+                {t('home.unlock')}
+              </Button>
+            )}
+          </div>
+        ) : !state ? (
           <div className="space-y-3 p-4">
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-16 w-full" />
@@ -247,6 +290,20 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
 
       {state?.permission && <PermissionSheet request={state.permission} sessionId={sessionId} />}
 
+      {!desktop && (
+        <Sheet open={panelOpen} onOpenChange={setPanelOpen}>
+          <SheetContent
+            side="left"
+            data-testid="session-panel"
+            showCloseButton={false}
+            className="w-[88vw] max-w-sm gap-0 p-0"
+          >
+            <SheetTitle className="sr-only">{t('home.sessions')}</SheetTitle>
+            <SheetDescription className="sr-only">{t('nav.openPanel')}</SheetDescription>
+            <SessionList currentSessionId={sessionId} onPick={() => setPanelOpen(false)} />
+          </SheetContent>
+        </Sheet>
+      )}
       <RenameDialog
         sessionId={sessionId}
         current={state?.title ?? summary?.title}
@@ -266,7 +323,9 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
             <Button
               variant="destructive"
               onClick={async () => {
-                await send({ type: 'session.delete', sessionId, cwd }).catch(() => {});
+                await send({ type: 'session.delete', sessionId, cwd })
+                  .then(() => clearDraft(sessionId))
+                  .catch(() => {});
                 navigate('home');
               }}
             >

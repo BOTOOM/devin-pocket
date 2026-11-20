@@ -33,6 +33,8 @@ export interface AppState {
   ports: LocalPort[];
   open: Map<string, SessionState>;
   knownSeq: Map<string, number>;
+  /** Sessions whose turn ended while the user was looking elsewhere. */
+  unseen: Set<string>;
   activeSessionId?: string;
   prefs: UiPrefs;
   hydrated: boolean;
@@ -59,6 +61,7 @@ let state: AppState = {
   ports: [],
   open: new Map(),
   knownSeq: new Map(),
+  unseen: new Set(),
   activeSessionId: localStorage.getItem(ACTIVE_KEY) ?? undefined,
   prefs: loadPrefs(),
   hydrated: false,
@@ -85,6 +88,18 @@ export function useStore<T>(sel: (s: AppState) => T): T {
     },
     () => sel(snapshot),
   );
+}
+
+let viewingSessionId: string | undefined;
+
+/** The chat on screen; its finished turns are never "unseen". */
+export function setViewingSession(id?: string) {
+  viewingSessionId = id;
+  if (id && state.unseen.has(id)) {
+    const unseen = new Set(state.unseen);
+    unseen.delete(id);
+    set({ unseen });
+  }
 }
 
 export function setActiveSession(id?: string) {
@@ -165,7 +180,10 @@ function handle(msg: ServerMessage) {
       const knownSeq = new Map(state.knownSeq);
       open.set(msg.sessionId, next);
       knownSeq.set(msg.sessionId, Math.max(msg.seq, next.seq));
-      set({ open, knownSeq });
+      if (msg.event.type === 'turnEnded' && msg.sessionId !== viewingSessionId) {
+        const unseen = new Set(state.unseen).add(msg.sessionId);
+        set({ open, knownSeq, unseen });
+      } else set({ open, knownSeq });
       break;
     }
     case 'session.closed': {

@@ -22,13 +22,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { useT } from '@/i18n';
 import { insertAtCaret } from '@/lib/dictation/helpers';
 import { useDictation } from '@/lib/dictation/use-dictation';
+import { type DraftImage, type DraftMention, loadDraft, saveDraft } from '@/lib/drafts';
 import { send } from '@/lib/ws';
 import { useStore } from '@/store';
 
-interface Mention {
-  name: string;
-  uri: string;
-}
+type Mention = DraftMention;
 
 const MENTION_MAX = 30;
 const IMAGE_MAX_BYTES = 1.5 * 1024 * 1024;
@@ -45,9 +43,11 @@ export function Composer({
   const t = useT();
   const enterToSend = useStore((s) => s.prefs.enterToSend);
   const agentInfo = useStore((s) => s.agentInfo);
-  const [text, setText] = useState('');
-  const [images, setImages] = useState<{ data: string; mimeType: string; name: string }[]>([]);
-  const [mentions, setMentions] = useState<Mention[]>([]);
+  // The chat remounts per session, so the draft is read once per session.
+  const [draft] = useState(() => loadDraft(sessionId));
+  const [text, setText] = useState(draft.text);
+  const [images, setImages] = useState<DraftImage[]>(draft.images);
+  const [mentions, setMentions] = useState<Mention[]>(draft.mentions);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQ, setMentionQ] = useState('');
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -231,6 +231,11 @@ export function Composer({
     }
     if (draftEpoch.current === epoch) setImages((prev) => [...prev, ...out]);
   };
+
+  // Editing a queued prompt borrows the composer; that text is not the draft.
+  useEffect(() => {
+    if (!editingId) saveDraft(sessionId, { text, images, mentions });
+  }, [sessionId, text, images, mentions, editingId]);
 
   // Auto-grow up to ~6 lines; scrollbar only once overflowing.
   // biome-ignore lint/correctness/useExhaustiveDependencies: recalc only when text changes

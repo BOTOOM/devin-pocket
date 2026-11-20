@@ -31,6 +31,9 @@ test('desktop session changes do not leak composer drafts', async ({ page }) => 
   await secondButton?.click();
   await expect(page).toHaveURL(second);
   await expect(page.locator('textarea')).toHaveValue('');
+  await sessionButtons.nth(1).click();
+  await expect(page).toHaveURL(first);
+  await expect(page.locator('textarea')).toHaveValue('PRIVATE_DRAFT_FOR_FIRST_SESSION');
 });
 
 test('desktop deleting the active session returns home', async ({ page }) => {

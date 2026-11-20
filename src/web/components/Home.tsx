@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BrandMark } from '@/components/BrandMark';
 import { NewSessionSheet } from '@/components/NewSessionSheet';
 import { RenameDialog } from '@/components/RenameDialog';
+import { SessionActivityBadge } from '@/components/SessionActivityBadge';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useT } from '@/i18n';
+import { clearDraft } from '@/lib/drafts';
 import { baseName, dayGroup, relTime } from '@/lib/format';
 import { navigate } from '@/lib/router';
 import { send } from '@/lib/ws';
@@ -70,7 +72,14 @@ export function DesktopWelcome() {
   );
 }
 
-export function SessionList({ currentSessionId }: { currentSessionId?: string }) {
+export function SessionList({
+  currentSessionId,
+  onPick,
+}: {
+  currentSessionId?: string;
+  /** Called after a row is tapped, e.g. to close the panel hosting the list. */
+  onPick?: () => void;
+}) {
   const t = useT();
   const sessions = useStore((s) => s.sessions);
   const hydrated = useStore((s) => s.hydrated);
@@ -199,6 +208,7 @@ export function SessionList({ currentSessionId }: { currentSessionId?: string })
                       active={s.sessionId === currentSessionId}
                       onRename={() => setRename(s)}
                       onDelete={() => setDel(s)}
+                      onPick={onPick}
                     />
                   ))}
                 </section>
@@ -233,12 +243,14 @@ function SessionRow({
   active,
   onRename,
   onDelete,
+  onPick,
 }: {
   s: SessionSummary;
   open: boolean;
   active: boolean;
   onRename: () => void;
   onDelete: () => void;
+  onPick?: () => void;
 }) {
   const t = useT();
   // "Forzar cierre" needs the agent's cognition.ai/force close capability.
@@ -251,18 +263,17 @@ function SessionRow({
       <button
         type="button"
         aria-current={active ? 'page' : undefined}
+        data-session-id={s.sessionId}
         className="flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-2 text-left focus-visible:outline-2 focus-visible:outline-ring"
-        onClick={() => navigate({ name: 'chat', sessionId: s.sessionId })}
+        onClick={() => {
+          navigate({ name: 'chat', sessionId: s.sessionId });
+          onPick?.();
+        }}
       >
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="truncate font-medium">{title}</span>
-            {open && (
-              <span
-                className="size-2 shrink-0 rounded-full bg-success"
-                title={t('home.openBadge')}
-              />
-            )}
+            <SessionActivityBadge sessionId={s.sessionId} open={open} />
             {s.locked && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -351,7 +362,10 @@ function DeleteDialog({
                   sessionId: s.sessionId,
                   cwd: s.cwd,
                 })
-                  .then(() => onDeleted(s.sessionId))
+                  .then(() => {
+                    clearDraft(s.sessionId);
+                    onDeleted(s.sessionId);
+                  })
                   .catch(() => {});
               onClose();
             }}

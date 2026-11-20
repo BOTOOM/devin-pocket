@@ -4,6 +4,7 @@ import './theme-screens';
 import './responsive-screens';
 import './desktop-session-screens';
 import './session-folder-screens';
+import './session-switcher-screens';
 
 test('fake agent home → session → prompt → permission → tool and usage', async ({ page }) => {
   await page.goto('/#/');

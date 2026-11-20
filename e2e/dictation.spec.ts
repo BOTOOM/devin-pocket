@@ -137,7 +137,9 @@ test('mic shares the action row; consent, transcript insertion, reload and delet
   await expect(input).toHaveValue('Good morning');
   expect(await page.evaluate(() => Reflect.get(window, '__dictationWorkers'))).toBe(1);
   await page.reload();
-  await expect(input).toBeVisible();
+  // The unsent draft is restored per session.
+  await expect(input).toHaveValue('Good morning');
+  await input.fill('');
   await mic.click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Stop dictation', exact: true }).click();
