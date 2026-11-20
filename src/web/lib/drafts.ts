@@ -17,8 +17,10 @@ export interface Draft {
 // what the user typed and are dropped once sent or emptied.
 const KEY = 'dp.drafts';
 const MAX = 30;
-// Images stay in memory only: base64 payloads would blow the localStorage quota.
-const images = new Map<string, DraftImage[]>();
+// Memory is the source of truth while the page lives (survives a failed write);
+// localStorage only restores text + mentions after a reload. Images stay in
+// memory: base64 payloads would blow the quota.
+const mem = new Map<string, Draft>();
 
 type Stored = Record<string, { text: string; mentions: DraftMention[]; at: number }>;
 
@@ -44,17 +46,20 @@ function write(all: Stored) {
 }
 
 export function loadDraft(sessionId: string): Draft {
+  const live = mem.get(sessionId);
+  if (live) return live;
   const d = read()[sessionId];
   return {
     text: typeof d?.text === 'string' ? d.text : '',
     mentions: Array.isArray(d?.mentions) ? d.mentions : [],
-    images: images.get(sessionId) ?? [],
+    images: [],
   };
 }
 
 export function saveDraft(sessionId: string, d: Draft) {
-  if (d.images.length) images.set(sessionId, d.images);
-  else images.delete(sessionId);
+  const empty = !d.text && !d.mentions.length && !d.images.length;
+  if (empty) mem.delete(sessionId);
+  else mem.set(sessionId, d);
   const all = read();
   const prev = all[sessionId];
   if (d.text || d.mentions.length) {
