@@ -171,6 +171,7 @@ export class PocketServer {
       host: c.host,
       logDir: stateDir(),
       agentCommand: c.agentCommand,
+      agentProcessModel: this.deps.agent.processModel,
       platform: platformInfo(),
     };
   }
@@ -423,6 +424,11 @@ export class PocketServer {
         }
         case 'permission.respond': {
           const ok = sessions.respondPermission(cmd.requestId, cmd.outcome);
+          this.ack(ws, env.id, ok, ok ? undefined : 'unknown requestId');
+          break;
+        }
+        case 'elicitation.respond': {
+          const ok = sessions.respondElicitation(cmd.requestId, cmd.response);
           this.ack(ws, env.id, ok, ok ? undefined : 'unknown requestId');
           break;
         }

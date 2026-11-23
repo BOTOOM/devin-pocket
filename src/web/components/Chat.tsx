@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Composer } from '@/components/Composer';
+import { ElicitationSheet } from '@/components/ElicitationSheet';
 import { SessionList } from '@/components/Home';
 import { PermissionSheet } from '@/components/PermissionSheet';
 import { PlanPanel } from '@/components/PlanPanel';
@@ -295,6 +296,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
       )}
 
       {state?.permission && <PermissionSheet request={state.permission} sessionId={sessionId} />}
+      {state?.elicitation && <ElicitationSheet request={state.elicitation} sessionId={sessionId} />}
 
       {!desktop && (
         <Sheet open={panelOpen} onOpenChange={setPanelOpen}>

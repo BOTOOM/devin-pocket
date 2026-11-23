@@ -67,4 +67,26 @@ describe('shared reducer', () => {
     expect(s.permission).toBeUndefined();
     expect(s.turn).toBe('working');
   });
+
+  it('tracks elicitation requested and resolved, clears on turn end', () => {
+    let s = initialSessionState('s', '/tmp');
+    const request = {
+      requestId: 'elic-1',
+      sessionId: 's',
+      message: 'Pick one',
+      schema: { type: 'object', properties: {} },
+      at,
+    } as const;
+    s = applyEvent(s, { type: 'elicitationRequested', request });
+    expect(s.elicitation?.requestId).toBe('elic-1');
+    // a stale resolve for another id leaves the pending request alone
+    s = applyEvent(s, { type: 'elicitationResolved', requestId: 'other' });
+    expect(s.elicitation?.requestId).toBe('elic-1');
+    s = applyEvent(s, { type: 'elicitationResolved', requestId: 'elic-1' });
+    expect(s.elicitation).toBeUndefined();
+    // and a turn end discards any dangling elicitation
+    s = applyEvent(s, { type: 'elicitationRequested', request });
+    s = applyEvent(s, { type: 'turnEnded', stopReason: 'end_turn' }, at + 1);
+    expect(s.elicitation).toBeUndefined();
+  });
 });

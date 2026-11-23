@@ -43,7 +43,7 @@
     "start": "node bin/devin-pocket.mjs start"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.5.0",
+    "@agentclientprotocol/sdk": "1.9.0",
     "cmdk": "^1.1.1",
     "qrcode": "1.5.4",
     "sonner": "^2.0.8",
@@ -75,8 +75,8 @@
     "developer-tools"
   ],
   "devDependencies": {
-    "@huggingface/transformers": "3.8.1",
     "@biomejs/biome": "2.5.14",
+    "@huggingface/transformers": "3.8.1",
     "@playwright/test": "1.63.0",
     "@semantic-release/changelog": "7.0.0",
     "@semantic-release/git": "11.0.1",

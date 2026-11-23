@@ -32,6 +32,8 @@ export const configSchema = z.object({
   port: z.number().int().min(1).max(65535).default(7777),
   host: z.string().default('127.0.0.1'),
   agentCommand: z.string().default('devin acp'),
+  /** `devin acp` process model: daemon shares sessions across clients (CLI ≥3000.13.4) */
+  agentProcessModel: z.enum(['auto', 'daemon', 'in-process']).default('auto'),
   workspaces: z.array(workspaceSchema).default([]),
   theme: z.string().optional(),
   showThoughts: z.boolean().optional(),

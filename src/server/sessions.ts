@@ -2,12 +2,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type {
   ContentBlock,
+  CreateElicitationRequest,
+  CreateElicitationResponse,
   PermissionOption,
   RequestPermissionRequest,
   SessionNotification,
 } from '@agentclientprotocol/sdk';
 import type {
   ContentBlock as CB,
+  ElicitationRequest,
+  ElicitationResponse,
   PermissionRequest,
   QueuedPrompt,
   ServerMessage,
@@ -35,6 +39,27 @@ interface PendingPermission {
   }) => void;
 }
 
+interface PendingElicitation {
+  sessionId: string;
+  resolve: (resp: CreateElicitationResponse) => void;
+}
+
+/** Map ACP errors to friendlier messages — session_locked carries structured data. */
+export function translateLockError(e: unknown, sessionId: string): Error {
+  const err = e as { message?: string; data?: Record<string, unknown> };
+  if (err?.data?.['cognition.ai/errorKind'] !== 'session_locked') {
+    return e instanceof Error ? e : new Error(String(e));
+  }
+  const pid = err.data['cognition.ai/lockHolderPid'];
+  const suffix =
+    typeof pid === 'number'
+      ? `otro proceso (PID ${pid}) / another process (PID ${pid})`
+      : 'otro proceso / another process';
+  return new Error(
+    `La sesión '${sessionId}' está abierta en ${suffix} — ciérrala allí o usa "Forzar cierre" / close it there or use force close`,
+  );
+}
+
 /** Local title overrides when the agent can't rename (see rename()). */
 function loadTitles(): Record<string, string> {
   try {
@@ -60,6 +85,7 @@ export class SessionManager {
   private sessions = new Map<string, SessionState>();
   private listeners = new Set<Send>();
   private permissions = new Map<string, PendingPermission>();
+  private elicitations = new Map<string, PendingElicitation>();
   private permSeq = 0;
   /** sessionId → prompt text whose user_message_chunk echo should be swallowed */
   private echoExpect = new Map<string, { text: string; buf: string }>();
@@ -92,6 +118,7 @@ export class SessionManager {
       } else if (s.phase === 'restarting' || s.phase === 'error' || s.phase === 'starting') {
         // the ACP connection is gone — pending permission RPCs would hang forever
         this.cancelAllPermissions();
+        this.cancelAllElicitations();
       }
     });
   }
@@ -101,6 +128,14 @@ export class SessionManager {
       this.permissions.delete(id);
       p.resolve({ outcome: { outcome: 'cancelled' } });
       this.emitEvent(p.sessionId, { type: 'permissionResolved', requestId: id });
+    }
+  }
+
+  private cancelAllElicitations(): void {
+    for (const [id, p] of this.elicitations) {
+      this.elicitations.delete(id);
+      p.resolve({ action: 'cancel' });
+      this.emitEvent(p.sessionId, { type: 'elicitationResolved', requestId: id });
     }
   }
 
@@ -227,6 +262,7 @@ export class SessionManager {
           meta['cognition.ai/isLocked'] === true || meta['cognition.ai/isLocked'] === 'true';
         const pid = meta['cognition.ai/lockHolderPid'];
         const hum = meta['cognition.ai/hasUserMessages'];
+        const planPath = meta['cognition.ai/planFilePath'];
         out.push({
           sessionId: si.sessionId,
           cwd: si.cwd ?? c ?? process.cwd(),
@@ -235,6 +271,7 @@ export class SessionManager {
           locked,
           lockHolderPid: typeof pid === 'number' ? pid : null,
           hasUserMessages: typeof hum === 'boolean' ? hum : undefined,
+          planFilePath: typeof planPath === 'string' ? planPath : undefined,
           open: this.sessions.has(si.sessionId),
         });
       }
@@ -333,7 +370,9 @@ export class SessionManager {
     this.loadStats.set(sessionId, stat);
     const t0 = performance.now();
     try {
-      const res = await this.agent.loadSession(sessionId, cwd);
+      const res = await this.agent.loadSession(sessionId, cwd).catch((e) => {
+        throw translateLockError(e, sessionId);
+      });
       this.agent.trackOpen(sessionId, cwd);
       if (res.modes) {
         this.emitEvent(sessionId, {
@@ -368,6 +407,12 @@ export class SessionManager {
       this.permissions.delete(id);
       p.resolve({ outcome: { outcome: 'cancelled' } });
       this.emitEvent(sessionId, { type: 'permissionResolved', requestId: id });
+    }
+    for (const [id, p] of this.elicitations) {
+      if (p.sessionId !== sessionId) continue;
+      this.elicitations.delete(id);
+      p.resolve({ action: 'cancel' });
+      this.emitEvent(sessionId, { type: 'elicitationResolved', requestId: id });
     }
     this.sessions.delete(sessionId);
     this.echoExpect.delete(sessionId);
@@ -655,6 +700,49 @@ export class SessionManager {
       p.resolve({ outcome: { outcome: 'selected', optionId: outcome.optionId } });
     }
     this.emitEvent(p.sessionId, { type: 'permissionResolved', requestId });
+    return true;
+  }
+
+  /**
+   * Called by AgentProcess createElicitation handler (`elicitation/create`).
+   * Only session-scoped form requests reach the UI; url/custom modes and
+   * request-scoped elicitations are declined so the agent can fall back.
+   */
+  requestElicitation(req: CreateElicitationRequest): Promise<CreateElicitationResponse> {
+    const sessionId =
+      'sessionId' in req && typeof req.sessionId === 'string' ? req.sessionId : undefined;
+    if (req.mode !== 'form' || !sessionId || !this.sessions.has(sessionId)) {
+      this.log.info(
+        `elicitation/create mode=${req.mode} session=${sessionId ?? 'request-scoped'} — declined`,
+      );
+      return Promise.resolve({ action: 'cancel' });
+    }
+    const requestId = `elic-${++this.permSeq}`;
+    const request: ElicitationRequest = {
+      requestId,
+      sessionId,
+      message: req.message,
+      schema: req.requestedSchema as ElicitationRequest['schema'],
+      toolCallId:
+        'toolCallId' in req && typeof req.toolCallId === 'string' ? req.toolCallId : undefined,
+      at: Date.now(),
+    };
+    return new Promise((resolve) => {
+      this.elicitations.set(requestId, { sessionId, resolve });
+      this.emitEvent(sessionId, { type: 'elicitationRequested', request });
+    });
+  }
+
+  respondElicitation(requestId: string, response: ElicitationResponse): boolean {
+    const p = this.elicitations.get(requestId);
+    if (!p) return false;
+    this.elicitations.delete(requestId);
+    p.resolve(
+      response.action === 'accept'
+        ? { action: 'accept', content: response.content ?? null }
+        : { action: response.action },
+    );
+    this.emitEvent(p.sessionId, { type: 'elicitationResolved', requestId });
     return true;
   }
 

@@ -171,6 +171,16 @@ export async function doctorReport(opts: {
       detail: ok ? 'signed in' : a.out.split('\n')[0] || 'not logged in',
       fix: ok ? undefined : 'Run: devin auth login',
     });
+    // shared session daemon (CLI ≥3000.13.4) — auto-starts on demand; report only
+    const d = await run(devinPath as string, ['daemon', 'status'], 8000);
+    if (d.code === 0) {
+      checks.push({
+        id: 'devin-daemon',
+        label: 'Devin daemon',
+        status: 'ok',
+        detail: d.out.split('\n')[0] || 'status ok',
+      });
+    }
   }
 
   if (devinFound) {

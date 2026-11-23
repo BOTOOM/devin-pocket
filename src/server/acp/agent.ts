@@ -12,6 +12,8 @@ import {
   type Client,
   ClientSideConnection,
   type ContentBlock,
+  type CreateElicitationRequest,
+  type CreateElicitationResponse,
   type InitializeResponse,
   type LoadSessionResponse,
   type NewSessionResponse,
@@ -24,7 +26,14 @@ import {
   type SessionInfo,
   type SessionNotification,
 } from '@agentclientprotocol/sdk';
-import type { AgentInfo, AgentStatus, BillingInfo, TurnStat } from '../../shared/protocol.js';
+import type {
+  AgentInfo,
+  AgentProcessModel,
+  AgentStatus,
+  BillingInfo,
+  MentionType,
+  TurnStat,
+} from '../../shared/protocol.js';
 import { requireNativeExecutable, resolveBin } from '../commands.js';
 import { type Logger, redact, type StderrSink } from '../log.js';
 import { VERSION } from '../paths.js';
@@ -73,6 +82,56 @@ export function probeAuth(binCmd: string, timeoutMs = 10_000): Promise<boolean> 
     );
     child.on('error', () => resolve(false));
   }).catch(() => false);
+}
+
+/** Desired agent process model from config/CLI. 'auto' = daemon when supported. */
+export type ProcessModelMode = 'auto' | 'daemon' | 'in-process';
+
+/**
+ * Probe: does `devin acp --help` advertise `--process-model` (CLI ≥3000.13.4)?
+ * Only meaningful for the real CLI.
+ */
+export function probeProcessModel(binCmd: string, timeoutMs = 8_000): Promise<boolean> {
+  const [bin] = splitCommand(binCmd);
+  if (!bin || !canProbeAuth(binCmd)) return Promise.resolve(false);
+  const devin = resolveBin(bin);
+  return new Promise<boolean>((resolve) => {
+    let child: ReturnType<typeof execFile>;
+    try {
+      child = execFile(
+        requireNativeExecutable(devin),
+        ['acp', '--help'],
+        { timeout: timeoutMs, windowsHide: true },
+        (err, stdout, stderr) => {
+          if (err) return resolve(false);
+          resolve(/--process-model|process_model/.test(`${stdout}${stderr}`));
+        },
+      );
+    } catch {
+      return resolve(false);
+    }
+    child.on('error', () => resolve(false));
+  }).catch(() => false);
+}
+
+/**
+ * Extra argv to pass to `devin acp` for the requested process model.
+ * `supported` comes from {@link probeProcessModel}; an explicit
+ * `--process-model` already in the command is left untouched upstream.
+ */
+export function processModelArgs(mode: ProcessModelMode, supported: boolean): string[] {
+  if (!supported) return [];
+  return ['--process-model', mode === 'in-process' ? 'in-process' : 'daemon'];
+}
+
+/** Read an explicit `--process-model` value out of a command's own args. */
+export function explicitProcessModel(args: string[]): AgentProcessModel | undefined {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    const v = a === '--process-model' ? args[i + 1] : a?.split('=')[1];
+    if (a?.startsWith('--process-model') && (v === 'daemon' || v === 'in-process')) return v;
+  }
+  return undefined;
 }
 
 /** `_cognition.ai/turn_stats` params → TurnStat (ported from devin-tui spend.ts). */
@@ -132,6 +191,8 @@ export interface AgentEvents {
     sessionId: string,
     req: RequestPermissionRequest,
   ) => Promise<RequestPermissionResponse>;
+  /** `elicitation/create` — the agent asks the user for structured input */
+  onElicitation: (req: CreateElicitationRequest) => Promise<CreateElicitationResponse>;
   onSessionsReopened: () => void;
   /** live permission request resolvers keyed by requestId (set by sessions.ts) */
 }
@@ -149,9 +210,20 @@ export class AgentProcess {
   private disposed = false;
   private manualRestart = false;
   private openSessions = new Set<{ sessionId: string; cwd: string }>();
+  private prepared = false;
+  /** extra argv appended at spawn (`--process-model …`) — set by prepare() */
+  private spawnArgs: string[] = [];
+  /** resolved process model of the spawned `devin acp` child */
+  processModel?: AgentProcessModel;
 
   constructor(
-    private opts: { command: string; cwd: string; log: Logger; stderrLog: StderrSink },
+    private opts: {
+      command: string;
+      cwd: string;
+      log: Logger;
+      stderrLog: StderrSink;
+      processModel?: ProcessModelMode;
+    },
     private ev: AgentEvents,
   ) {}
 
@@ -163,10 +235,12 @@ export class AgentProcess {
     const caps = this.init?.agentCapabilities as AgentCapabilities | undefined;
     if (!this.init) return undefined;
     const meta = (caps?._meta ?? {}) as Record<string, unknown>;
+    const mentions = meta['cognition.ai/mentionTypes'];
     return {
       name: this.init.agentInfo?.name ?? undefined,
       title: this.init.agentInfo?.title ?? undefined,
       version: this.init.agentInfo?.version ?? undefined,
+      processModel: this.processModel,
       caps: {
         loadSession: caps?.loadSession === true,
         listSessions: caps?.sessionCapabilities?.list != null,
@@ -183,6 +257,11 @@ export class AgentProcess {
         midTurnPrompts: meta['cognition.ai/midTurnPrompts'] === true,
         chains: meta['cognition.ai/chains'] === true,
         contentSearch: meta['cognition.ai/sessionListContentSearch'] === true,
+        sortDirection: meta['cognition.ai/sessionListSortDirection'] === true,
+        multiRoot:
+          meta['cognition.ai/multiRootWorkspace'] === true ||
+          caps?.sessionCapabilities?.additionalDirectories != null,
+        mentionTypes: Array.isArray(mentions) ? (mentions as MentionType[]) : [],
         meta,
       },
     };
@@ -218,10 +297,37 @@ export class AgentProcess {
     for (const s of this.openSessions) if (s.sessionId === sessionId) this.openSessions.delete(s);
   }
 
-  spawn(): void {
+  /**
+   * One-time feature detection before the first spawn: resolves the process
+   * model for the real `devin` CLI (shared daemon since 3000.13.4 — sessions
+   * survive client restarts and attach from several clients at once).
+   */
+  async prepare(): Promise<void> {
+    if (this.prepared) return;
+    this.prepared = true;
     const [rawBin, ...args] = splitCommand(this.opts.command);
+    const explicit = explicitProcessModel(args);
+    if (explicit) {
+      this.processModel = explicit;
+      return;
+    }
+    if (!rawBin || !canProbeAuth(this.opts.command) || !args.includes('acp')) return;
+    const supported = await probeProcessModel(this.opts.command);
+    if (!supported) {
+      this.opts.log.info('devin acp has no --process-model (CLI <3000.13.4) — in-process');
+      return;
+    }
+    const mode = this.opts.processModel ?? 'auto';
+    this.spawnArgs = processModelArgs(mode, true);
+    this.processModel = mode === 'in-process' ? 'in-process' : 'daemon';
+    this.opts.log.info(`devin acp process model: ${this.processModel}`);
+  }
+
+  spawn(): void {
+    const [rawBin, ...baseArgs] = splitCommand(this.opts.command);
     if (!rawBin) throw new Error('empty agent command');
     const bin = resolveBin(rawBin);
+    const args = [...baseArgs, ...this.spawnArgs];
     this.opts.log.info(`spawn: ${bin} ${args.join(' ')} (cwd=${this.opts.cwd})`);
     try {
       this.child = spawn(requireNativeExecutable(bin), args, {
@@ -264,6 +370,8 @@ export class AgentProcess {
       sessionUpdate: (n) => this.ev.onSessionNotification(n),
       requestPermission: (req) =>
         this.ev.onPermissionRequest(req.sessionId, req) as Promise<RequestPermissionResponse>,
+      createElicitation: (req) => this.ev.onElicitation(req),
+      completeElicitation: () => Promise.resolve(),
       extNotification: (method, params) => {
         if (method === '_cognition.ai/turn_stats') {
           const ts = parseTurnStats(params);
@@ -297,6 +405,8 @@ export class AgentProcess {
         clientCapabilities: {
           fs: { readTextFile: false, writeTextFile: false },
           terminal: false,
+          // form elicitation: ask_user_question reaches us as elicitation/create
+          elicitation: { form: {} },
           // Cognition extension features this client uses; the agent parses
           // them into its "client capabilities" summary (verified in its log).
           _meta: {
@@ -386,9 +496,20 @@ export class AgentProcess {
   }
 
   async listSessions(cwd?: string, content?: string): Promise<SessionInfo[]> {
+    const meta: Record<string, unknown> = {};
+    if (content) meta['cognition.ai/content'] = content;
+    // newest-first server-side ordering — verified on CLI ≥3000.14 (sort caps)
+    const capsMeta = (this.init?.agentCapabilities?._meta ?? {}) as Record<string, unknown>;
+    const orderBy = capsMeta['cognition.ai/sessionListOrderBy'];
+    if (Array.isArray(orderBy) && orderBy.includes('updated_at')) {
+      meta['cognition.ai/orderBy'] = 'updated_at';
+    }
+    if (capsMeta['cognition.ai/sessionListSortDirection'] === true) {
+      meta['cognition.ai/sortDirection'] = 'desc';
+    }
     const res = await this.c.listSessions({
       ...(cwd ? { cwd } : {}),
-      ...(content ? { _meta: { 'cognition.ai/content': content } } : {}),
+      ...(Object.keys(meta).length ? { _meta: meta } : {}),
     });
     return res.sessions;
   }

@@ -566,7 +566,10 @@ const FAKE_SESSIONS = () => [
     cwd: AGENT_CWD,
     title: 'Fix the flaky test',
     updatedAt: new Date(Date.now() - 2 * 3600_000).toISOString(),
-    _meta: { 'cognition.ai/hasUserMessages': true },
+    _meta: {
+      'cognition.ai/hasUserMessages': true,
+      'cognition.ai/planFilePath': '/tmp/fake-session-middle.plan.md',
+    },
   },
   {
     sessionId: 'fake-session-empty',
@@ -623,13 +626,24 @@ const agent: Agent = {
           list: {},
           delete: {},
           close: { _meta: { 'cognition.ai/force': true } },
+          additionalDirectories: {},
         },
         logout: {},
         _meta: {
           'cognition.ai/sessionListOrderBy': ['updated_at', 'created_at'],
+          'cognition.ai/sessionListSortDirection': true,
           'cognition.ai/midTurnPrompts': true,
           'cognition.ai/chains': true,
           'cognition.ai/sessionListContentSearch': true,
+          'cognition.ai/sessionRename': true,
+          'cognition.ai/editableCommands': true,
+          'cognition.ai/multiRootWorkspace': true,
+          'cognition.ai/mentionTypes': [
+            { type: 'file', label: 'File' },
+            { type: 'directory', label: 'Directory' },
+            { type: 'skill', label: 'Skill' },
+            { type: 'plan', label: 'Plan' },
+          ],
         },
       },
       authMethods: authenticated
@@ -852,6 +866,41 @@ const agent: Agent = {
     }
     if (ptext.startsWith('QUEUE_RESULT_')) {
       await update({ sessionUpdate: 'agent_message_chunk', content: text(`Completed ${ptext}`) });
+      return { stopReason: 'end_turn' };
+    }
+    if (ptext === 'ELICIT_FORM') {
+      // session-scoped form elicitation — exercises elicitation/create end to end
+      const res = await conn
+        .createElicitation({
+          mode: 'form',
+          sessionId,
+          message: 'Pick a color and a name for the demo',
+          requestedSchema: {
+            type: 'object',
+            title: 'Demo question',
+            properties: {
+              color: {
+                type: 'string',
+                title: 'Color',
+                enum: ['red', 'green', 'blue'],
+              },
+              name: { type: 'string', title: 'Name', default: 'pocket' },
+              count: { type: 'integer', title: 'Count' },
+              fast: { type: 'boolean', title: 'Fast mode', default: true },
+              tags: {
+                type: 'array',
+                title: 'Tags',
+                items: { type: 'string', enum: ['a', 'b', 'c'] },
+              },
+            },
+            required: ['color', 'name'],
+          },
+        })
+        .catch(() => ({ action: 'cancel' as const }));
+      await update({
+        sessionUpdate: 'agent_message_chunk',
+        content: text(`Elicitation result: ${JSON.stringify(res)}`),
+      });
       return { stopReason: 'end_turn' };
     }
     if (ptext === 'MARKDOWN_FIXTURE') {

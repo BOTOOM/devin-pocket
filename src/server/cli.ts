@@ -168,6 +168,7 @@ async function runServer(args: Args): Promise<ServerHandle> {
     port,
     host,
     agentCommand: args.agent ?? process.env.DEVIN_POCKET_AGENT ?? config.agentCommand,
+    agentProcessModel: args.processModel ?? config.agentProcessModel,
   };
   const log = new Logger();
   startUpdateChecks(log);
@@ -180,7 +181,13 @@ async function runServer(args: Args): Promise<ServerHandle> {
   // created after agent — SessionManager takes the agent in its ctor
   let sessions!: SessionManager;
   const agent = new AgentProcess(
-    { command: merged.agentCommand, cwd: args.cwd ?? process.cwd(), log, stderrLog: stderr },
+    {
+      command: merged.agentCommand,
+      cwd: args.cwd ?? process.cwd(),
+      log,
+      stderrLog: stderr,
+      processModel: merged.agentProcessModel,
+    },
     {
       onStatus: (s) => {
         for (const l of statusListeners) l(s);
@@ -191,6 +198,7 @@ async function runServer(args: Args): Promise<ServerHandle> {
         for (const l of billingListeners) l(b);
       },
       onPermissionRequest: (sid, req) => sessions.requestPermission(sid, req),
+      onElicitation: (req) => sessions.requestElicitation(req),
       onSessionsReopened: () => void sessions.reopenAll(),
     },
   );
@@ -246,6 +254,7 @@ async function runServer(args: Args): Promise<ServerHandle> {
       `listening on ${merged.host} — protegido por emparejamiento / protected by pairing (no TLS)`,
     );
   }
+  await agent.prepare();
   agent.spawn();
 
   const shutdown = (): void => {
@@ -524,7 +533,7 @@ switch (args.cmd) {
       `devin-pocket — Devin en tu navegador / Devin in your browser
 
 Uso / Usage:
-  devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD] [--no-open] [--dev] [--foreground] [--qr=ascii]
+  devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD] [--process-model auto|daemon|in-process] [--no-open] [--dev] [--foreground] [--qr=ascii]
   devin-pocket stop | restart | status | logs [-f] [-n N] | doctor | models | open | version | help
   devin-pocket update [--check] [--version X] [--yes]
   devin-pocket pair [--qr=ascii] [--port N]

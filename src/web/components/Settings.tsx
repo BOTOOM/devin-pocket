@@ -26,6 +26,8 @@ const CAP_LABELS: Record<string, string> = {
   embeddedContext: 'embeddedContext',
   rename: 'rename',
   editableCommands: 'editableCommands',
+  sortDirection: 'sortDirection',
+  multiRoot: 'multiRoot',
 };
 
 function quotaColor(pct: number): string {
@@ -312,6 +314,12 @@ export function SettingsScreen() {
                   {agentInfo?.title ?? agentInfo?.name ?? '—'} {agentInfo?.version ?? ''}
                 </span>
               </div>
+              {agentInfo?.processModel && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{t('settings.processModel')}</span>
+                  <span className="font-mono">{agentInfo.processModel}</span>
+                </div>
+              )}
               {agentInfo && (
                 <div>
                   <div className="mb-1 text-muted-foreground">{t('settings.caps')}</div>
