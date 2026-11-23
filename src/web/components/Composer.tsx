@@ -249,7 +249,7 @@ export function Composer({
   }, [text]);
 
   return (
-    <div className="safe-x safe-bottom relative border-t bg-background px-3 pb-2 pt-2">
+    <div className="pane-chat safe-x safe-bottom relative border-t bg-background px-3 pb-2 pt-2">
       {(state?.queue.length ?? 0) > 0 && (
         <Collapsible open={queueOpen} onOpenChange={setQueueOpen} className="mb-2">
           <CollapsibleTrigger className="flex min-h-10 w-full items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-accent/60">

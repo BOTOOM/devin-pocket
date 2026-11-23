@@ -72,7 +72,7 @@ export function DiagnosticsScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="safe-top safe-x flex items-center gap-1 border-b px-2 py-2">
+      <header className="pane-page safe-top safe-x flex items-center gap-1 border-b px-2 py-2">
         <Button
           variant="ghost"
           size="icon"
@@ -93,113 +93,117 @@ export function DiagnosticsScreen() {
         </Button>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:[&>*]:min-w-0">
-        <UpdateNotice />
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t('diag.doctor')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {report === null ? (
-              <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" /> {t('common.loading')}
-              </div>
-            ) : (
-              report.checks.map((c) => (
-                <div key={c.id} className="flex items-start gap-2.5 rounded-lg px-1 py-1.5">
-                  <CheckIcon status={c.status} />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">
-                      {c.id === 'pocket-update' ? t('doctor.label.pocket-update') : c.label}
-                    </div>
-                    {c.detail && (
-                      <div className="text-xs text-muted-foreground">
-                        {c.id === 'pocket-update' && c.update
-                          ? t('doctor.detail.pocket-update', {
-                              current: c.update.current,
-                              latest: c.update.latest,
-                            })
-                          : c.detail}
-                      </div>
-                    )}
-                    {c.fix && (
-                      <div className="mt-0.5 flex items-center gap-1 text-xs text-primary">
-                        <span>{fixText(t, c)}</span>
-                        <CopyButton
-                          text={fixText(t, c).replace(/^[^:]+:\s*/, '')}
-                          className="h-6 w-6"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-
-        <CatalogCard />
-
-        <Collapsible>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="pane-page space-y-4 p-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:[&>*]:min-w-0">
+          <UpdateNotice />
           <Card>
-            <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3">
-              <span className="text-base font-semibold">{t('diag.logs')}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t('common.refresh')}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  loadLogs();
-                }}
-              >
-                <RefreshCw className="size-4" />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-0">
-                {logsErr ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    {t('common.error')}
-                  </p>
-                ) : logs === null ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    {t('common.loading')}
-                  </p>
-                ) : logs.lines.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">
-                    {t('logs.empty')}
-                  </p>
-                ) : (
-                  <pre className="max-h-[40dvh] overflow-auto rounded-md bg-muted p-3 font-mono text-[11px] leading-relaxed">
-                    {logs.lines.join('\n')}
-                  </pre>
-                )}
-                {logs && logs.files.length > 0 && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {logs.files.map((f) => `${f.name} (${Math.round(f.size / 1024)}k)`).join(' · ')}
-                  </p>
-                )}
-              </CardContent>
-            </CollapsibleContent>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">{t('diag.doctor')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              {report === null ? (
+                <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin" /> {t('common.loading')}
+                </div>
+              ) : (
+                report.checks.map((c) => (
+                  <div key={c.id} className="flex items-start gap-2.5 rounded-lg px-1 py-1.5">
+                    <CheckIcon status={c.status} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium">
+                        {c.id === 'pocket-update' ? t('doctor.label.pocket-update') : c.label}
+                      </div>
+                      {c.detail && (
+                        <div className="text-xs text-muted-foreground">
+                          {c.id === 'pocket-update' && c.update
+                            ? t('doctor.detail.pocket-update', {
+                                current: c.update.current,
+                                latest: c.update.latest,
+                              })
+                            : c.detail}
+                        </div>
+                      )}
+                      {c.fix && (
+                        <div className="mt-0.5 flex items-center gap-1 text-xs text-primary">
+                          <span>{fixText(t, c)}</span>
+                          <CopyButton
+                            text={fixText(t, c).replace(/^[^:]+:\s*/, '')}
+                            className="h-6 w-6"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
           </Card>
-        </Collapsible>
 
-        <div className="flex flex-col gap-2">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => window.open('/api/report', '_blank')}
-          >
-            <Download className="size-4" /> {t('diag.report')}
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => send({ type: 'agent.restart' }).catch(() => {})}
-          >
-            <RotateCcw className="size-4" /> {t('diag.restart')}
-          </Button>
+          <CatalogCard />
+
+          <Collapsible>
+            <Card>
+              <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3">
+                <span className="text-base font-semibold">{t('diag.logs')}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t('common.refresh')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    loadLogs();
+                  }}
+                >
+                  <RefreshCw className="size-4" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0">
+                  {logsErr ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      {t('common.error')}
+                    </p>
+                  ) : logs === null ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      {t('common.loading')}
+                    </p>
+                  ) : logs.lines.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      {t('logs.empty')}
+                    </p>
+                  ) : (
+                    <pre className="max-h-[40dvh] overflow-auto rounded-md bg-muted p-3 font-mono text-[11px] leading-relaxed">
+                      {logs.lines.join('\n')}
+                    </pre>
+                  )}
+                  {logs && logs.files.length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {logs.files
+                        .map((f) => `${f.name} (${Math.round(f.size / 1024)}k)`)
+                        .join(' · ')}
+                    </p>
+                  )}
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => window.open('/api/report', '_blank')}
+            >
+              <Download className="size-4" /> {t('diag.report')}
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => send({ type: 'agent.restart' }).catch(() => {})}
+            >
+              <RotateCcw className="size-4" /> {t('diag.restart')}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
