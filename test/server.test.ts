@@ -330,6 +330,14 @@ describe('devin-pocket server', () => {
         (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
       ),
     ).toHaveLength(1);
+    // the send-now ack is emitted at dispatch — before the merged turn ends —
+    // so a long turn cannot trip the client's ack timeout.
+    const ackIdx = c.msgs.findIndex((m) => m.type === 'ack' && m.id === 'queue-now');
+    const endIdx = c.msgs.findIndex(
+      (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
+    );
+    expect(ackIdx).toBeGreaterThanOrEqual(0);
+    expect(endIdx).toBeGreaterThan(ackIdx);
     c.ws.close();
     other.ws.close();
   });

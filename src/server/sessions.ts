@@ -495,8 +495,10 @@ export class SessionManager {
       });
       // The steer RPC resolves only when the merged turn ends — return without
       // holding the command ack for the whole turn; a failure emits a session
-      // 'error' event and puts the item back at the head of the queue.
-      void this.steer(sessionId, item.blocks).catch(() => {
+      // 'error' event plus a toast (state.error is not rendered) and puts the
+      // item back at the head of the queue.
+      void this.steer(sessionId, item.blocks).catch((e) => {
+        this.emit({ type: 'toast', level: 'error', text: (e as Error).message });
         const rest = this.sessions.get(sessionId)?.queue ?? [];
         this.emitEvent(sessionId, { type: 'queueChanged', queue: [item, ...rest] });
       });
