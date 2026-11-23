@@ -48,8 +48,8 @@ export const ToolCard = memo(function ToolCard({ item, cwd }: { item: ToolItem; 
   const t = useT();
   const Icon = ICONS[item.toolKind] ?? Wrench;
   const done = item.status === 'completed' || item.status === 'failed';
-  // Completed execute tools collapse by default; everything else open.
-  const [open, setOpen] = useState(!(item.toolKind === 'execute' && done));
+  // Finished tools collapse by default (desktop Devin style); running ones stay open.
+  const [open, setOpen] = useState(!done);
   const diffs = item.content.filter((c) => c.type === 'diff');
   const texts = item.content.filter((c) => c.type === 'content' && c.content?.type === 'text');
   const hasBody =

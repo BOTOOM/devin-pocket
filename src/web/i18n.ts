@@ -148,6 +148,9 @@ const es = {
   'chat.newMessages': 'Nuevos mensajes',
   'chat.loadEarlier': 'Cargar {n} mensajes anteriores',
   'chat.thinking': 'Pensando…',
+  'chat.thoughtFor': 'Pensó durante {s}s',
+  'work.active': 'Trabajando…',
+  'work.done': 'Trabajó durante {s}s',
   'chat.locked': 'Esta sesión está abierta en otro cliente. Solo lectura.',
   'chat.lockedBody':
     'Otro cliente tiene esta sesión abierta, así que no se puede cargar aquí. Ciérrala allí o fuerza el cierre.',
@@ -461,6 +464,9 @@ const en: Record<keyof typeof es, string> = {
   'chat.newMessages': 'New messages',
   'chat.loadEarlier': 'Load {n} earlier messages',
   'chat.thinking': 'Thinking…',
+  'chat.thoughtFor': 'Thought for {s}s',
+  'work.active': 'Working…',
+  'work.done': 'Worked for {s}s',
   'chat.locked': 'This session is open in another client. Read only.',
   'chat.lockedBody':
     'Another client has this session open, so it cannot load here. Close it there or force close it.',

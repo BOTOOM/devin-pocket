@@ -139,10 +139,12 @@ export function applyEvent(state: SessionState, ev: SessionEvent, now = Date.now
     case 'turnStarted':
       s.turn = 'working';
       s.error = undefined;
+      s.turnEndedAt = undefined;
       return s;
     case 'turnEnded':
       s.items = finishStreaming(s.items);
       s.turn = 'idle';
+      s.turnEndedAt = now;
       s.permission = undefined;
       s.elicitation = undefined;
       return s;
@@ -179,6 +181,7 @@ export function applyEvent(state: SessionState, ev: SessionEvent, now = Date.now
     case 'error':
       s.error = ev.message;
       s.turn = 'idle';
+      s.turnEndedAt = now;
       s.items = finishStreaming(s.items);
       return s;
     default:

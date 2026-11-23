@@ -15,6 +15,10 @@ describe('shared reducer', () => {
     s = applyEvent(s, { type: 'turnEnded', stopReason: 'end_turn' }, at + 3);
     expect(s.items[0]).toMatchObject({ streaming: false });
     expect(s.turn).toBe('idle');
+    expect(s.turnEndedAt).toBe(at + 3);
+    // a new turn clears the marker
+    s = applyEvent(s, { type: 'turnStarted' }, at + 4);
+    expect(s.turnEndedAt).toBeUndefined();
   });
 
   it('creates and updates a tool call', () => {

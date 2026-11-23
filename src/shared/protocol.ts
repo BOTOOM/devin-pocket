@@ -304,6 +304,8 @@ export interface SessionState {
   turnStats: TurnStat[];
   /** last error surfaced for this session (prompt failed, load failed…) */
   error?: string;
+  /** when the last turn finished — drives "worked for Ns" durations */
+  turnEndedAt?: number;
   /** replay in progress (session/load) */
   loading: boolean;
   /** monotonically increasing; browsers drop events with seq <= their own */
