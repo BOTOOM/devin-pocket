@@ -99,10 +99,12 @@ for the complete walkthrough.
      curl -fsSL https://raw.githubusercontent.com/BOTOOM/devin-pocket/main/install-termux.sh | bash
    ```
 
-   Updates Termux, installs `proot-distro`, creates Ubuntu (24.04 with the newer
-   proot-distro interface) or reuses it, updates Ubuntu, prepares Node.js using the
+   Updates Termux only when `curl` or `proot-distro` are missing, creates Ubuntu
+   (24.04 with the newer proot-distro interface) or reuses any already installed
+   Ubuntu/Debian distro — even under a different `--distro` name — updates the
+   distro only on a fresh install, prepares Node.js using the
    26-if-missing / 24-if-below-24 / keep-24+ policy above and installs
-   build tools, and installs the official Devin CLI if missing. It chooses the
+   build tools that are missing, and installs the official Devin CLI if missing. It chooses the
    highest stable npm version at least **seven days old**. Only npm E404 falls
    back to building a `main` source archive. If the package exists but no version
    is old enough, it stops: select `--source` or `--package` explicitly.
@@ -142,8 +144,8 @@ bash install-termux.sh --source main --distro ubuntu --no-upgrade
 | --- | --- |
 | `--source REF` | Build a public branch, tag or commit of BOTOOM/devin-pocket. |
 | `--package SPEC` | Exact `devin-pocket@VERSION`, HTTPS tarball URL or existing local `.tgz`. |
-| `--distro NAME` | Ubuntu name to create/reuse; default `ubuntu`; must be Ubuntu. |
-| `--no-upgrade` | Skip general upgrades, still install prerequisites. |
+| `--distro NAME` | Ubuntu/Debian distro name to create/reuse; default `ubuntu`; without it, any installed compatible distro is reused. |
+| `--no-upgrade` | Skip general upgrades (only applies to fresh installs anyway), still install prerequisites. |
 | `--help`, `-h` | Help without installing. |
 
 `--source` and `--package` are mutually exclusive. For a branch-specific installer,

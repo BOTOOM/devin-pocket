@@ -11,14 +11,15 @@ usage() {
   say '  Sin opciones: npm (versión estable publicada hace 7+ días), o código de main si no existe.'
   say '  --source REF     Compila una rama, tag o commit de BOTOOM/devin-pocket.'
   say '  --package SPEC   devin-pocket@VERSION, URL HTTPS de un .tgz o archivo .tgz local.'
-  say '  --distro NOMBRE  Nombre del Ubuntu instalado o a crear (por defecto: ubuntu).'
+  say '  --distro NOMBRE  Nombre de la distro Ubuntu/Debian instalada o a crear (por defecto: ubuntu).'
   say '  --no-upgrade     No actualiza paquetes generales; sí prepara los requisitos de Node.'
   say '  --help           Muestra esta ayuda, sin instalar nada.'
 }
 
-ubuntu_install() (
+distro_install() (
   set -euo pipefail
-  local mode=$1 spec=$2 upgrade=$3 stage pidfile pid node_major node_target package_version ref
+  local mode=$1 spec=$2 upgrade=$3 fresh=$4 stage pidfile pid node_major node_target package_version ref pkg_name
+  local -a required missing=()
   export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
   export DEBIAN_FRONTEND=noninteractive
   pidfile="${XDG_STATE_HOME:-$HOME/.local/state}/devin-pocket/server.pid"
@@ -30,8 +31,8 @@ ubuntu_install() (
   fi
   [[ -r /etc/os-release ]] || err 'La distro no tiene /etc/os-release.'
   . /etc/os-release
-  [[ "${ID:-}" == ubuntu ]] || err 'Este instalador necesita Ubuntu; la distro elegida es otra.'
-  [[ $(id -u) == 0 ]] || err 'Entra a Ubuntu como root (no requiere root en Android).'
+  [[ "${ID:-}" == ubuntu || "${ID:-}" == debian ]] || err 'Este instalador necesita Ubuntu o Debian; la distro elegida es otra.'
+  [[ $(id -u) == 0 ]] || err 'Entra a la distro como root (no requiere root en Android).'
 
   node_major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || printf '0')
   node_target=0
@@ -41,10 +42,19 @@ ubuntu_install() (
 
   stage=$(mktemp -d)
   trap 'rm -rf -- "$stage"' EXIT
-  say 'Preparando paquetes de Ubuntu…'
-  apt-get update
-  if [[ "$upgrade" == 1 ]]; then apt-get upgrade -y -o Dpkg::Options::=--force-confold; fi
-  apt-get install -y ca-certificates curl git ripgrep jq python3 build-essential tar xz-utils unzip libatomic1 procps
+  required=(ca-certificates curl git ripgrep jq python3 build-essential tar xz-utils unzip libatomic1 procps)
+  for pkg_name in "${required[@]}"; do
+    dpkg-query -W -f='${Status}' "$pkg_name" 2>/dev/null | grep -q 'install ok installed' \
+      || missing+=("$pkg_name")
+  done
+  if (( ${#missing[@]} )) || [[ "$upgrade" == 1 && "$fresh" == 1 ]]; then
+    say 'Preparando paquetes del sistema…'
+    apt-get update
+    if [[ "$upgrade" == 1 && "$fresh" == 1 ]]; then apt-get upgrade -y -o Dpkg::Options::=--force-confold; fi
+    if (( ${#missing[@]} )); then apt-get install -y "${missing[@]}"; fi
+  else
+    say 'Los paquetes del sistema ya están instalados; se conservan sin cambios.'
+  fi
   if [[ "$node_target" != 0 ]]; then
     say "Instalando Node.js $node_target LTS desde NodeSource…"
     curl --fail --show-error --location --retry 3 --proto '=https' --proto-redir '=https' \
@@ -142,8 +152,38 @@ write_launcher() {
   chmod +x "$target"
 }
 
+distro_release_id() {
+  local dir=$1 file line
+  for file in "$dir/etc/os-release" "$dir/rootfs/etc/os-release"; do
+    [[ -r "$file" ]] || continue
+    line=$(grep -m1 '^ID=' "$file" 2>/dev/null) || continue
+    line=${line#ID=}
+    line=${line//\"/}
+    [[ -n "$line" ]] && { printf '%s\n' "$line"; return 0; }
+  done
+  return 1
+}
+
+find_compatible_distro() {
+  local runtime=$1 want base dir
+  for want in ubuntu debian; do
+    for base in "$runtime/installed-rootfs" "$runtime/containers"; do
+      [[ -d "$base" ]] || continue
+      for dir in "$base"/*/; do
+        [[ -d "$dir" ]] || continue
+        [[ "$(distro_release_id "${dir%/}")" == "$want" ]] || continue
+        dir=${dir%/}
+        printf '%s\n' "${dir##*/}"
+        return 0
+      done
+    done
+  done
+  return 1
+}
+
 main() {
-  local mode=auto spec='' distro=ubuntu upgrade=1 local_package='' proot install_help runtime launch_command=devin-pocket
+  local mode=auto spec='' distro=ubuntu distro_explicit=0 upgrade=1 fresh=0 local_package='' proot install_help runtime launch_command=devin-pocket found='' pkg_name
+  local -a missing=()
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --help|-h) usage; return ;;
@@ -153,7 +193,7 @@ main() {
         mode=${1#--}; spec=$2; shift 2 ;;
       --distro)
         [[ $# -ge 2 && -n "$2" ]] || err 'Falta el nombre de la distro.'
-        distro=$2; shift 2 ;;
+        distro=$2; distro_explicit=1; shift 2 ;;
       --no-upgrade) upgrade=0; shift ;;
       *) err "Opción desconocida: $1. Usa --help." ;;
     esac
@@ -175,15 +215,28 @@ main() {
     aarch64|x86_64) ;;
     *) err 'Devin CLI necesita ARM64 o x86_64. Este dispositivo usa otra arquitectura.' ;;
   esac
-  say 'Preparando Termux → Ubuntu → Node.js → Devin CLI → Devin Pocket…'
-  pkg update -y
-  if [[ "$upgrade" == 1 ]]; then pkg upgrade -y -o Dpkg::Options::=--force-confold; fi
-  pkg install -y curl proot-distro
+  say 'Preparando Termux → proot → Node.js → Devin CLI → Devin Pocket…'
+  for pkg_name in curl proot-distro; do
+    dpkg-query -W -f='${Status}' "$pkg_name" 2>/dev/null | grep -q 'install ok installed' \
+      || missing+=("$pkg_name")
+  done
+  if (( ${#missing[@]} )); then
+    pkg update -y
+    if [[ "$upgrade" == 1 ]]; then pkg upgrade -y -o Dpkg::Options::=--force-confold; fi
+    pkg install -y "${missing[@]}"
+  else
+    say 'curl y proot-distro ya están instalados en Termux; no se reinstalan.'
+  fi
+  has proot-distro || err 'proot-distro no está disponible. Instálalo con: pkg install proot-distro'
   proot=$(command -v proot-distro)
   runtime="${TERMUX__PREFIX:-$PREFIX}/var/lib/proot-distro"
   if [[ -d "$runtime/installed-rootfs/$distro" || -d "$runtime/containers/$distro" ]]; then
-    say "Reutilizando $distro; no se borra ni se reinstala su sistema de archivos."
+    say "Reutilizando la distro '$distro' ya instalada; no se descarga ni se reinstala."
+  elif [[ "$distro_explicit" == 0 ]] && found=$(find_compatible_distro "$runtime") && [[ -n "$found" ]]; then
+    distro=$found
+    say "Reutilizando la distro compatible '$distro' ya instalada; no se descarga otra."
   else
+    fresh=1
     install_help=$(proot-distro install --help)
     if [[ "$install_help" == *--name* ]]; then
       proot-distro install --override-alias "$distro" ubuntu:24.04
@@ -195,9 +248,9 @@ main() {
   if [[ -n "$local_package" ]]; then login+=(--bind "$local_package:$spec"); fi
   {
     printf 'set -euo pipefail\n'
-    declare -f say err has ubuntu_install
-    printf 'ubuntu_install "$@"\n'
-  } | "${login[@]}" -- /bin/bash -ls -- "$mode" "$spec" "$upgrade"
+    declare -f say err has distro_install
+    printf 'distro_install "$@"\n'
+  } | "${login[@]}" -- /bin/bash -ls -- "$mode" "$spec" "$upgrade" "$fresh"
 
   write_launcher "$PREFIX/bin/devin-pocket-ubuntu" "$distro" "$proot"
   if [[ -e "$PREFIX/bin/devin-pocket" || -L "$PREFIX/bin/devin-pocket" ]] \

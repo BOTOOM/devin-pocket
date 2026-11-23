@@ -21,7 +21,14 @@ afterEach(() => {
   for (const dir of temporaryDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-function fixture(options: { legacy?: boolean; existing?: boolean; missingDevin?: boolean } = {}) {
+function fixture(
+  options: {
+    legacy?: boolean;
+    existing?: boolean;
+    missingDevin?: boolean;
+    hostReady?: boolean;
+  } = {},
+) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'pocket-installer-')));
   temporaryDirs.push(root);
   const prefix = path.join(root, 'termux');
@@ -62,7 +69,17 @@ export HOME="$MOCK_GUEST_HOME"
 export PATH="$HOME/.local/bin:/usr/bin:/bin"
 exec /bin/bash "$MOCK_ROOT/guest-script.sh" "$@"`,
   );
+  if (options.hostReady) {
+    executable(hostBin, 'dpkg-query', `printf 'install ok installed\\n'`);
+  }
   executable(guestBin, 'id', 'printf "0\\n"');
+  executable(
+    guestBin,
+    'dpkg-query',
+    `last=\${!#}
+case " \${MOCK_DPKG_MISSING:-} " in *" $last "*) exit 1 ;; esac
+printf 'install ok installed\\n'`,
+  );
   executable(
     guestBin,
     'apt-get',
@@ -321,6 +338,43 @@ describe.skipIf(process.platform === 'win32')('Termux bootstrap installer', () =
     expect(f.commands()).not.toContain('proot-distro|install|');
     expect(f.commands()).not.toContain('|upgrade|');
     expect(readFileSync(launcher, 'utf8')).toBe('user launcher');
+  });
+
+  it('reinstalls nothing on a device that is already set up', () => {
+    const f = fixture({ existing: true, hostReady: true });
+    const result = f.run(['--package', 'devin-pocket@0.1.5']);
+    expect(result.status).toBe(0);
+    const commands = f.commands();
+    expect(commands).not.toContain('pkg|');
+    expect(commands).not.toContain('apt-get|');
+    expect(commands).not.toContain('proot-distro|install|');
+    expect(commands).toContain('proot-distro|login|ubuntu|');
+  });
+
+  it.each([
+    ['installed-rootfs', 'mi-ubuntu', 'ubuntu'],
+    ['installed-rootfs', 'mi-debian', 'debian'],
+    ['containers', 'vieja-ubuntu', 'ubuntu'],
+  ])('reuses an installed compatible distro under another alias (%s/%s)', (layout, alias, id) => {
+    const f = fixture();
+    const base = path.join(f.prefix, 'var', 'lib', 'proot-distro', layout, alias);
+    const osReleaseDir =
+      layout === 'containers' ? path.join(base, 'rootfs', 'etc') : path.join(base, 'etc');
+    mkdirSync(osReleaseDir, { recursive: true });
+    writeFileSync(path.join(osReleaseDir, 'os-release'), `ID=${id}\n`);
+    const result = f.run(['--package', 'devin-pocket@0.1.5']);
+    expect(result.status).toBe(0);
+    expect(f.commands()).not.toContain('proot-distro|install|');
+    expect(f.commands()).toContain(`proot-distro|login|${alias}|`);
+  });
+
+  it('installs only the missing system packages inside a reused distro', () => {
+    const f = fixture({ existing: true });
+    const result = f.run(['--package', 'devin-pocket@0.1.5'], { MOCK_DPKG_MISSING: 'curl jq' });
+    expect(result.status).toBe(0);
+    expect(f.commands()).toContain('apt-get|update|');
+    expect(f.commands()).toContain('apt-get|install|-y|curl|jq|');
+    expect(f.commands()).not.toContain('apt-get|upgrade|');
   });
 
   it('builds a source archive with frozen dependencies and npm, without git clone', () => {
