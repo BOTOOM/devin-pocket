@@ -1,6 +1,6 @@
 import type { ContentBlock, SessionState, TranscriptItem } from '@shared/protocol';
 import { ArrowDown, ChevronRight, Loader2 } from 'lucide-react';
-import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ToolCard } from '@/components/ToolCard';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -10,10 +10,15 @@ import { useStore } from '@/store';
 
 const PAGE = 60;
 
-export function Transcript({ state }: { state: SessionState }) {
+export function Transcript({
+  state,
+  scroller,
+}: {
+  state: SessionState;
+  scroller: RefObject<HTMLDivElement | null>;
+}) {
   const t = useT();
   const showThoughts = useStore((s) => s.prefs.showThoughts);
-  const ref = useRef<HTMLDivElement>(null);
   const [follow, setFollow] = useState(true);
   const [limit, setLimit] = useState(PAGE);
   const anchorRef = useRef<{ height: number; top: number } | null>(null);
@@ -26,7 +31,7 @@ export function Transcript({ state }: { state: SessionState }) {
   const working = state.turn === 'working' || state.turn === 'awaitingPermission';
 
   const expand = () => {
-    const el = ref.current?.parentElement;
+    const el = scroller.current;
     if (el) anchorRef.current = { height: el.scrollHeight, top: el.scrollTop };
     setLimit((l) => Math.min(l + PAGE, items.length));
   };
@@ -34,7 +39,7 @@ export function Transcript({ state }: { state: SessionState }) {
   // Keep the viewport anchored when prepending older items.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when limit changes
   useLayoutEffect(() => {
-    const el = ref.current?.parentElement;
+    const el = scroller.current;
     const a = anchorRef.current;
     if (el && a) {
       anchorRef.current = null;
@@ -45,13 +50,13 @@ export function Transcript({ state }: { state: SessionState }) {
   // Auto-scroll tail-follow; pause when the user scrolls up.
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on every new/updated item
   useEffect(() => {
-    const el = ref.current?.parentElement;
+    const el = scroller.current;
     if (follow && el) el.scrollTop = el.scrollHeight;
   }, [follow, items]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: expand reads refs only; mount once
   useEffect(() => {
-    const el = ref.current?.parentElement;
+    const el = scroller.current;
     if (!el) return;
     const onScroll = () => {
       setFollow(el.scrollHeight - el.scrollTop - el.clientHeight < 80);
@@ -62,7 +67,7 @@ export function Transcript({ state }: { state: SessionState }) {
   }, []);
 
   return (
-    <div ref={ref} className="relative px-3 py-4">
+    <div className="relative px-3 py-4">
       <div className="space-y-3">
         {hidden > 0 && (
           <div className="flex justify-center">
@@ -87,7 +92,7 @@ export function Transcript({ state }: { state: SessionState }) {
           className="sticky bottom-3 left-1/2 -translate-x-1/2 rounded-full shadow-md"
           onClick={() => {
             setFollow(true);
-            const el = ref.current?.parentElement;
+            const el = scroller.current;
             if (el) el.scrollTop = el.scrollHeight;
           }}
         >

@@ -58,6 +58,8 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
   const [asideOpen, setAsideOpen] = useState(false);
   const [asideQuestion, setAsideQuestion] = useState('');
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   // Open the session if the server has it listed but not loaded (e.g. deep link).
   const openSent = useRef<string | null>(null);
   useEffect(() => {
@@ -163,7 +165,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
 
       <StatusStrip state={state} sessionId={sessionId} />
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="pane-chat flex min-h-full flex-col">
           {summary?.locked && !state ? (
             <div
@@ -213,7 +215,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
               <p className="text-sm text-muted-foreground">{t('chat.emptyHint')}</p>
             </div>
           ) : (
-            <Transcript key={sessionId} state={state} />
+            <Transcript key={sessionId} state={state} scroller={scrollRef} />
           )}
         </div>
       </div>
