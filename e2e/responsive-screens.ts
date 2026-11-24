@@ -58,8 +58,10 @@ for (const [width, height] of [
     await expect(page.locator('textarea')).toBeVisible();
     if (width >= 1024) {
       await expect(sidebar.locator('[aria-current="page"]')).toHaveCount(1);
+      // the pane itself is full-width by design (edge-to-edge scroll); the
+      // capped element is the centered content column inside it
       await expect
-        .poll(async () => (await page.getByTestId('main-pane').boundingBox())?.width)
+        .poll(async () => (await page.locator('.pane-chat').first().boundingBox())?.width)
         .toBeLessThanOrEqual(860);
     }
     for (const chip of ['mode', 'reasoning', 'model']) {
