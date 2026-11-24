@@ -864,6 +864,17 @@ const agent: Agent = {
       for (let i = 0; i < 150 && !cancelled; i++) await sleep(FAST ? 40 : 100);
       return { stopReason: cancelled ? 'cancelled' : 'end_turn' };
     }
+    if (ptext === 'THINK_HOLD') {
+      // thought-only active group that holds mid-turn — exercises the manual
+      // close of a thoughts-visible section before the answer arrives
+      await update({
+        sessionUpdate: 'agent_thought_chunk',
+        content: text('Pondering deeply.\n'),
+      });
+      for (let i = 0; i < 150 && !cancelled; i++) await sleep(FAST ? 40 : 100);
+      await update({ sessionUpdate: 'agent_message_chunk', content: text('Done thinking.') });
+      return { stopReason: cancelled ? 'cancelled' : 'end_turn' };
+    }
     if (ptext.startsWith('QUEUE_RESULT_')) {
       await update({ sessionUpdate: 'agent_message_chunk', content: text(`Completed ${ptext}`) });
       return { stopReason: 'end_turn' };

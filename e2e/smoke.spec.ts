@@ -313,3 +313,23 @@ test('side question works alongside an active turn', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Añadir a la cola|Add to queue/i })).toBeVisible();
   await expect(page.locator('.prose').filter({ hasText: 'Side answer:' })).toHaveCount(1);
 });
+
+test('manually closed working section stays closed when the answer arrives', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('dp.prefs', JSON.stringify({ showThoughts: true, enterToSend: true }));
+  });
+  await page.goto('/#/');
+  await startSession(page);
+  await page.locator('textarea').fill('THINK_HOLD');
+  await page.keyboard.press('Enter');
+  const section = page.locator('[data-testid="working-section"]').first();
+  await expect(section).toBeVisible({ timeout: 20_000 });
+  // showThoughts opens the thoughts-bearing active group — close it mid-turn
+  await expect(section).toHaveAttribute('data-state', 'open');
+  await section.click();
+  await expect(section).toHaveAttribute('data-state', 'closed');
+  // when the answer lands the turn ends — the manual close must win over the
+  // auto-sync (without it, the finished group reopens because it has thoughts)
+  await expect(page.getByText('Done thinking.')).toBeVisible({ timeout: 20_000 });
+  await expect(section).toHaveAttribute('data-state', 'closed');
+});
