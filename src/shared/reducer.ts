@@ -144,6 +144,7 @@ export function applyEvent(state: SessionState, ev: SessionEvent, now = Date.now
       s.items = finishStreaming(s.items);
       s.turn = 'idle';
       s.permission = undefined;
+      s.elicitation = undefined;
       return s;
     case 'permissionRequested':
       s.permission = ev.request;
@@ -152,6 +153,12 @@ export function applyEvent(state: SessionState, ev: SessionEvent, now = Date.now
     case 'permissionResolved':
       if (s.permission?.requestId === ev.requestId) s.permission = undefined;
       if (s.turn === 'awaitingPermission') s.turn = 'working';
+      return s;
+    case 'elicitationRequested':
+      s.elicitation = ev.request;
+      return s;
+    case 'elicitationResolved':
+      if (s.elicitation?.requestId === ev.requestId) s.elicitation = undefined;
       return s;
     case 'loading':
       s.loading = ev.loading;

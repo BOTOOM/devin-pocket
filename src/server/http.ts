@@ -171,6 +171,7 @@ export class PocketServer {
       host: c.host,
       logDir: stateDir(),
       agentCommand: c.agentCommand,
+      agentProcessModel: this.deps.agent.processModel,
       platform: platformInfo(),
     };
   }
@@ -426,6 +427,11 @@ export class PocketServer {
           this.ack(ws, env.id, ok, ok ? undefined : 'unknown requestId');
           break;
         }
+        case 'elicitation.respond': {
+          const ok = sessions.respondElicitation(cmd.requestId, cmd.response);
+          this.ack(ws, env.id, ok, ok ? undefined : 'unknown requestId');
+          break;
+        }
         case 'catalog.refresh': {
           const cat = await loadCatalog(true, this.deps.log);
           this.broadcast({ type: 'catalog', catalog: cat });
@@ -523,6 +529,7 @@ export class PocketServer {
           port: this.deps.config.port,
           host: this.deps.config.host,
           agentCommand: this.deps.config.agentCommand,
+          processModel: this.deps.config.agentProcessModel,
           ownsPort: true,
         });
         return this.json(res, r);

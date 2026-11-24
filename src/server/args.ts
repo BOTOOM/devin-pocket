@@ -4,6 +4,8 @@ export interface Args {
   host?: string;
   cwd?: string;
   agent?: string;
+  /** `devin acp` process model override: auto|daemon|in-process */
+  processModel?: 'auto' | 'daemon' | 'in-process';
   open: boolean;
   dev: boolean;
   foreground: boolean;
@@ -60,6 +62,12 @@ export function parseArgs(argv: string[]): Args {
       case '--agent':
         a.agent = rest[++i];
         break;
+      case '--process-model': {
+        const v = rest[++i];
+        if (v === 'auto' || v === 'daemon' || v === 'in-process') a.processModel = v;
+        else throw new Error('--process-model: auto | daemon | in-process');
+        break;
+      }
       case '--no-open':
         a.open = false;
         break;
@@ -124,6 +132,7 @@ export function serializeArgs(a: Args): string[] {
   if (a.host !== undefined) out.push('--host', a.host);
   if (a.cwd !== undefined) out.push('--cwd', a.cwd);
   if (a.agent !== undefined) out.push('--agent', a.agent);
+  if (a.processModel !== undefined) out.push('--process-model', a.processModel);
   if (!a.open) out.push('--no-open');
   if (a.qr) out.push('--qr=ascii');
   return out;

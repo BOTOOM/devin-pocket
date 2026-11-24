@@ -22,7 +22,8 @@ Guidance for developer agents working on this repo. Read this before making chan
 ```
 devin acp child (stdio JSON-RPC)
   → src/server/acp/agent.ts      AgentProcess: spawn, JSON-RPC via @agentclientprotocol/sdk,
-                                 status machine, turn_stats, permission bridge
+                                 status machine, turn_stats, permission + elicitation
+                                 bridges, process-model probe (`--process-model`)
   → src/server/acp/normalize.ts  ACP SessionUpdate → SessionEvent
   → src/server/sessions.ts       SessionManager: open sessions, permissions, session list
   → src/server/http.ts           PocketServer: HTTP static + /api/* + /ws WebSocket
@@ -65,7 +66,8 @@ devin acp child (stdio JSON-RPC)
 - `src/server/acp/normalize.ts` — ACP updates → `SessionEvent`s (tool calls, plan,
   thoughts, usage, commands, config options).
 - `src/server/sessions.ts` — SessionManager (list/create/open/close/delete/rename/
-  prompt/cancel/setMode/setConfigOption, pending permissions).
+  prompt/cancel/setMode/setConfigOption, pending permissions + elicitations,
+  `translateLockError` for `session_locked`).
 - `src/server/catalog.ts` — model catalog fetch/parse/cache/debug.
 - `src/server/dictation-model.ts`, `src/shared/dictation.ts` — pinned model proxy,
   pairing guard integration and atomic disk cache.
@@ -120,7 +122,8 @@ pnpm pack && npm install -g ./devin-pocket-*.tgz
 # use npm for the global link there.
 
 # runtime:
-devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD] [--no-open]
+devin-pocket start [--port N] [--host H] [--cwd DIR] [--agent CMD]
+                   [--process-model auto|daemon|in-process] [--no-open]
 devin-pocket stop | restart | status | logs [-f] [-n N] | doctor | models | open
 devin-pocket update [--check] [--version X] [--yes]
 devin-pocket pair [--qr=ascii]
@@ -203,15 +206,32 @@ Client→agent methods (via `@agentclientprotocol/sdk` `ClientSideConnection`):
 `deleteSession`, `prompt`, `cancel`, `setSessionMode`, `setSessionConfigOption`.
 
 Agent→client: `session/update` notifications, `session/request_permission`,
-`fs/read_text_file`, `fs/write_text_file`, `terminal/*`, plus Cognition extension
+`elicitation/create` (form mode → `ElicitationSheet`; url/custom/request-scoped
+are auto-cancelled so the agent falls back), `fs/read_text_file`,
+`fs/write_text_file`, `terminal/*`, plus Cognition extension
 notifications `_cognition.ai/turn_stats` and `_cognition.ai/output`.
 
+**Process model (CLI ≥3000.13.4)**: `devin acp` accepts `--process-model
+daemon|in-process`. Under `daemon` sessions live in the shared `devin daemon`
+(auto-starts) — they survive devin-pocket restarts and can be open in several
+clients at once. `AgentProcess.prepare()` probes `devin acp --help` once;
+`auto` (default, `agentProcessModel` config / `--process-model` flag) picks
+daemon when supported, older CLIs run with no flag. An explicit
+`--process-model` inside `agentCommand` wins over everything. Resolved model is
+exposed as `agentInfo.processModel` (Settings → About). `devin daemon status`
+is reported by `devin-pocket doctor`.
+
 `_meta` keys consumed: `cognition.ai/isLocked`, `cognition.ai/lockHolderPid`,
-`cognition.ai/sessionListOrderBy` (initialize caps), `cognition.ai/editableCommand(s)`
-(permission tool calls), `cognition.ai/category`, `cognition.ai/cwd`,
-`cognition.ai/command`, `cognition.ai/commandNames`, `cognition.ai/rename`,
-`cognition.ai/sessionRename`, `cognition.ai/inferenceToolName`,
-`cognition.ai/preview_is_shell_command`, `cognition.ai/terminalPreview`.
+`cognition.ai/errorKind` (`session_locked` → friendly error),
+`cognition.ai/sessionListOrderBy` + `cognition.ai/sessionListSortDirection`
+(initialize caps; when offered we request `orderBy=updated_at` + `sortDirection=desc`),
+`cognition.ai/planFilePath` + `cognition.ai/hasUserMessages` (session/list),
+`cognition.ai/multiRootWorkspace`, `cognition.ai/mentionTypes`,
+`cognition.ai/editableCommand(s)` (permission tool calls), `cognition.ai/category`,
+`cognition.ai/cwd`, `cognition.ai/command`, `cognition.ai/commandNames`,
+`cognition.ai/rename`, `cognition.ai/sessionRename`,
+`cognition.ai/inferenceToolName`, `cognition.ai/preview_is_shell_command`,
+`cognition.ai/terminalPreview`.
 
 ## Known gaps / TODO
 
@@ -266,7 +286,14 @@ notifications `_cognition.ai/turn_stats` and `_cognition.ai/output`.
   the `cognition.ai/sessionRename` meta path is not wired.
 - `editedCommand` can't be sent back in the standard ACP permission response — the
   field is displayed read-only.
-- Workflow/elicitation/resource-link ACP shapes are unverified.
+- Elicitation `form` mode is implemented (`elicitation/create` → sheet →
+  `elicitation.respond`); `url`/`custom` modes and request-scoped elicitations
+  are cancelled so the agent falls back to text questions. Schema coverage:
+  string (plain + single-select `enum`/`oneOf`), number/integer, boolean,
+  multi-select arrays (`enum`/`anyOf`).
+- `@agentclientprotocol/sdk` 2.x rewrites the app API (no `ClientSideConnection`)
+  — migration deferred; we pin 1.x.
+- Resource-link ACP shapes are unverified.
 - Fake agent `deleteSession` only removes app-created sessions; the fixed demo
   sessions (`fake-session-*`) always remain.
 

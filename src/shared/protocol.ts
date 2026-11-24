@@ -12,6 +12,8 @@
  */
 import type {
   ContentBlock,
+  ElicitationContentValue,
+  ElicitationSchema,
   PermissionOption,
   PlanEntryStatus,
   SessionConfigOption,
@@ -64,6 +66,8 @@ export interface DevicesResponse {
 
 export type {
   ContentBlock,
+  ElicitationContentValue,
+  ElicitationSchema,
   PermissionOption,
   SessionConfigOption,
   ToolCallContent,
@@ -90,10 +94,25 @@ export interface AuthMethod {
   description?: string | null;
 }
 
+export interface MentionType {
+  type: string;
+  icon?: string;
+  label?: string;
+}
+
+/** Where the agent runs its sessions (CLI ≥3000.13.4 `devin daemon`). */
+export type AgentProcessModel = 'daemon' | 'in-process';
+
 export interface AgentInfo {
   name?: string;
   title?: string;
   version?: string;
+  /**
+   * Resolved process model of the `devin acp` child. 'daemon' means sessions
+   * live in the shared `devin daemon` — they survive a devin-pocket restart
+   * and can be open in several clients at once (multi-attach).
+   */
+  processModel?: AgentProcessModel;
   /** agentCapabilities as reported by initialize (subset the UI cares about) */
   caps: {
     loadSession: boolean;
@@ -112,6 +131,12 @@ export interface AgentInfo {
     chains: boolean;
     /** session/list accepts `_meta["cognition.ai/content"]` search */
     contentSearch: boolean;
+    /** session/list accepts `_meta["cognition.ai/sortDirection"]` */
+    sortDirection: boolean;
+    /** session/new|load accept additional workspace directories */
+    multiRoot: boolean;
+    /** @-mention kinds the agent offers in prompts (file, skill, plan…) */
+    mentionTypes: MentionType[];
     /** raw `_meta` from agentCapabilities (cognition.ai/* flags) */
     meta: Record<string, unknown>;
   };
@@ -140,6 +165,8 @@ export interface SessionSummary {
   lockHolderPid?: number | null;
   /** _meta["cognition.ai/hasUserMessages"] — false = empty session (CLI ≥3000.11.205) */
   hasUserMessages?: boolean;
+  /** _meta["cognition.ai/planFilePath"] — saved plan file, when the session has one */
+  planFilePath?: string;
   /** true when this server process currently has it loaded */
   open: boolean;
 }
@@ -209,6 +236,25 @@ export interface PermissionRequest {
   at: number;
 }
 
+/**
+ * ACP `elicitation/create` (form mode) — the agent asks the user for structured
+ * input (ask_user_question). Mirrors the permission-request lifecycle.
+ */
+export interface ElicitationRequest {
+  requestId: string;
+  /** session the elicitation belongs to */
+  sessionId: string;
+  message: string;
+  /** form fields to render (requestedSchema of the create request) */
+  schema: ElicitationSchema;
+  toolCallId?: string;
+  at: number;
+}
+
+export type ElicitationResponse =
+  | { action: 'accept'; content?: Record<string, ElicitationContentValue> }
+  | { action: 'decline' | 'cancel' };
+
 /** One `_cognition.ai/turn_stats` notification, distilled (tokens are per turn). */
 export interface TurnStat {
   turnRequestId: string;
@@ -252,6 +298,8 @@ export interface SessionState {
   currentMode?: string;
   configOptions: SessionConfigOption[];
   permission?: PermissionRequest;
+  /** pending elicitation/create (form) from the agent */
+  elicitation?: ElicitationRequest;
   usage?: UsageInfo;
   turnStats: TurnStat[];
   /** last error surfaced for this session (prompt failed, load failed…) */
@@ -313,6 +361,8 @@ export type SessionEvent =
   | { type: 'turnEnded'; stopReason: string }
   | { type: 'permissionRequested'; request: PermissionRequest }
   | { type: 'permissionResolved'; requestId: string }
+  | { type: 'elicitationRequested'; request: ElicitationRequest }
+  | { type: 'elicitationResolved'; requestId: string }
   | { type: 'loading'; loading: boolean }
   | { type: 'system'; text: string; level: 'info' | 'warn' | 'error' }
   | { type: 'error'; message?: string };
@@ -394,6 +444,8 @@ export interface ServerSettings {
   host: string;
   logDir: string;
   agentCommand: string;
+  /** resolved `devin acp` process model (daemon = shared multi-client sessions) */
+  agentProcessModel?: AgentProcessModel;
   platform: { termux: boolean; proot: boolean; os: string; arch: string; node: string };
 }
 
@@ -481,6 +533,12 @@ export type ClientCommand =
       outcome:
         | { kind: 'selected'; optionId: string; editedCommand?: string }
         | { kind: 'cancelled' };
+    }
+  | {
+      type: 'elicitation.respond';
+      sessionId: string;
+      requestId: string;
+      response: ElicitationResponse;
     }
   | { type: 'catalog.refresh' }
   | { type: 'ports.refresh' };

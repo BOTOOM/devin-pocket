@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Composer } from '@/components/Composer';
+import { ElicitationSheet } from '@/components/ElicitationSheet';
 import { SessionList } from '@/components/Home';
 import { PermissionSheet } from '@/components/PermissionSheet';
 import { PlanPanel } from '@/components/PlanPanel';
@@ -65,8 +66,11 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     if (hydrated && !state && summary && !summary.locked && openSent.current !== sessionId) {
       openSent.current = sessionId;
-      send({ type: 'session.open', sessionId, cwd: summary.cwd }).catch(() => {
+      send({ type: 'session.open', sessionId, cwd: summary.cwd }).catch((e) => {
         if (openSent.current === sessionId) openSent.current = null;
+        // surface open failures (e.g. session_locked discovered at open time)
+        // — otherwise the user stares at skeletons with no explanation
+        void import('sonner').then(({ toast }) => toast.error((e as Error).message));
       });
     }
   }, [hydrated, state, summary, sessionId]);
@@ -295,6 +299,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
       )}
 
       {state?.permission && <PermissionSheet request={state.permission} sessionId={sessionId} />}
+      {state?.elicitation && <ElicitationSheet request={state.elicitation} sessionId={sessionId} />}
 
       {!desktop && (
         <Sheet open={panelOpen} onOpenChange={setPanelOpen}>

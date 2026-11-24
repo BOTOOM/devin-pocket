@@ -50,6 +50,7 @@ beforeEach(async () => {
       onTurnStats: (id, stats) => sessions.handleTurnStats(id, stats),
       onBillingInfo: () => {},
       onPermissionRequest: (id, request) => sessions.requestPermission(id, request),
+      onElicitation: (req) => sessions.requestElicitation(req),
       onSessionsReopened: () => void sessions.reopenAll(),
     },
   );
@@ -60,7 +61,13 @@ beforeEach(async () => {
     log,
     auth,
     dev: false,
-    config: { host: '0.0.0.0', port: 0, agentCommand: command, workspaces: [] },
+    config: {
+      host: '0.0.0.0',
+      port: 0,
+      agentCommand: command,
+      agentProcessModel: 'auto',
+      workspaces: [],
+    },
   };
   server = new PocketServer(deps);
   await server.start();

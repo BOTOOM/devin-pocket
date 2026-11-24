@@ -64,6 +64,7 @@ async function boot(): Promise<Harness> {
       onTurnStats: (sid, st) => sessions.handleTurnStats(sid, st),
       onBillingInfo: () => {},
       onPermissionRequest: (sid, req) => sessions.requestPermission(sid, req),
+      onElicitation: (req) => sessions.requestElicitation(req),
       onSessionsReopened: () => {},
     },
   );
@@ -76,6 +77,7 @@ async function boot(): Promise<Harness> {
       port: 0,
       host: '127.0.0.1',
       agentCommand: AGENT_CMD,
+      agentProcessModel: 'auto',
       workspaces: [{ path: process.cwd(), name: 'repo' }],
     },
     dev: true,
@@ -206,6 +208,50 @@ describe('devin-pocket server', () => {
     expect(s.turn).toBe('idle');
     expect(s.items.some((i) => i.kind === 'agent')).toBe(true);
     expect(s.turnStats.length).toBeGreaterThan(0);
+    c.ws.close();
+  });
+
+  it('elicitation form → respond → agent gets the content', async () => {
+    const c = wsClient(h.port);
+    await c.waitFor((m) => m.type === 'hello');
+    c.send({ type: 'session.new', cwd: process.cwd() }, 'new-elic');
+    const snapMsg = await c.waitFor((m) => m.type === 'session.snapshot');
+    if (snapMsg.type !== 'session.snapshot') throw new Error('bad');
+    const snap = snapMsg.state;
+    c.send(
+      {
+        type: 'prompt',
+        sessionId: snap.sessionId,
+        blocks: [{ type: 'text', text: 'ELICIT_FORM' }],
+      },
+      'elic-1',
+    );
+    const req = await c.waitFor(
+      (m) => m.type === 'session.event' && m.event.type === 'elicitationRequested',
+    );
+    if (req.type !== 'session.event' || req.event.type !== 'elicitationRequested')
+      throw new Error('bad');
+    expect(req.event.request.schema.properties?.color).toBeTruthy();
+    c.send(
+      {
+        type: 'elicitation.respond',
+        sessionId: snap.sessionId,
+        requestId: req.event.request.requestId,
+        response: {
+          action: 'accept',
+          content: { color: 'green', name: 'pocket', fast: true, tags: ['a'] },
+        },
+      },
+      'elic-2',
+    );
+    await c.waitFor((m) => m.type === 'session.event' && m.event.type === 'elicitationResolved');
+    await c.waitFor(
+      (m) =>
+        m.type === 'session.event' &&
+        m.event.type === 'agentChunk' &&
+        m.event.text.includes('"action":"accept"'),
+      20_000,
+    );
     c.ws.close();
   });
 
