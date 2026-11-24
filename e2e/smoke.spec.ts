@@ -324,8 +324,11 @@ test('manually closed working section stays closed when the answer arrives', asy
   await page.keyboard.press('Enter');
   const section = page.locator('[data-testid="working-section"]').first();
   await expect(section).toBeVisible({ timeout: 20_000 });
-  // showThoughts opens the thoughts-bearing active group — close it mid-turn
+  // showThoughts opens the thoughts-bearing active group — close it mid-turn;
+  // the live label proves the turn was still running when the close happened
+  // (otherwise the test could pass vacuously if the answer won the race)
   await expect(section).toHaveAttribute('data-state', 'open');
+  await expect(section.getByText(/Trabajando|Working/)).toBeVisible();
   await section.click();
   await expect(section).toHaveAttribute('data-state', 'closed');
   // when the answer lands the turn ends — the manual close must win over the
