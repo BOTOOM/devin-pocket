@@ -249,6 +249,20 @@
     padding-left: calc(1rem + env(safe-area-inset-left));
     padding-right: calc(1rem + env(safe-area-inset-right));
   }
+  /* Desktop: scroll regions span the pane edge-to-edge; content keeps a centered column. */
+  .pane-chat,
+  .pane-page {
+    margin-inline: auto;
+    width: 100%;
+  }
+  @media (min-width: 1024px) {
+    .pane-chat {
+      max-width: 860px;
+    }
+    .pane-page {
+      max-width: 1100px;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

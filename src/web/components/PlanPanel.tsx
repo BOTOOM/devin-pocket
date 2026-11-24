@@ -9,7 +9,7 @@ export function PlanPanel({ plan }: { plan: PlanEntry[] }) {
   const [open, setOpen] = useState(false);
   const done = plan.filter((e) => e.status === 'completed').length;
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="border-t bg-card">
+    <Collapsible open={open} onOpenChange={setOpen} className="pane-chat border-t bg-card">
       <CollapsibleTrigger className="safe-x flex min-h-10 w-full items-center gap-2 px-4 text-sm font-medium">
         {t('plan.title', { done, total: plan.length })}
         <ChevronDown

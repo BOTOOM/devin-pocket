@@ -58,6 +58,8 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
   const [asideOpen, setAsideOpen] = useState(false);
   const [asideQuestion, setAsideQuestion] = useState('');
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   // Open the session if the server has it listed but not loaded (e.g. deep link).
   const openSent = useRef<string | null>(null);
   useEffect(() => {
@@ -94,7 +96,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="safe-top safe-x flex items-center gap-1 border-b px-4 py-2">
+      <header className="pane-chat safe-top safe-x flex items-center gap-1 border-b px-4 py-2">
         {/* Desktop keeps the session sidebar on screen; phones open it as a panel. */}
         {!desktop && (
           <Button
@@ -163,60 +165,64 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
 
       <StatusStrip state={state} sessionId={sessionId} />
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {summary?.locked && !state ? (
-          <div
-            data-testid="session-locked"
-            className="flex flex-col items-center gap-3 px-6 py-12 text-center text-sm text-muted-foreground"
-          >
-            <Lock className="size-6" />
-            <p className="max-w-xs">{t('chat.lockedBody')}</p>
-            {canForceClose && (
-              <Button
-                variant="outline"
-                className="gap-2"
-                onClick={async () => {
-                  try {
-                    await send({ type: 'session.forceClose', sessionId });
-                    void import('sonner').then(({ toast }) => toast.success(t('home.unlockDone')));
-                  } catch (e) {
-                    void import('sonner').then(({ toast }) => toast.error((e as Error).message));
-                  }
-                }}
-              >
-                <LockOpen className="size-4" />
-                {t('home.unlock')}
-              </Button>
-            )}
-          </div>
-        ) : !state ? (
-          <div className="space-y-3 p-4">
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : state.loading ? (
-          <div className="space-y-3 p-4">
-            {[0, 1, 2].map((i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
-          </div>
-        ) : state.items.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1.5 p-8 text-center">
-            <div className="text-sm font-medium text-muted-foreground">
-              {baseName(cwd) || cwd}
-              {state.currentMode ? ` · ${state.currentMode}` : ''}
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="pane-chat flex min-h-full flex-col">
+          {summary?.locked && !state ? (
+            <div
+              data-testid="session-locked"
+              className="flex flex-col items-center gap-3 px-6 py-12 text-center text-sm text-muted-foreground"
+            >
+              <Lock className="size-6" />
+              <p className="max-w-xs">{t('chat.lockedBody')}</p>
+              {canForceClose && (
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={async () => {
+                    try {
+                      await send({ type: 'session.forceClose', sessionId });
+                      void import('sonner').then(({ toast }) =>
+                        toast.success(t('home.unlockDone')),
+                      );
+                    } catch (e) {
+                      void import('sonner').then(({ toast }) => toast.error((e as Error).message));
+                    }
+                  }}
+                >
+                  <LockOpen className="size-4" />
+                  {t('home.unlock')}
+                </Button>
+              )}
             </div>
-            <p className="text-sm text-muted-foreground">{t('chat.emptyHint')}</p>
-          </div>
-        ) : (
-          <Transcript key={sessionId} state={state} />
-        )}
+          ) : !state ? (
+            <div className="space-y-3 p-4">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : state.loading ? (
+            <div className="space-y-3 p-4">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : state.items.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-1.5 p-8 text-center">
+              <div className="text-sm font-medium text-muted-foreground">
+                {baseName(cwd) || cwd}
+                {state.currentMode ? ` · ${state.currentMode}` : ''}
+              </div>
+              <p className="text-sm text-muted-foreground">{t('chat.emptyHint')}</p>
+            </div>
+          ) : (
+            <Transcript key={sessionId} state={state} scroller={scrollRef} />
+          )}
+        </div>
       </div>
 
       {state && btwOk && asideOpen && (
         <section
-          className="safe-x max-h-[42dvh] space-y-2 overflow-y-auto border-t bg-card px-4 py-2"
+          className="pane-chat safe-x max-h-[42dvh] space-y-2 overflow-y-auto border-t bg-card px-4 py-2"
           aria-label={t('aside.title')}
         >
           <div className="flex items-center justify-between gap-2">
@@ -281,7 +287,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
       {state && state.plan.length > 0 && <PlanPanel plan={state.plan} />}
 
       {summary?.locked && !state ? (
-        <div className="safe-bottom border-t bg-muted px-4 py-3 text-center text-sm text-muted-foreground">
+        <div className="pane-chat safe-bottom border-t bg-muted px-4 py-3 text-center text-sm text-muted-foreground">
           {t('chat.locked')}
         </div>
       ) : (

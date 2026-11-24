@@ -155,7 +155,7 @@ export function SettingsScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="safe-top safe-x flex items-center gap-1 border-b px-2 py-2">
+      <header className="pane-page safe-top safe-x flex items-center gap-1 border-b px-2 py-2">
         <Button
           variant="ghost"
           size="icon"
@@ -167,175 +167,177 @@ export function SettingsScreen() {
         <h1 className="px-2 text-lg font-semibold">{t('settings.title')}</h1>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:[&>*]:min-w-0">
-        <UpdateNotice />
-        <DevicesCard />
-        <DictationSettings />
-        <Card>
-          <CardContent className="space-y-3 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <Label>{t('settings.theme')}</Label>
-              <ToggleGroup
-                type="single"
-                value={theme}
-                onValueChange={(v) => v && setTheme(v as typeof theme)}
-              >
-                <ToggleGroupItem value="light" className="px-3">
-                  {t('settings.theme.light')}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="dark" className="px-3">
-                  {t('settings.theme.dark')}
-                </ToggleGroupItem>
-                <ToggleGroupItem value="system" className="px-3">
-                  {t('settings.theme.system')}
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between gap-3">
-              <Label>{t('settings.lang')}</Label>
-              <ToggleGroup
-                type="single"
-                value={localStorage.getItem('dp.lang') === 'en' ? 'en' : 'es'}
-                onValueChange={(v) => v && setLang(v as 'es' | 'en')}
-              >
-                <ToggleGroupItem value="es" className="px-4">
-                  ES
-                </ToggleGroupItem>
-                <ToggleGroupItem value="en" className="px-4">
-                  EN
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="thoughts">{t('settings.thoughts')}</Label>
-              <Switch
-                id="thoughts"
-                checked={prefs.showThoughts}
-                onCheckedChange={(v) => setPrefs({ showThoughts: v })}
-              />
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <Label htmlFor="enterSend">{t('settings.enterToSend')}</Label>
-                <p className="text-xs text-muted-foreground">{t('settings.enterToSend.hint')}</p>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="pane-page space-y-4 p-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:[&>*]:min-w-0">
+          <UpdateNotice />
+          <DevicesCard />
+          <DictationSettings />
+          <Card>
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Label>{t('settings.theme')}</Label>
+                <ToggleGroup
+                  type="single"
+                  value={theme}
+                  onValueChange={(v) => v && setTheme(v as typeof theme)}
+                >
+                  <ToggleGroupItem value="light" className="px-3">
+                    {t('settings.theme.light')}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="dark" className="px-3">
+                    {t('settings.theme.dark')}
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="system" className="px-3">
+                    {t('settings.theme.system')}
+                  </ToggleGroupItem>
+                </ToggleGroup>
               </div>
-              <Switch
-                id="enterSend"
-                checked={prefs.enterToSend}
-                onCheckedChange={(v) => setPrefs({ enterToSend: v })}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {billing && <BillingCard billing={billing} t={t} />}
-
-        <Card>
-          <CardHeader className="p-4 pb-1">
-            <CardTitle className="text-base">{t('settings.workspaces')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1 p-4 pt-0">
-            {prefs.workspaces.map((w: Workspace) => (
-              <div key={w.path} className="flex items-center gap-2 rounded-lg border px-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{w.name}</div>
-                  <div className="truncate text-xs text-muted-foreground">{w.path}</div>
+              <Separator />
+              <div className="flex items-center justify-between gap-3">
+                <Label>{t('settings.lang')}</Label>
+                <ToggleGroup
+                  type="single"
+                  value={localStorage.getItem('dp.lang') === 'en' ? 'en' : 'es'}
+                  onValueChange={(v) => v && setLang(v as 'es' | 'en')}
+                >
+                  <ToggleGroupItem value="es" className="px-4">
+                    ES
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="en" className="px-4">
+                    EN
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="thoughts">{t('settings.thoughts')}</Label>
+                <Switch
+                  id="thoughts"
+                  checked={prefs.showThoughts}
+                  onCheckedChange={(v) => setPrefs({ showThoughts: v })}
+                />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <Label htmlFor="enterSend">{t('settings.enterToSend')}</Label>
+                  <p className="text-xs text-muted-foreground">{t('settings.enterToSend.hint')}</p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t('common.delete')}
-                  onClick={() =>
-                    setPrefs({ workspaces: prefs.workspaces.filter((x) => x.path !== w.path) })
-                  }
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+                <Switch
+                  id="enterSend"
+                  checked={prefs.enterToSend}
+                  onCheckedChange={(v) => setPrefs({ enterToSend: v })}
+                />
               </div>
-            ))}
-            <Button variant="outline" className="w-full gap-2" onClick={() => setWsOpen(true)}>
-              <FolderPlus className="size-4" /> {t('settings.addFolder')}
-            </Button>
-            <p className="pt-1 text-xs text-muted-foreground">{t('settings.workspaces.note')}</p>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="p-4 pb-1">
-            <CardTitle className="text-base">{t('settings.ports')}</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            {ports.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('settings.ports.empty')}</p>
-            ) : (
-              ports.map((p) => (
-                <div
-                  key={p.port}
-                  className="flex items-center justify-between rounded-lg border px-3 py-2 mb-1"
-                >
-                  <div>
-                    <span className="font-mono text-sm font-medium">:{p.port}</span>
-                    {p.process && (
-                      <span className="ml-2 text-xs text-muted-foreground">{p.process}</span>
-                    )}
+          {billing && <BillingCard billing={billing} t={t} />}
+
+          <Card>
+            <CardHeader className="p-4 pb-1">
+              <CardTitle className="text-base">{t('settings.workspaces')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1 p-4 pt-0">
+              {prefs.workspaces.map((w: Workspace) => (
+                <div key={w.path} className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{w.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">{w.path}</div>
                   </div>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="gap-1"
-                    onClick={() => window.open(`http://localhost:${p.port}`, '_blank')}
+                    size="icon"
+                    aria-label={t('common.delete')}
+                    onClick={() =>
+                      setPrefs({ workspaces: prefs.workspaces.filter((x) => x.path !== w.path) })
+                    }
                   >
-                    {t('common.open')} <ExternalLink className="size-3.5" />
+                    <Trash2 className="size-4" />
                   </Button>
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+              ))}
+              <Button variant="outline" className="w-full gap-2" onClick={() => setWsOpen(true)}>
+                <FolderPlus className="size-4" /> {t('settings.addFolder')}
+              </Button>
+              <p className="pt-1 text-xs text-muted-foreground">{t('settings.workspaces.note')}</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="p-4 pb-1">
-            <CardTitle className="text-base">{t('settings.about')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 p-4 pt-0 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('app.name')}</span>
-              <span className="font-mono">v{settings?.version ?? '?'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('settings.agent')}</span>
-              <span className="font-mono">
-                {agentInfo?.title ?? agentInfo?.name ?? '—'} {agentInfo?.version ?? ''}
-              </span>
-            </div>
-            {agentInfo && (
-              <div>
-                <div className="mb-1 text-muted-foreground">{t('settings.caps')}</div>
-                <div className="flex flex-wrap gap-1">
-                  {Object.entries(agentInfo.caps)
-                    .filter(([k, v]) => k !== 'meta' && v === true)
-                    .map(([k]) => (
-                      <Badge key={k} variant="secondary">
-                        {CAP_LABELS[k] ?? k}
-                      </Badge>
-                    ))}
-                </div>
+          <Card>
+            <CardHeader className="p-4 pb-1">
+              <CardTitle className="text-base">{t('settings.ports')}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              {ports.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('settings.ports.empty')}</p>
+              ) : (
+                ports.map((p) => (
+                  <div
+                    key={p.port}
+                    className="flex items-center justify-between rounded-lg border px-3 py-2 mb-1"
+                  >
+                    <div>
+                      <span className="font-mono text-sm font-medium">:{p.port}</span>
+                      {p.process && (
+                        <span className="ml-2 text-xs text-muted-foreground">{p.process}</span>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1"
+                      onClick={() => window.open(`http://localhost:${p.port}`, '_blank')}
+                    >
+                      {t('common.open')} <ExternalLink className="size-3.5" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="p-4 pb-1">
+              <CardTitle className="text-base">{t('settings.about')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 p-4 pt-0 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('app.name')}</span>
+                <span className="font-mono">v{settings?.version ?? '?'}</span>
               </div>
-            )}
-            <div className="pt-1">
-              <button
-                type="button"
-                className="text-sm text-primary"
-                onClick={() => navigate('diagnostics')}
-              >
-                {t('diag.title')} →
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{t('settings.agent')}</span>
+                <span className="font-mono">
+                  {agentInfo?.title ?? agentInfo?.name ?? '—'} {agentInfo?.version ?? ''}
+                </span>
+              </div>
+              {agentInfo && (
+                <div>
+                  <div className="mb-1 text-muted-foreground">{t('settings.caps')}</div>
+                  <div className="flex flex-wrap gap-1">
+                    {Object.entries(agentInfo.caps)
+                      .filter(([k, v]) => k !== 'meta' && v === true)
+                      .map(([k]) => (
+                        <Badge key={k} variant="secondary">
+                          {CAP_LABELS[k] ?? k}
+                        </Badge>
+                      ))}
+                  </div>
+                </div>
+              )}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  className="text-sm text-primary"
+                  onClick={() => navigate('diagnostics')}
+                >
+                  {t('diag.title')} →
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <WorkspaceSheet

@@ -39,7 +39,7 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
     controls === 3 ? 'grid-cols-[1fr_1.5fr_.8fr]' : controls === 2 ? 'grid-cols-2' : 'grid-cols-1';
 
   return (
-    <div className="safe-x space-y-1.5 border-b px-4 py-2">
+    <div className="pane-chat safe-x space-y-1.5 border-b px-4 py-2">
       <div className={`grid max-w-xl min-w-0 items-center gap-1.5 ${columns}`}>
         {state.modes.length > 0 && (
           <Chip

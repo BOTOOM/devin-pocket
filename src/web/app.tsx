@@ -51,10 +51,9 @@ export function App() {
               <SessionList currentSessionId={route.name === 'chat' ? route.sessionId : undefined} />
             </aside>
           )}
-          <div
-            data-testid="main-pane"
-            className={`flex min-h-0 min-w-0 flex-1 flex-col ${route.name === 'chat' ? 'lg:mx-auto lg:max-w-[860px]' : 'lg:mx-auto lg:max-w-[1100px]'}`}
-          >
+          {/* Full-width pane: each screen centers its own column (.pane-chat/.pane-page)
+              so scroll regions reach the edges instead of sitting inside the margin. */}
+          <div data-testid="main-pane" className="flex min-h-0 min-w-0 flex-1 flex-col">
             {route.name === 'home' && (desktop ? <DesktopWelcome /> : <HomeScreen />)}
             {route.name === 'chat' && (
               <ChatScreen key={route.sessionId} sessionId={route.sessionId} />
