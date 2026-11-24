@@ -296,9 +296,7 @@ describe('devin-pocket server', () => {
     if (first.type !== 'ack' || !first.ok) throw new Error('queue failed');
     const firstId = (first.result as { id: string }).id;
     c.send({ type: 'prompt.sendNow', sessionId: sid, id: firstId }, 'queue-now');
-    // the steered prompt holds its response ~1.2s — an ack awaiting the
-    // merged turn would miss this 600ms window
-    await c.waitFor((m) => m.type === 'ack' && m.id === 'queue-now', 600);
+    await c.waitFor((m) => m.type === 'ack' && m.id === 'queue-now');
     await poll(
       () =>
         h.sessions
@@ -331,13 +329,21 @@ describe('devin-pocket server', () => {
         (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
       ),
     ).toHaveLength(1);
-    // the send-now ack is emitted at dispatch — before the merged turn ends —
-    // so a long turn cannot trip the client's ack timeout.
+    // the send-now ack is emitted at dispatch: the fake agent emits its
+    // 'Completed' chunk right before resolving the steered prompt, so an ack
+    // that awaited the merged turn would land after that chunk in the stream.
     const ackIdx = c.msgs.findIndex((m) => m.type === 'ack' && m.id === 'queue-now');
+    const chunkIdx = c.msgs.findIndex(
+      (m) =>
+        m.type === 'session.event' &&
+        m.event.type === 'agentChunk' &&
+        m.event.text.includes('Completed STEER_SLOW_1200'),
+    );
     const endIdx = c.msgs.findIndex(
       (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
     );
     expect(ackIdx).toBeGreaterThanOrEqual(0);
+    expect(chunkIdx).toBeGreaterThan(ackIdx);
     expect(endIdx).toBeGreaterThan(ackIdx);
     c.ws.close();
     other.ws.close();
