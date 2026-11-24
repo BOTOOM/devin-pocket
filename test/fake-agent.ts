@@ -850,6 +850,16 @@ const agent: Agent = {
       for (let i = 0; i < 150 && !cancelled; i++) await sleep(FAST ? 40 : 100);
       return { stopReason: cancelled ? 'cancelled' : 'end_turn' };
     }
+    if (ptext.startsWith('STEER_SLOW_')) {
+      // Holds the prompt response like a long merged turn, so tests can prove
+      // the send-now ack is emitted at dispatch instead of at turn end.
+      await sleep(Number(ptext.slice(11)) || 1000);
+      await update({
+        sessionUpdate: 'agent_message_chunk',
+        content: text(`Completed ${ptext}`),
+      });
+      return { stopReason: 'end_turn' };
+    }
     if (ptext.startsWith('QUEUE_RESULT_')) {
       await update({ sessionUpdate: 'agent_message_chunk', content: text(`Completed ${ptext}`) });
       return { stopReason: 'end_turn' };

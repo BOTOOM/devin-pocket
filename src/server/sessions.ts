@@ -498,7 +498,12 @@ export class SessionManager {
       // 'error' event plus a toast (state.error is not rendered) and puts the
       // item back at the head of the queue.
       void this.steer(sessionId, item.blocks).catch((e) => {
-        this.emit({ type: 'toast', level: 'error', text: (e as Error).message });
+        this.emit({
+          type: 'toast',
+          level: 'error',
+          key: 'toast.sendFailed',
+          text: (e as Error).message,
+        });
         const rest = this.sessions.get(sessionId)?.queue ?? [];
         this.emitEvent(sessionId, { type: 'queueChanged', queue: [item, ...rest] });
       });

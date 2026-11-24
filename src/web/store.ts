@@ -12,6 +12,7 @@ import type {
 } from '@shared/protocol';
 import { applyEvent } from '@shared/reducer';
 import { useSyncExternalStore } from 'react';
+import { t } from '@/i18n';
 import { onConnection, onMessage, send, startSocket } from '@/lib/ws';
 
 export interface UiPrefs {
@@ -217,7 +218,11 @@ function handle(msg: ServerMessage) {
               : msg.level === 'success'
                 ? toast.success
                 : toast.info;
-        fn(msg.text);
+        // `key` selects a localized message; `text` stays as the raw detail.
+        fn(
+          msg.key ? t(msg.key as Parameters<typeof t>[0]) : msg.text,
+          msg.key ? { description: msg.text } : undefined,
+        );
       });
       break;
     }

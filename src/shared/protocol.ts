@@ -450,7 +450,7 @@ export type ServerMessage =
   | { type: 'billing'; billing: BillingInfo }
   | { type: 'ports'; ports: LocalPort[] }
   | { type: 'workspaces'; workspaces: Workspace[] }
-  | { type: 'toast'; level: 'info' | 'success' | 'warn' | 'error'; text: string }
+  | { type: 'toast'; level: 'info' | 'success' | 'warn' | 'error'; text: string; key?: string }
   | { type: 'ack'; id: string; ok: true; result?: unknown }
   | { type: 'ack'; id: string; ok: false; error: string; code?: ErrorCode };
 

@@ -270,7 +270,7 @@ describe('devin-pocket server', () => {
       {
         type: 'prompt.enqueue',
         sessionId: sid,
-        blocks: [{ type: 'text', text: 'QUEUE_RESULT_first' }],
+        blocks: [{ type: 'text', text: 'STEER_SLOW_1200' }],
       },
       'queue-first',
     );
@@ -296,15 +296,16 @@ describe('devin-pocket server', () => {
     if (first.type !== 'ack' || !first.ok) throw new Error('queue failed');
     const firstId = (first.result as { id: string }).id;
     c.send({ type: 'prompt.sendNow', sessionId: sid, id: firstId }, 'queue-now');
-    await c.waitFor((m) => m.type === 'ack' && m.id === 'queue-now');
+    // the steered prompt holds its response ~1.2s — an ack awaiting the
+    // merged turn would miss this 600ms window
+    await c.waitFor((m) => m.type === 'ack' && m.id === 'queue-now', 600);
     await poll(
       () =>
         h.sessions
           .openStates()
           .find((s) => s.sessionId === sid)
-          ?.items.some(
-            (i) => i.kind === 'agent' && i.text.includes('Completed QUEUE_RESULT_first'),
-          ) ?? false,
+          ?.items.some((i) => i.kind === 'agent' && i.text.includes('Completed STEER_SLOW_1200')) ??
+        false,
     );
     const state = h.sessions.openStates().find((s) => s.sessionId === sid);
     expect(state?.queue).toHaveLength(0);
