@@ -154,16 +154,22 @@ function WorkingSection({
   // tool-only runs stay collapsed
   const keepOpen = showThoughts && items.some((it) => it.kind === 'thought');
   const [open, setOpen] = useState(active || keepOpen);
-  // re-syncs when the group stops being live or when thoughts enter the
+  // auto-syncs when the group stops being live or when thoughts enter the
   // visible slice (loading earlier items reveals thoughts the pref wants
-  // shown); manual toggles afterwards are kept — neither dep flips back
+  // shown) — but only until the user toggles the section: a manual close
+  // wins over every later transition
+  const manualRef = useRef(false);
   useEffect(() => {
-    setOpen(active || keepOpen);
+    if (!manualRef.current) setOpen(active || keepOpen);
   }, [active, keepOpen]);
+  const toggle = (v: boolean) => {
+    manualRef.current = true;
+    setOpen(v);
+  };
 
   const startedAt = items[0]?.at ?? endAt;
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="space-y-1.5">
+    <Collapsible open={open} onOpenChange={toggle} className="space-y-1.5">
       <CollapsibleTrigger
         data-testid="working-section"
         className="flex min-h-8 w-full items-center gap-2 text-left text-sm text-muted-foreground"
