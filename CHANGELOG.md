@@ -1,3 +1,15 @@
+## [0.12.0](https://github.com/BOTOOM/devin-pocket/compare/v0.11.0...v0.12.0) (2026-11-24)
+
+### Features
+
+* daemon process model + ACP elicitation (CLI ≥3000.13.4) ([ee5f545](https://github.com/BOTOOM/devin-pocket/commit/ee5f54575cdbbb6743984abbc3ea2000affc8ef3))
+
+### Bug Fixes
+
+* **chat:** toast when session.open fails ([3613e05](https://github.com/BOTOOM/devin-pocket/commit/3613e05ee5de72376f4eba2b9130af33010c406f))
+* **doctor:** probe ACP with the resolved process model; localize daemon check ([75d3905](https://github.com/BOTOOM/devin-pocket/commit/75d39055c603fe1e53239296f71954a8a62e30aa))
+* **elicitation:** schema-valid submit, integer parsing, working close ([7436115](https://github.com/BOTOOM/devin-pocket/commit/743611525845471f6eaacc0732c8f360e451de31))
+
 ## [0.11.0](https://github.com/BOTOOM/devin-pocket/compare/v0.10.1...v0.11.0) (2026-11-24)
 
 ### Features
