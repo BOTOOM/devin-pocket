@@ -274,10 +274,22 @@ test('long history renders the last page and expands on load earlier', async ({ 
   await page.getByText('Fix the flaky test').click();
   const earlier = page.getByRole('button', { name: /Cargar.*anteriores|Load.*earlier/i });
   await expect(earlier).toBeVisible({ timeout: 20_000 });
+  // finished work groups are collapsed by default — open them to reach the tools
+  const openWorkSections = async () => {
+    const closed = page.locator('[data-testid="working-section"][data-state="closed"]');
+    for (let i = 0; i < 20 && (await closed.count()) > 0; i++) {
+      await closed.first().click();
+    }
+  };
+  await openWorkSections();
   // newest items rendered; oldest stay out of the DOM
   await expect(page.getByRole('button', { name: 'Filler call 80', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Filler call 1', exact: true })).toHaveCount(0);
   await earlier.dispatchEvent('click'); // no scroll — it would auto-expand
+  // the group stays open across pagination — no re-opening here: if loading
+  // earlier items remounted (and re-collapsed) the section, both fillers
+  // would drop out of the DOM
+  await expect(page.getByRole('button', { name: 'Filler call 80', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Filler call 1', exact: true })).toBeVisible();
   await expect(earlier).toHaveCount(0);
   // a double session.open would have replayed the history twice
@@ -300,4 +312,27 @@ test('side question works alongside an active turn', async ({ page }) => {
   await expect(panel.getByText('Side answer: ¿Cómo va?')).toBeVisible();
   await expect(page.getByRole('button', { name: /Añadir a la cola|Add to queue/i })).toBeVisible();
   await expect(page.locator('.prose').filter({ hasText: 'Side answer:' })).toHaveCount(1);
+});
+
+test('manually closed working section stays closed when the answer arrives', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('dp.prefs', JSON.stringify({ showThoughts: true, enterToSend: true }));
+  });
+  await page.goto('/#/');
+  await startSession(page);
+  await page.locator('textarea').fill('THINK_HOLD');
+  await page.keyboard.press('Enter');
+  const section = page.locator('[data-testid="working-section"]').first();
+  await expect(section).toBeVisible({ timeout: 20_000 });
+  // showThoughts opens the thoughts-bearing active group — close it mid-turn;
+  // the live label proves the turn was still running when the close happened
+  // (otherwise the test could pass vacuously if the answer won the race)
+  await expect(section).toHaveAttribute('data-state', 'open');
+  await expect(section.getByText(/Trabajando|Working/)).toBeVisible();
+  await section.click();
+  await expect(section).toHaveAttribute('data-state', 'closed');
+  // when the answer lands the turn ends — the manual close must win over the
+  // auto-sync (without it, the finished group reopens because it has thoughts)
+  await expect(page.getByText('Done thinking.')).toBeVisible({ timeout: 20_000 });
+  await expect(section).toHaveAttribute('data-state', 'closed');
 });

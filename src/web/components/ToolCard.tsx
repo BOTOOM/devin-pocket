@@ -12,7 +12,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import { memo, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useT } from '@/i18n';
@@ -48,8 +48,13 @@ export const ToolCard = memo(function ToolCard({ item, cwd }: { item: ToolItem; 
   const t = useT();
   const Icon = ICONS[item.toolKind] ?? Wrench;
   const done = item.status === 'completed' || item.status === 'failed';
-  // Completed execute tools collapse by default; everything else open.
-  const [open, setOpen] = useState(!(item.toolKind === 'execute' && done));
+  // Finished tools collapse by default (desktop Devin style); running ones stay open.
+  const [open, setOpen] = useState(!done);
+  // a tool that finishes while mounted collapses too — manual toggles after
+  // that are kept (done never flips back)
+  useEffect(() => {
+    if (done) setOpen(false);
+  }, [done]);
   const diffs = item.content.filter((c) => c.type === 'diff');
   const texts = item.content.filter((c) => c.type === 'content' && c.content?.type === 'text');
   const hasBody =

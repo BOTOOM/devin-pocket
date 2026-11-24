@@ -79,6 +79,8 @@ devin acp child (stdio JSON-RPC)
   `initialSessionState`, `pickModelOptions`, `selectOptions`; `catalog-match.ts` —
   `matchEntry`; `cost.ts` — usage/cost math.
 - `src/web/` — `app.tsx` routes; `store.ts` zustand store; `lib/ws.ts` WS client;
+  `lib/work-groups.ts` `groupWorkItems()` — consecutive thought/tool runs become
+  collapsible "Working" segments in the transcript (desktop Devin style);
   `lib/router.ts` hash router (`navigate()` takes paths like `'settings'` → `#/settings`);
   `components/` — Home, Chat, Transcript, ToolCard, Composer, StatusStrip, ModelSheet
   (compare panel + Fast switch), PermissionSheet, PlanPanel, CommandPalette,
@@ -100,6 +102,13 @@ devin acp child (stdio JSON-RPC)
   All user-facing strings via `t('key')` — add keys to **both** `es` and `en` in i18n.ts.
 - Mobile CSS: prefer `min-w-0`, `break-all`/`break-words`, `items-start`, safe-area
   paddings; avoid fixed heights/widths on text rows.
+- Transcript layout (desktop Devin style): `Transcript` groups consecutive
+  `thought`/`tool` items into a `WorkingSection` — open + "Trabajando…" while the
+  turn is live, auto-collapses to "Trabajó Ns" when the agent answers or the turn
+  ends (`SessionState.turnEndedAt` supplies the end timestamp). Streaming
+  thoughts show "Pensando…" expanded, then collapse to "Pensó Ns" (`showThoughts`
+  pref keeps them expanded). Completed tool cards are collapsed by default;
+  agent/user/system items always stay flat.
 - Tests: `vitest` for unit/integration (reuse the fake agent; don't hit real `devin`
   in tests — `DEVIN_POCKET_MODELS_FILE` fixture for catalog). Playwright for e2e.
 - Comments: terse, only where non-obvious; match surrounding style.

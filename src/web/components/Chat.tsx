@@ -170,7 +170,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
       <StatusStrip state={state} sessionId={sessionId} />
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="pane-chat flex min-h-full flex-col">
+        <div data-testid="chat-column" className="pane-chat flex min-h-full flex-col">
           {summary?.locked && !state ? (
             <div
               data-testid="session-locked"
