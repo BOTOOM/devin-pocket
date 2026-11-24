@@ -93,9 +93,14 @@ export function Transcript({
           // group end: next segment's start, else turn end / last item — only
           // used for finished durations; an active group shows a live label
           const endAt = nextStart ?? state.turnEndedAt ?? seg.items.at(-1)?.at ?? first.at;
+          // key stability: pagination only ever changes the FIRST item of the
+          // leading group — key finished groups by their last item so their
+          // collapse state survives loading earlier messages; the live group
+          // gets a constant key so streaming appends never remount it
+          const lastId = seg.items.at(-1)?.id ?? first.id;
           return (
             <WorkingSection
-              key={first.id}
+              key={active ? 'work-active' : lastId}
               items={seg.items}
               active={active}
               endAt={endAt}
@@ -149,11 +154,13 @@ function WorkingSection({
   showThoughts: boolean;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(active);
-  // auto-collapse when the group stops being live; manual toggles after that
-  // are kept (active never flips back for a mounted group)
+  const [open, setOpen] = useState(active || showThoughts);
+  // auto-collapse when the group stops being live — unless the user keeps
+  // thoughts visible; manual toggles after that are kept (active never flips
+  // back for a mounted group)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-sync when active flips
   useEffect(() => {
-    setOpen(active);
+    setOpen(active || showThoughts);
   }, [active]);
 
   const startedAt = items[0]?.at ?? endAt;
