@@ -27,13 +27,17 @@ export function Transcript({
   const items = state.items;
   const hidden = Math.max(0, items.length - limit);
   hiddenRef.current = hidden;
+  const itemsLenRef = useRef(items.length);
+  itemsLenRef.current = items.length;
   const visible = hidden > 0 ? items.slice(-limit) : items;
   const working = state.turn === 'working' || state.turn === 'awaitingPermission';
 
   const expand = () => {
     const el = scroller.current;
     if (el) anchorRef.current = { height: el.scrollHeight, top: el.scrollTop };
-    setLimit((l) => Math.min(l + PAGE, items.length));
+    // itemsLenRef: the mount-once scroll listener captures this expand, so it
+    // must read the current length, not the one from the first render.
+    setLimit((l) => Math.min(l + PAGE, itemsLenRef.current));
   };
 
   // Keep the viewport anchored when prepending older items.
