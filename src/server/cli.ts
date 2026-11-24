@@ -511,6 +511,7 @@ switch (args.cmd) {
       port,
       host,
       agentCommand: args.agent ?? process.env.DEVIN_POCKET_AGENT ?? fileConfig.agentCommand,
+      processModel: args.processModel ?? fileConfig.agentProcessModel,
       serverPid: readPid() ?? undefined,
     });
     const icon = { ok: '✓', warn: '!', fail: '✗', skip: '·' } as const;

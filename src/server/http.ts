@@ -529,6 +529,7 @@ export class PocketServer {
           port: this.deps.config.port,
           host: this.deps.config.host,
           agentCommand: this.deps.config.agentCommand,
+          processModel: this.deps.config.agentProcessModel,
           ownsPort: true,
         });
         return this.json(res, r);

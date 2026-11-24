@@ -111,7 +111,11 @@ export function DiagnosticsScreen() {
                     <CheckIcon status={c.status} />
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium">
-                        {c.id === 'pocket-update' ? t('doctor.label.pocket-update') : c.label}
+                        {c.id === 'pocket-update'
+                        ? t('doctor.label.pocket-update')
+                        : c.id === 'devin-daemon'
+                          ? t('doctor.label.devin-daemon')
+                          : c.label}
                       </div>
                       {c.detail && (
                         <div className="text-xs text-muted-foreground">

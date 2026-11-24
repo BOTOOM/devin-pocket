@@ -4,7 +4,15 @@ import net from 'node:net';
 import { Readable, Writable } from 'node:stream';
 import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from '@agentclientprotocol/sdk';
 import type { DoctorCheck, DoctorReport } from '../shared/protocol.js';
-import { canProbeAuth, resolveBin, splitCommand } from './acp/agent.js';
+import {
+  canProbeAuth,
+  explicitProcessModel,
+  type ProcessModelMode,
+  probeProcessModel,
+  processModelArgs,
+  resolveBin,
+  splitCommand,
+} from './acp/agent.js';
 import { findExecutable, requireNativeExecutable } from './commands.js';
 import { configFile, isProot, isTermux, loadConfig, stateDir, VERSION } from './paths.js';
 import { cachedUpdate } from './update.js';
@@ -40,12 +48,23 @@ function portFree(port: number, host: string): Promise<boolean> {
   });
 }
 
-/** Spawn the agent, initialize, kill. Confirms the ACP handshake works. */
-function acpProbe(command: string, timeoutMs = 15_000): Promise<string | null> {
+/** Spawn the agent, initialize, kill. Confirms the ACP handshake works.
+ *  Resolves the process model exactly like AgentProcess.prepare() so the
+ *  probe exercises the same argv the server will use. */
+async function acpProbe(
+  command: string,
+  mode: ProcessModelMode = 'auto',
+  timeoutMs = 15_000,
+): Promise<string | null> {
+  const [rawBin, ...baseArgs] = splitCommand(command);
+  if (!rawBin) return 'empty agent command';
+  let args = baseArgs;
+  if (!explicitProcessModel(baseArgs) && canProbeAuth(command) && baseArgs.includes('acp')) {
+    const supported = await probeProcessModel(command);
+    args = [...baseArgs, ...processModelArgs(mode, supported)];
+  }
+  const bin = resolveBin(rawBin);
   return new Promise((resolve) => {
-    const [rawBin, ...args] = splitCommand(command);
-    if (!rawBin) return resolve('empty agent command');
-    const bin = resolveBin(rawBin);
     let child: ReturnType<typeof spawn>;
     try {
       child = spawn(requireNativeExecutable(bin), args, {
@@ -111,6 +130,8 @@ export async function doctorReport(opts: {
   port: number;
   host: string;
   agentCommand: string;
+  /** desired agent process model — same resolution the server applies */
+  processModel?: ProcessModelMode;
   /** the caller knows it is the listener on `port` (running server) */
   ownsPort?: boolean;
   /** pid of a running devin-pocket daemon (from pidfile) */
@@ -184,7 +205,7 @@ export async function doctorReport(opts: {
   }
 
   if (devinFound) {
-    const err = await acpProbe(opts.agentCommand);
+    const err = await acpProbe(opts.agentCommand, opts.processModel);
     checks.push({
       id: 'acp-handshake',
       label: 'ACP handshake (devin acp)',
