@@ -61,7 +61,7 @@ for (const [width, height] of [
       // the pane itself is full-width by design (edge-to-edge scroll); the
       // capped element is the centered content column inside it
       await expect
-        .poll(async () => (await page.locator('.pane-chat').first().boundingBox())?.width)
+        .poll(async () => (await page.getByTestId('chat-column').boundingBox())?.width)
         .toBeLessThanOrEqual(860);
     }
     for (const chip of ['mode', 'reasoning', 'model']) {
