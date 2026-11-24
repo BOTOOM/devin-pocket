@@ -66,8 +66,11 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
   useEffect(() => {
     if (hydrated && !state && summary && !summary.locked && openSent.current !== sessionId) {
       openSent.current = sessionId;
-      send({ type: 'session.open', sessionId, cwd: summary.cwd }).catch(() => {
+      send({ type: 'session.open', sessionId, cwd: summary.cwd }).catch((e) => {
         if (openSent.current === sessionId) openSent.current = null;
+        // surface open failures (e.g. session_locked discovered at open time)
+        // — otherwise the user stares at skeletons with no explanation
+        void import('sonner').then(({ toast }) => toast.error((e as Error).message));
       });
     }
   }, [hydrated, state, summary, sessionId]);
