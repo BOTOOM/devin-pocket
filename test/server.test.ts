@@ -316,7 +316,7 @@ describe('devin-pocket server', () => {
       {
         type: 'prompt.enqueue',
         sessionId: sid,
-        blocks: [{ type: 'text', text: 'QUEUE_RESULT_first' }],
+        blocks: [{ type: 'text', text: 'STEER_SLOW_1200' }],
       },
       'queue-first',
     );
@@ -348,9 +348,8 @@ describe('devin-pocket server', () => {
         h.sessions
           .openStates()
           .find((s) => s.sessionId === sid)
-          ?.items.some(
-            (i) => i.kind === 'agent' && i.text.includes('Completed QUEUE_RESULT_first'),
-          ) ?? false,
+          ?.items.some((i) => i.kind === 'agent' && i.text.includes('Completed STEER_SLOW_1200')) ??
+        false,
     );
     const state = h.sessions.openStates().find((s) => s.sessionId === sid);
     expect(state?.queue).toHaveLength(0);
@@ -376,6 +375,22 @@ describe('devin-pocket server', () => {
         (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
       ),
     ).toHaveLength(1);
+    // the send-now ack is emitted at dispatch: the fake agent emits its
+    // 'Completed' chunk right before resolving the steered prompt, so an ack
+    // that awaited the merged turn would land after that chunk in the stream.
+    const ackIdx = c.msgs.findIndex((m) => m.type === 'ack' && m.id === 'queue-now');
+    const chunkIdx = c.msgs.findIndex(
+      (m) =>
+        m.type === 'session.event' &&
+        m.event.type === 'agentChunk' &&
+        m.event.text.includes('Completed STEER_SLOW_1200'),
+    );
+    const endIdx = c.msgs.findIndex(
+      (m) => m.type === 'session.event' && m.sessionId === sid && m.event.type === 'turnEnded',
+    );
+    expect(ackIdx).toBeGreaterThanOrEqual(0);
+    expect(chunkIdx).toBeGreaterThan(ackIdx);
+    expect(endIdx).toBeGreaterThan(ackIdx);
     c.ws.close();
     other.ws.close();
   });

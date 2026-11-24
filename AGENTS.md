@@ -240,7 +240,11 @@ is reported by `devin-pocket doctor`.
   queued drafts with edit/remove/send-now actions. With `midTurnPrompts`
   (CLI ≥3000.11.92) send-now **steers**: `SessionManager.steer()` sends the
   prompt mid-turn without cancelling — one merged turn, one `turnEnded`.
-  Stop is separate. Queue survives browser reconnects but not a server restart.
+  The `prompt.sendNow` ack returns at dispatch (not at turn end): the steer RPC
+  resolves only when the merged turn finishes, so awaiting it would always
+  hit the client's ack timeout; failures emit a session `error` event and
+  re-queue the item. Stop is separate. Queue survives browser reconnects but
+  not a server restart.
 - **`/btw` side questions (verified vs real agent 3000.11.234)**: handshake is
   (1) declare `clientCapabilities._meta['cognition.ai/chains']=true` at
   initialize (the agent logs `chains=true`), and (2) send the `/btw` prompt with

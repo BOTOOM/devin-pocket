@@ -90,6 +90,17 @@ export function isConnected(): boolean {
   return ws?.readyState === WebSocket.OPEN;
 }
 
+/** Commands that await a slow agent operation (spawn, session replay, a
+ *  /rename turn, `devin models list`) get a wider ack window; the rest stay
+ *  at 30s so a stuck server still fails fast. */
+const CMD_TIMEOUTS: Partial<Record<ClientCommand['type'], number>> = {
+  'session.new': 120_000,
+  'session.open': 120_000,
+  'sessions.refresh': 120_000,
+  'session.rename': 120_000,
+  'catalog.refresh': 60_000,
+};
+
 export function send(cmd: ClientCommand): Promise<unknown> {
   if (cmd.type === 'session.new') {
     const existing = sessionCreations.get(cmd.cwd);
@@ -105,7 +116,7 @@ export function send(cmd: ClientCommand): Promise<unknown> {
     ws.send(JSON.stringify(env));
     setTimeout(() => {
       if (pending.delete(env.id)) reject(new Error('ack timeout'));
-    }, 30000);
+    }, CMD_TIMEOUTS[cmd.type] ?? 30_000);
   });
   if (cmd.type === 'session.new') {
     sessionCreations.set(cmd.cwd, request);

@@ -532,18 +532,26 @@ export class SessionManager {
     // Steering (CLI ≥3000.11.92): a mid-turn prompt joins the running turn —
     // no cancel, no lost progress. Fall back to cancel+resend on old agents.
     if (this.active.has(sessionId) && this.agent.agentInfo?.caps.midTurnPrompts) {
+      if (s.loading) throw new Error('session is not open');
+      if (this.agent.status.phase !== 'ready') throw new Error('agent is not ready');
       this.emitEvent(sessionId, {
         type: 'queueChanged',
         queue: s.queue.filter((p) => p.id !== id),
       });
-      try {
-        await this.steer(sessionId, item.blocks);
-      } catch (e) {
-        // put it back at the head so the UI still shows the send-now action
+      // The steer RPC resolves only when the merged turn ends — return without
+      // holding the command ack for the whole turn; a failure emits a session
+      // 'error' event plus a toast (state.error is not rendered) and puts the
+      // item back at the head of the queue.
+      void this.steer(sessionId, item.blocks).catch((e) => {
+        this.emit({
+          type: 'toast',
+          level: 'error',
+          key: 'toast.sendFailed',
+          text: (e as Error).message,
+        });
         const rest = this.sessions.get(sessionId)?.queue ?? [];
         this.emitEvent(sessionId, { type: 'queueChanged', queue: [item, ...rest] });
-        throw e;
-      }
+      });
       return;
     }
     this.emitEvent(sessionId, {
