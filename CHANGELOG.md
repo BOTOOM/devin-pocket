@@ -1,3 +1,15 @@
+## [0.11.0](https://github.com/BOTOOM/devin-pocket/compare/v0.10.1...v0.11.0) (2026-11-24)
+
+### Features
+
+* **install:** make the Termux installer skip reinstalling what exists ([b4e763b](https://github.com/BOTOOM/devin-pocket/commit/b4e763bf31ae9b31d399125475b04234cd34ce5a))
+* **web:** edge-to-edge scroll on desktop panes ([eec7a7a](https://github.com/BOTOOM/devin-pocket/commit/eec7a7a967270c1b4b2f342d7f6fc14aed807e2a))
+
+### Bug Fixes
+
+* **chat:** pass scroller ref to Transcript for auto-scroll ([705fb06](https://github.com/BOTOOM/devin-pocket/commit/705fb06a3d3ba3e390ac3ba111bc6578474ac8eb))
+* **transcript:** read current items length in scroll-load expand ([7b5001e](https://github.com/BOTOOM/devin-pocket/commit/7b5001eb9132c38fc8d678ef60f80bd15a08c141))
+
 ## [0.10.1](https://github.com/BOTOOM/devin-pocket/compare/v0.10.0...v0.10.1) (2026-11-20)
 
 ### Bug Fixes
