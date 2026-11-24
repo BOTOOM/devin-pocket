@@ -106,10 +106,38 @@ export function ElicitationSheet({
     return v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
   });
 
+  // a partially filled multi-select below its minItems violates the schema
+  // even when the prop itself is optional (0 selections = omit instead)
+  const invalid = entries.some(([k, p]) => {
+    if (p.type !== 'array') return false;
+    const min = (p as { minItems?: number | null }).minItems;
+    const v = values[k];
+    return min != null && Array.isArray(v) && v.length > 0 && v.length < min;
+  });
+
+  const submit = () => {
+    const content: Record<string, ElicitationContentValue> = {};
+    for (const [k, p] of entries) {
+      const v = values[k];
+      // omit empty optional values instead of sending schema-invalid
+      // empty strings/arrays; required empties are already blocked above
+      if (v === undefined) continue;
+      if ((p.type === 'number' || p.type === 'integer') && v === '') continue;
+      if (Array.isArray(v) && v.length === 0 && !required.has(k)) continue;
+      content[k] = v;
+    }
+    respond({ action: 'accept', content });
+  };
+
   const set = (k: string, v: ElicitationContentValue) => setValues((s) => ({ ...s, [k]: v }));
 
   return (
-    <Sheet open onOpenChange={() => {}}>
+    <Sheet
+      open
+      onOpenChange={(open) => {
+        if (!open) respond({ action: 'cancel' });
+      }}
+    >
       <SheetContent
         side="bottom"
         className="safe-x safe-bottom max-h-[85dvh] overflow-y-auto px-4"
@@ -146,8 +174,8 @@ export function ElicitationSheet({
             )}
             <Button
               className="min-h-12 w-full"
-              disabled={missing.length > 0}
-              onClick={() => respond({ action: 'accept', content: values })}
+              disabled={missing.length > 0 || invalid}
+              onClick={submit}
             >
               {t('elic.submit')}
             </Button>
@@ -231,11 +259,12 @@ function Field({
               onChange('');
               return;
             }
-            const n =
-              prop.type === 'integer'
-                ? Number.parseInt(e.target.value, 10)
-                : Number(e.target.value);
-            if (!Number.isNaN(n)) onChange(n);
+            // Number() honors exponent notation (1e3); integers reject decimals
+            // instead of silently truncating them
+            const n = Number(e.target.value);
+            if (Number.isNaN(n)) return;
+            if (prop.type === 'integer' && !Number.isInteger(n)) return;
+            onChange(n);
           }}
         />
       </div>
