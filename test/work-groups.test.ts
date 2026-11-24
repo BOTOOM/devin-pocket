@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { TranscriptItem } from '../src/shared/protocol.js';
-import { groupWorkItems, segmentStart, spanSeconds } from '../src/web/lib/work-groups.js';
+import {
+  groupWorkItems,
+  segmentStart,
+  spanSeconds,
+  visibleSegments,
+} from '../src/web/lib/work-groups.js';
 
 const at = (n: number) => n * 1000;
 const user = (n: number): TranscriptItem => ({
@@ -80,6 +85,35 @@ describe('groupWorkItems', () => {
     const segs = groupWorkItems([agent(5), tool(9)]);
     expect(segmentStart(segs[0] ?? { type: 'item', item: agent(0) })).toBe(at(5));
     expect(segmentStart(segs[1] ?? { type: 'item', item: agent(0) })).toBe(at(9));
+  });
+});
+
+describe('visibleSegments', () => {
+  it('trims the boundary work run but keeps its full-history key', () => {
+    const items = [thought(1), tool(2), tool(3), tool(4), agent(5)];
+    const segs = visibleSegments(items, 3);
+    expect(segs.map((s) => s.type)).toEqual(['work', 'item']);
+    const g = segs[0];
+    if (g?.type !== 'work') throw new Error('expected work segment');
+    // only the last 2 work items fit the budget, but the key is the run's
+    // first item in the full history — stable as more items load
+    expect(g.items.map((i) => i.id)).toEqual(['tc3', 'tc4']);
+    expect(g.key).toBe('t1');
+  });
+
+  it('keeps whole segments when they fit', () => {
+    const items = [agent(1), thought(2), tool(3), agent(4)];
+    const segs = visibleSegments(items, 4);
+    expect(segs).toHaveLength(3);
+    const g = segs[1];
+    if (g?.type !== 'work') throw new Error('expected work segment');
+    expect(g.key).toBe('t2');
+    expect(g.items).toHaveLength(2);
+  });
+
+  it('matches groupWorkItems when nothing is hidden', () => {
+    const items = [user(1), thought(2), agent(3)];
+    expect(visibleSegments(items, 10)).toEqual(groupWorkItems(items));
   });
 });
 

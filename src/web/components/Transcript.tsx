@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useT } from '@/i18n';
 import { Markdown } from '@/lib/markdown';
-import { groupWorkItems, segmentStart, spanSeconds } from '@/lib/work-groups';
+import { segmentStart, spanSeconds, visibleSegments } from '@/lib/work-groups';
 import { useStore } from '@/store';
 
 const PAGE = 60;
@@ -30,9 +30,10 @@ export function Transcript({
   hiddenRef.current = hidden;
   const itemsLenRef = useRef(items.length);
   itemsLenRef.current = items.length;
-  const visible = hidden > 0 ? items.slice(-limit) : items;
   const working = state.turn === 'working' || state.turn === 'awaitingPermission';
-  const segments = groupWorkItems(visible);
+  // grouping runs over the full history so work-run keys stay stable across
+  // pagination — remounting a group the user opened would lose its state
+  const segments = visibleSegments(items, limit);
   const lastSeg = segments.at(-1);
 
   const expand = () => {
@@ -93,14 +94,9 @@ export function Transcript({
           // group end: next segment's start, else turn end / last item — only
           // used for finished durations; an active group shows a live label
           const endAt = nextStart ?? state.turnEndedAt ?? seg.items.at(-1)?.at ?? first.at;
-          // key stability: pagination only ever changes the FIRST item of the
-          // leading group — key finished groups by their last item so their
-          // collapse state survives loading earlier messages; the live group
-          // gets a constant key so streaming appends never remount it
-          const lastId = seg.items.at(-1)?.id ?? first.id;
           return (
             <WorkingSection
-              key={active ? 'work-active' : lastId}
+              key={seg.key}
               items={seg.items}
               active={active}
               endAt={endAt}
@@ -154,13 +150,16 @@ function WorkingSection({
   showThoughts: boolean;
 }) {
   const t = useT();
-  const [open, setOpen] = useState(active || showThoughts);
+  // the thoughts pref only auto-opens groups that actually have thoughts —
+  // tool-only runs stay collapsed
+  const keepOpen = showThoughts && items.some((it) => it.kind === 'thought');
+  const [open, setOpen] = useState(active || keepOpen);
   // auto-collapse when the group stops being live — unless the user keeps
   // thoughts visible; manual toggles after that are kept (active never flips
   // back for a mounted group)
   // biome-ignore lint/correctness/useExhaustiveDependencies: only re-sync when active flips
   useEffect(() => {
-    setOpen(active || showThoughts);
+    setOpen(active || keepOpen);
   }, [active]);
 
   const startedAt = items[0]?.at ?? endAt;

@@ -286,7 +286,10 @@ test('long history renders the last page and expands on load earlier', async ({ 
   await expect(page.getByRole('button', { name: 'Filler call 80', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Filler call 1', exact: true })).toHaveCount(0);
   await earlier.dispatchEvent('click'); // no scroll — it would auto-expand
-  await openWorkSections();
+  // the group stays open across pagination — no re-opening here: if loading
+  // earlier items remounted (and re-collapsed) the section, both fillers
+  // would drop out of the DOM
+  await expect(page.getByRole('button', { name: 'Filler call 80', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Filler call 1', exact: true })).toBeVisible();
   await expect(earlier).toHaveCount(0);
   // a double session.open would have replayed the history twice

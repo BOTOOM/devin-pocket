@@ -71,6 +71,9 @@ for (const theme of ['dark', 'light'] as const) {
     // close it and completion would keep it closed)
     await expect(async () => {
       if (await page.getByText('const a = 2;').isVisible()) return;
+      // the group itself may fold when the agent answers — reopen it too
+      const closedSec = page.locator('[data-testid="working-section"][data-state="closed"]');
+      if ((await closedSec.count()) > 0) await closedSec.first().click();
       if ((await edit.getAttribute('data-state')) !== 'open') await edit.click();
       throw new Error('diff not visible yet');
     }).toPass({ timeout: 20_000 });

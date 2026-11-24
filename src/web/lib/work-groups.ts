@@ -1,9 +1,12 @@
 import type { TranscriptItem } from '../../shared/protocol.js';
 
-/** A flat render unit: a single item, or a run of work items in one collapsible. */
+/** A flat render unit: a single item, or a run of work items in one collapsible.
+ *  `key` on work segments is the id of the run's first item in the FULL history
+ *  — stable across pagination trims and streaming appends, so React never
+ *  remounts a group the user is reading. */
 export type TranscriptSegment =
   | { type: 'item'; item: TranscriptItem }
-  | { type: 'work'; items: TranscriptItem[] };
+  | { type: 'work'; key: string; items: TranscriptItem[] };
 
 /** Items the desktop UI nests under the "Working" section — never user-facing text. */
 const WORK_KINDS = new Set<TranscriptItem['kind']>(['thought', 'tool']);
@@ -19,9 +22,37 @@ export function groupWorkItems(items: TranscriptItem[]): TranscriptSegment[] {
     const last = out.at(-1);
     if (WORK_KINDS.has(item.kind)) {
       if (last?.type === 'work') last.items.push(item);
-      else out.push({ type: 'work', items: [item] });
+      else out.push({ type: 'work', key: item.id, items: [item] });
     } else {
       out.push({ type: 'item', item });
+    }
+  }
+  return out;
+}
+
+/**
+ * Segments covering only the last `limit` items of a full history. Grouping
+ * runs over ALL items first so a work run split by the pagination boundary
+ * keeps its full-history `key`; the boundary segment is trimmed to fit.
+ */
+export function visibleSegments(items: TranscriptItem[], limit: number): TranscriptSegment[] {
+  const all = groupWorkItems(items);
+  const out: TranscriptSegment[] = [];
+  let budget = limit;
+  for (let i = all.length - 1; i >= 0 && budget > 0; i--) {
+    const seg = all[i];
+    if (!seg) break;
+    if (seg.type === 'item') {
+      out.unshift(seg);
+      budget -= 1;
+      continue;
+    }
+    if (seg.items.length <= budget) {
+      out.unshift(seg);
+      budget -= seg.items.length;
+    } else {
+      out.unshift({ ...seg, items: seg.items.slice(-budget) });
+      budget = 0;
     }
   }
   return out;
