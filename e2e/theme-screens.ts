@@ -66,6 +66,14 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: 'Allow', exact: true }).click();
     const edit = page.getByRole('button', { name: /Edit src\/index.ts/ });
     await expect(edit).toBeVisible({ timeout: 20_000 });
+    // finished tool cards collapse by default — expand the edit to frame the
+    // diff (the click must wait for completion: clicking a running card would
+    // close it and completion would keep it closed)
+    await expect(async () => {
+      if (await page.getByText('const a = 2;').isVisible()) return;
+      if ((await edit.getAttribute('data-state')) !== 'open') await edit.click();
+      throw new Error('diff not visible yet');
+    }).toPass({ timeout: 20_000 });
     await expect(page.getByText('const a = 2;')).toBeVisible();
     await shot('diff');
     await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeVisible({
