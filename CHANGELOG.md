@@ -1,3 +1,11 @@
+## [0.12.1](https://github.com/BOTOOM/devin-pocket/compare/v0.12.0...v0.12.1) (2026-11-24)
+
+### Bug Fixes
+
+* **sessions:** toast on failed steer; assert ack precedes turnEnded ([9c370c8](https://github.com/BOTOOM/devin-pocket/commit/9c370c8b690d435ec1201d6e8311d06b8825275e))
+* **ws:** localize steer-failure toast; prove ack precedes turn end ([58c4833](https://github.com/BOTOOM/devin-pocket/commit/58c48339743425689ce4a9fbce2ecf295dfe39f3))
+* **ws:** stop false "ack timeout" on agent-bound commands ([2ea90de](https://github.com/BOTOOM/devin-pocket/commit/2ea90de78e57f41d4caee4f1401b0b1d9030b3af))
+
 ## [0.12.0](https://github.com/BOTOOM/devin-pocket/compare/v0.11.0...v0.12.0) (2026-11-24)
 
 ### Features
