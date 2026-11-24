@@ -154,13 +154,12 @@ function WorkingSection({
   // tool-only runs stay collapsed
   const keepOpen = showThoughts && items.some((it) => it.kind === 'thought');
   const [open, setOpen] = useState(active || keepOpen);
-  // auto-collapse when the group stops being live — unless the user keeps
-  // thoughts visible; manual toggles after that are kept (active never flips
-  // back for a mounted group)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only re-sync when active flips
+  // re-syncs when the group stops being live or when thoughts enter the
+  // visible slice (loading earlier items reveals thoughts the pref wants
+  // shown); manual toggles afterwards are kept — neither dep flips back
   useEffect(() => {
     setOpen(active || keepOpen);
-  }, [active]);
+  }, [active, keepOpen]);
 
   const startedAt = items[0]?.at ?? endAt;
   return (

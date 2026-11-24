@@ -31,12 +31,23 @@ export function groupWorkItems(items: TranscriptItem[]): TranscriptSegment[] {
 }
 
 /**
- * Segments covering only the last `limit` items of a full history. Grouping
- * runs over ALL items first so a work run split by the pagination boundary
- * keeps its full-history `key`; the boundary segment is trimmed to fit.
+ * Segments covering only the last `limit` items of a history. Grouping starts
+ * at the window start — except when the window opens inside a work run, where
+ * it walks back to that run's first item so the boundary group keeps its
+ * full-history `key`; groups entirely inside the window never merge backwards.
  */
 export function visibleSegments(items: TranscriptItem[], limit: number): TranscriptSegment[] {
-  const all = groupWorkItems(items);
+  const start = Math.max(0, items.length - limit);
+  let runStart = start;
+  const boundary = items[start];
+  if (start > 0 && boundary && WORK_KINDS.has(boundary.kind)) {
+    while (runStart > 0) {
+      const prev = items[runStart - 1];
+      if (!prev || !WORK_KINDS.has(prev.kind)) break;
+      runStart--;
+    }
+  }
+  const all = groupWorkItems(items.slice(runStart));
   const out: TranscriptSegment[] = [];
   let budget = limit;
   for (let i = all.length - 1; i >= 0 && budget > 0; i--) {
