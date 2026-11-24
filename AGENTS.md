@@ -140,6 +140,10 @@ devin-pocket devices [revoke <id|all>]
   `devin-pocket-ubuntu` (compatibility alias), forwarding all arguments into the
   selected `--distro`. Existing launchers/widget shortcuts are preserved. An
   unrelated host `devin-pocket` is never overwritten; use the alias on collision.
+  The installer is idempotent: `pkg`/`apt-get` run only for missing packages,
+  any already installed Ubuntu/Debian distro is reused under whatever alias
+  (without `--distro` it scans `installed-rootfs`/`containers` for a compatible
+  `os-release` ID), and the general upgrade only runs on a fresh distro.
 - Devin CLI runs inside Ubuntu/Debian proot (`proot-distro`); the app detects Termux
   and calls `termux-wake-lock` (needs Termux:API). Termux:Boot/Termux:Widget can
   auto-start `devin-pocket`.
