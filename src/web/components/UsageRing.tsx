@@ -83,6 +83,9 @@ export function UsageRing({ state }: { state: SessionState }) {
                   style={{ width: `${pct}%`, background: usageColor(pct) }}
                 />
               </div>
+              <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+                {fmtTokens(usage.used)} / {fmtTokens(usage.size)}
+              </div>
             </div>
 
             <dl className="grid grid-cols-3 gap-2 text-center">
