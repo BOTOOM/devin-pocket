@@ -82,6 +82,15 @@ test('compact controls stay on one row with long settings on a narrow phone', as
   await page.getByText('Bypass Permissions', { exact: true }).last().click();
   await expect(page.locator('[data-chip="mode"]')).toContainText('Bypass Permissions');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  const tops = await page
+    .locator('[data-chip]')
+    .evaluateAll((buttons) =>
+      buttons
+        .filter((b) => ['mode', 'model', 'reasoning'].includes(b.getAttribute('data-chip') ?? ''))
+        .map((b) => b.getBoundingClientRect().top),
+    );
+  expect(tops).toHaveLength(3);
+  expect(new Set(tops).size).toBe(1);
   await page.locator('[data-chip="model"]').click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
