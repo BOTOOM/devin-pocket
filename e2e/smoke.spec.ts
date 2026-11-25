@@ -28,24 +28,69 @@ test('fake agent home → session → prompt → permission → tool and usage',
 });
 
 test('compact controls stay on one row with long settings on a narrow phone', async ({ page }) => {
+  // Design intent: chips lead the composer's scroll row, so at open they are
+  // visible without scrolling on a ~390px phone; at 320px mode+model stay
+  // fully visible and the rest is reachable by scrolling the row internally.
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto('/#/');
+    await startSession(page);
+    const vis = await page.locator('[data-chip="mode"]').evaluate((el) => {
+      const row = el.parentElement as HTMLElement;
+      const rowRect = row.getBoundingClientRect();
+      const chips = ['mode', 'model', 'reasoning'].map((c) => {
+        const r = (row.querySelector(`[data-chip="${c}"]`) as HTMLElement).getBoundingClientRect();
+        return {
+          chip: c,
+          top: r.top,
+          full: r.left >= rowRect.left - 1 && r.right <= rowRect.right + 1,
+        };
+      });
+      return {
+        scrollLeft: row.scrollLeft,
+        scrollable: row.scrollWidth > row.clientWidth + 1,
+        chips,
+      };
+    });
+    expect(vis.scrollLeft).toBeLessThanOrEqual(1);
+    expect(new Set(vis.chips.map((c) => c.top)).size).toBe(1);
+    const fullyVisible = vis.chips.filter((c) => c.full).map((c) => c.chip);
+    if (width >= 390) expect(fullyVisible).toEqual(['mode', 'model', 'reasoning']);
+    else expect(fullyVisible).toEqual(['mode', 'model']);
+    // the row — never the page — scrolls sideways to reach the remaining controls
+    expect(vis.scrollable).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    // scrolling the row to its end brings the trailing controls into view
+    const cmdVisible = await page.locator('[data-chip="mode"]').evaluate((el) => {
+      const row = el.parentElement as HTMLElement;
+      row.scrollLeft = row.scrollWidth;
+      const rowRect = row.getBoundingClientRect();
+      const buttons = Array.from(row.querySelectorAll('button'));
+      const last = buttons[buttons.length - 1].getBoundingClientRect();
+      return last.left >= rowRect.left - 1 && last.right <= rowRect.right + 1;
+    });
+    expect(cmdVisible).toBe(true);
+  }
+
+  // long labels truncate inside the chip instead of stretching the layout
   await page.setViewportSize({ width: 320, height: 800 });
   await page.goto('/#/');
   await startSession(page);
   await page.locator('[data-chip="mode"]').click();
   await page.getByText('Bypass Permissions', { exact: true }).last().click();
   await expect(page.locator('[data-chip="mode"]')).toContainText('Bypass Permissions');
-  const positions = await page.locator('[data-chip]').evaluateAll((buttons) =>
-    buttons
-      .filter((b) => ['mode', 'model', 'reasoning'].includes(b.getAttribute('data-chip') ?? ''))
-      .map((b) => {
-        const rect = b.getBoundingClientRect();
-        return { top: rect.top, right: rect.right };
-      }),
-  );
-  expect(positions).toHaveLength(3);
-  expect(new Set(positions.map((p) => p.top)).size).toBe(1);
-  expect(positions.every((p) => p.right <= 320)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  const tops = await page
+    .locator('[data-chip]')
+    .evaluateAll((buttons) =>
+      buttons
+        .filter((b) => ['mode', 'model', 'reasoning'].includes(b.getAttribute('data-chip') ?? ''))
+        .map((b) => b.getBoundingClientRect().top),
+    );
+  expect(tops).toHaveLength(3);
+  expect(new Set(tops).size).toBe(1);
   await page.locator('[data-chip="model"]').click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });

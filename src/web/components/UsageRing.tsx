@@ -20,7 +20,8 @@ function usageColor(pct: number): string {
   return 'var(--usage-high)';
 }
 
-export function UsageBar({ state }: { state: SessionState }) {
+/** Circular context-usage indicator; the ring fills as the context window fills. */
+export function UsageRing({ state }: { state: SessionState }) {
   const t = useT();
   const catalog = useStore((s) => s.catalog);
   const [open, setOpen] = useState(false);
@@ -31,27 +32,34 @@ export function UsageBar({ state }: { state: SessionState }) {
   const cost =
     usage.cost ?? (catalog.status === 'ready' ? estimateCost(state.turnStats, catalog) : undefined);
 
+  const r = 8;
+  const c = 2 * Math.PI * r;
+
   return (
     <>
       <button
         type="button"
-        className="flex w-full items-center gap-2"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full"
         data-chip="usage"
         onClick={() => setOpen(true)}
-        aria-label={t('usage.title')}
+        aria-label={`${t('usage.title')}: ${pct.toFixed(0)}%`}
+        title={`${t('usage.title')}: ${fmtTokens(usage.used)} / ${fmtTokens(usage.size)}`}
       >
-        <div
-          className="h-1.5 flex-1 overflow-hidden rounded-full"
-          style={{ background: 'var(--usage-track)' }}
-        >
-          <div
-            className="h-full rounded-full transition-[width]"
-            style={{ width: `${pct}%`, background: usageColor(pct) }}
+        <svg viewBox="0 0 20 20" className="size-6 -rotate-90" aria-hidden="true">
+          <circle cx="10" cy="10" r={r} fill="none" stroke="var(--usage-track)" strokeWidth="2.5" />
+          <circle
+            cx="10"
+            cy="10"
+            r={r}
+            fill="none"
+            stroke={usageColor(pct)}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray={c}
+            strokeDashoffset={c * (1 - pct / 100)}
+            className="transition-[stroke-dashoffset]"
           />
-        </div>
-        <span className="text-xs tabular-nums text-muted-foreground">
-          {fmtTokens(usage.used)} / {fmtTokens(usage.size)}
-        </span>
+        </svg>
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
@@ -74,6 +82,9 @@ export function UsageBar({ state }: { state: SessionState }) {
                   className="h-full rounded-full"
                   style={{ width: `${pct}%`, background: usageColor(pct) }}
                 />
+              </div>
+              <div className="mt-1 text-xs tabular-nums text-muted-foreground">
+                {fmtTokens(usage.used)} / {fmtTokens(usage.size)}
               </div>
             </div>
 
