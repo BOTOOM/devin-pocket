@@ -3,7 +3,6 @@ import { pickModelOptions } from '@shared/reducer';
 import { Check, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { ModelSheet } from '@/components/ModelSheet';
-import { UsageBar } from '@/components/UsageBar';
 import {
   Sheet,
   SheetContent,
@@ -23,7 +22,8 @@ const MODE_DESC: Record<string, string> = {
   bypass: 'Bypass — sin permisos, úsalo con cuidado / no permission prompts, use carefully',
 };
 
-export function StatusStrip({ state, sessionId }: { state?: SessionState; sessionId: string }) {
+/** Compact mode/model/reasoning chips + their sheets; rendered inside the composer row. */
+export function SessionChips({ state, sessionId }: { state?: SessionState; sessionId: string }) {
   const t = useT();
   const [sheet, setSheet] = useState<'mode' | 'model' | 'reason' | null>(null);
   if (!state) return null;
@@ -34,44 +34,38 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
   const speedValue = currentValue(speed);
   const modeName =
     state.modes.find((m) => m.id === state.currentMode)?.name ?? state.currentMode ?? '';
-  const controls = Number(state.modes.length > 0) + Number(!!model) + Number(!!reasonValue);
-  const columns =
-    controls === 3 ? 'grid-cols-[1fr_1.5fr_.8fr]' : controls === 2 ? 'grid-cols-2' : 'grid-cols-1';
 
   return (
-    <div className="pane-chat safe-x space-y-1.5 border-b px-4 py-2">
-      <div className={`grid max-w-xl min-w-0 items-center gap-1.5 ${columns}`}>
-        {state.modes.length > 0 && (
-          <Chip
-            chip="mode"
-            label={`${t('mode.title')}: ${modeName}`}
-            onClick={() => setSheet('mode')}
-            active={state.currentMode === 'bypass'}
-          >
-            {modeName || t('mode.title')}
-          </Chip>
-        )}
-        {model && (
-          <Chip
-            chip="model"
-            label={`${t('model.title')}: ${modelName ?? modelValue ?? ''}${speedValue === 'fast' ? ' · Fast' : ''}`}
-            onClick={() => setSheet('model')}
-          >
-            {modelName ?? modelValue ?? t('model.title')}
-            {speedValue === 'fast' && <span className="shrink-0 text-warning"> ⚡</span>}
-          </Chip>
-        )}
-        {reasoning && reasonValue && (
-          <Chip
-            chip="reasoning"
-            label={`${t('reasoning.title')}: ${reasonValue}`}
-            onClick={() => setSheet('reason')}
-          >
-            {reasonValue}
-          </Chip>
-        )}
-      </div>
-      {state.usage && <UsageBar state={state} />}
+    <>
+      {state.modes.length > 0 && (
+        <Chip
+          chip="mode"
+          label={`${t('mode.title')}: ${modeName}`}
+          onClick={() => setSheet('mode')}
+          active={state.currentMode === 'bypass'}
+        >
+          {modeName || t('mode.title')}
+        </Chip>
+      )}
+      {model && (
+        <Chip
+          chip="model"
+          label={`${t('model.title')}: ${modelName ?? modelValue ?? ''}${speedValue === 'fast' ? ' · Fast' : ''}`}
+          onClick={() => setSheet('model')}
+        >
+          {modelName ?? modelValue ?? t('model.title')}
+          {speedValue === 'fast' && <span className="shrink-0 text-warning"> ⚡</span>}
+        </Chip>
+      )}
+      {reasoning && reasonValue && (
+        <Chip
+          chip="reasoning"
+          label={`${t('reasoning.title')}: ${reasonValue}`}
+          onClick={() => setSheet('reason')}
+        >
+          {reasonValue}
+        </Chip>
+      )}
 
       <Sheet open={sheet === 'mode'} onOpenChange={(o) => !o && setSheet(null)}>
         <SheetContent side="bottom" className="safe-bottom">
@@ -153,7 +147,7 @@ export function StatusStrip({ state, sessionId }: { state?: SessionState; sessio
           </SheetContent>
         </Sheet>
       )}
-    </div>
+    </>
   );
 }
 
@@ -177,7 +171,7 @@ function Chip({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-medium ${
+      className={`flex h-8 min-w-0 max-w-28 shrink-0 items-center justify-center gap-1 rounded-full border px-2 text-xs font-medium md:max-w-44 ${
         active ? 'border-warning/60 bg-warning/15 text-warning' : 'bg-card'
       }`}
     >

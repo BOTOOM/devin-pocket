@@ -15,7 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CommandPalette } from '@/components/CommandPalette';
 import { DictationButton, DictationStatus } from '@/components/Dictation';
-import { currentValue, selectOptions } from '@/components/StatusStrip';
+import { currentValue, SessionChips, selectOptions } from '@/components/StatusStrip';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
@@ -484,7 +484,8 @@ export function Composer({
           }`}
         />
         <div className="flex items-center justify-between gap-2 p-1">
-          <div className="flex min-w-0 flex-wrap items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+            <SessionChips state={state} sessionId={sessionId} />
             <Button
               variant="ghost"
               size="icon"
@@ -525,9 +526,9 @@ export function Composer({
                 /
               </span>
             </Button>
-            <DictationButton dictation={dictation} disabled={!agentReady} />
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
+            <DictationButton dictation={dictation} disabled={!agentReady} />
             {working && (
               <Button
                 variant="destructive"

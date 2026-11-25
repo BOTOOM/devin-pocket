@@ -14,8 +14,8 @@ import { SessionList } from '@/components/Home';
 import { PermissionSheet } from '@/components/PermissionSheet';
 import { PlanPanel } from '@/components/PlanPanel';
 import { RenameDialog } from '@/components/RenameDialog';
-import { StatusStrip } from '@/components/StatusStrip';
 import { Transcript } from '@/components/Transcript';
+import { UsageRing } from '@/components/UsageRing';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -124,6 +124,7 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
             {baseName(cwd) || cwd}
           </div>
         </div>
+        {state && <UsageRing state={state} />}
         {btwOk && (
           <Button
             variant={asideOpen ? 'secondary' : 'ghost'}
@@ -166,8 +167,6 @@ export function ChatScreen({ sessionId }: { sessionId: string }) {
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
-
-      <StatusStrip state={state} sessionId={sessionId} />
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div data-testid="chat-column" className="pane-chat flex min-h-full flex-col">
